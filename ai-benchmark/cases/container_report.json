@@ -1,0 +1,67 @@
+{
+  "container_name": "AI Benchmark Container",
+  "objects": [
+    {
+      "id": "intrusion-set--0ec2f388-bf0f-4b5c-97b1-fc736d26c25f",
+      "name": "Kimsuky",
+      "type": "intrusion-set"
+    },
+    {
+      "id": "intrusion-set--bef4c620-0787-42a8-a96d-b7eb6e85917c",
+      "name": "APT28",
+      "type": "intrusion-set"
+    },
+    {
+      "id": "malware--1dac60f2-7d53-4a3e-95d1-cb2e875d5491",
+      "name": "InvisibleFerret",
+      "type": "malware"
+    },
+    {
+      "id": "malware--0450ed20-e9a7-4799-b601-2f2710300796",
+      "name": "BRICKSTORM",
+      "type": "malware"
+    },
+    {
+      "id": "malware--f5a56c26-e192-489d-a77e-a8b38fd70eee",
+      "name": "Kali365",
+      "type": "malware"
+    },
+    {
+      "id": "attack-pattern--543fceb5-cb92-40cb-aacf-6913d4db58bc",
+      "name": "SIP and Trust Provider Hijacking",
+      "type": "attack-pattern"
+    },
+    {
+      "id": "attack-pattern--c4ad009b-6e13-4419-8d21-918a1652de02",
+      "name": "Path Interception",
+      "type": "attack-pattern"
+    },
+    {
+      "id": "attack-pattern--72b5ef57-325c-411b-93ca-a3ca6fa17e31",
+      "name": "SIP and Trust Provider Hijacking",
+      "type": "attack-pattern"
+    },
+    {
+      "id": "attack-pattern--9422fc14-1c43-410d-ab0f-a709b76c72dc",
+      "name": "Registry Run Keys / Startup Folder",
+      "type": "attack-pattern"
+    },
+    {
+      "id": "tool--76f8a686-3157-481f-9af6-e8558883a8d6",
+      "name": "TruffleHog",
+      "type": "tool"
+    }
+  ],
+  "entity_names": [
+    "Kimsuky",
+    "APT28",
+    "InvisibleFerret",
+    "BRICKSTORM",
+    "Kali365",
+    "SIP and Trust Provider Hijacking",
+    "Path Interception",
+    "SIP and Trust Provider Hijacking",
+    "Registry Run Keys / Startup Folder",
+    "TruffleHog"
+  ]
+}

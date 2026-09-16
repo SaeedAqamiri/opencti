@@ -135,13 +135,11 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
   const [commitMutationExplain] = useApiMutation<TextFieldAskAIExplainMutation>(textFieldAskAIExplainMutation);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    if (isEnterpriseEdition) {
-      event.preventDefault();
-      if (isCGUStatusPending) {
-        setDisplayCGUDialog(true);
-      } else {
-        setMenuOpen({ open: true, anchorEl: event.currentTarget });
-      }
+    event.preventDefault();
+    if (isCGUStatusPending) {
+      setDisplayCGUDialog(true);
+    } else {
+      setMenuOpen({ open: true, anchorEl: event.currentTarget });
     }
   };
   const handleCloseMenu = () => {

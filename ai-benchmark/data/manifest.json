@@ -1,0 +1,24 @@
+{
+  "source": "https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json",
+  "frozen_at": "2026-09-15",
+  "sha256": "dc1639caa5501d720e280cf1cbd8fbe009884a0c9b3e6e9ed9d0c25166c3d8f4",
+  "note": "raw STIX object counts in this frozen snapshot (may include deprecated/revoked objects)",
+  "counts": {
+    "relationship": 21262,
+    "x-mitre-analytic": 1758,
+    "attack-pattern": 858,
+    "malware": 733,
+    "x-mitre-detection-strategy": 699,
+    "course-of-action": 268,
+    "intrusion-set": 191,
+    "x-mitre-data-component": 109,
+    "tool": 95,
+    "campaign": 56,
+    "x-mitre-data-source": 38,
+    "x-mitre-tactic": 15,
+    "x-mitre-collection": 1,
+    "x-mitre-matrix": 1,
+    "identity": 1,
+    "marking-definition": 1
+  }
+}

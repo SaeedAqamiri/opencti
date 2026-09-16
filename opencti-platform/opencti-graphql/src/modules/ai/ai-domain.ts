@@ -54,7 +54,6 @@ import { addAskAiQueryCount, addNlqQueryCount } from '../../manager/telemetryMan
 const SYSTEM_PROMPT = 'You are an assistant helping cyber threat intelligence analysts to generate text about cyber threat intelligence information or from a cyber threat intelligence knowledge graph based on the STIX 2.1 model.';
 
 export const fixSpelling = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('fix_spelling');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -75,7 +74,6 @@ export const fixSpelling = async (context: AuthContext, user: AuthUser, id: stri
 };
 
 export const makeShorter = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('make_shorter');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -96,7 +94,6 @@ export const makeShorter = async (context: AuthContext, user: AuthUser, id: stri
 };
 
 export const makeLonger = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('make_longer');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -119,7 +116,6 @@ export const makeLonger = async (context: AuthContext, user: AuthUser, id: strin
 
 // eslint-disable-next-line max-len
 export const changeTone = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text, tone: InputMaybe<Tone> = Tone.Tactical) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('change_tone');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -140,7 +136,6 @@ export const changeTone = async (context: AuthContext, user: AuthUser, id: strin
 };
 
 export const summarize = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('summarize');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -160,7 +155,6 @@ export const summarize = async (context: AuthContext, user: AuthUser, id: string
 };
 
 export const explain = async (context: AuthContext, user: AuthUser, id: string, content: string) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('explain');
   if (content.length < 5) {
     return `Content is too short (${content.length})`;
@@ -180,7 +174,6 @@ export const explain = async (context: AuthContext, user: AuthUser, id: string, 
 };
 
 export const generateContainerReport = async (context: AuthContext, user: AuthUser, args: MutationAiContainerGenerateReportArgs) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('container_report');
   const { id, containerId, paragraphs = 10, tone = 'technical', format = 'HTML', language = 'en-us' } = args;
   const paragraphsNumber = !paragraphs || paragraphs > 20 ? 20 : paragraphs;

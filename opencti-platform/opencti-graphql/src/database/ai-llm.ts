@@ -4,6 +4,7 @@ import { AzureChatOpenAI, ChatOpenAI } from '@langchain/openai';
 import { Mistral } from '@mistralai/mistralai';
 import type { ChatCompletionStreamRequest } from '@mistralai/mistralai/models/components';
 import { AuthenticationError, AzureOpenAI, OpenAI } from 'openai';
+import dns from 'node:dns';
 import conf, { BUS_TOPICS, logApp } from '../config/conf';
 import { UnknownError, UnsupportedError } from '../config/errors';
 import { OutputSchema } from '../modules/ai/ai-nlq-schema';
@@ -13,6 +14,10 @@ import type { AuthUser } from '../types/user';
 import { truncate } from '../utils/format';
 import { notify } from './redis';
 import { isEmptyField } from './utils';
+
+// Some LLM endpoints (e.g. api.z.ai) resolve to IPv6-only while the host may
+// have no IPv6 route; undici/fetch then hangs instead of falling back.
+dns.setDefaultResultOrder('ipv4first');
 
 const AI_ENABLED = conf.get('ai:enabled');
 const AI_TYPE = conf.get('ai:type');
@@ -65,6 +70,12 @@ if (AI_ENABLED && AI_TOKEN) {
       client = new OpenAI({
         apiKey: AI_TOKEN,
         ...(isEmptyField(AI_ENDPOINT) ? {} : { baseURL: AI_ENDPOINT }),
+        // Pin the global fetch implementation: esbuild-bundled SDK may otherwise
+        // pick its undici-based transport, which is flaky in some environments
+        // (e.g. IPv6-only DNS answers on hosts without an IPv6 route).
+        fetch: ((input: any, init?: any) => globalThis.fetch(input, init)) as any,
+        maxRetries: 4,
+        timeout: 180000,
       });
 
       nlqChat = new ChatOpenAI({
@@ -149,7 +160,7 @@ export const queryChatGpt = async (busId: string | null, developerMessage: strin
     const response = await (client as OpenAI)?.chat.completions.create({
       model: AI_MODEL,
       messages: [
-        { role: (AI_TYPE === 'azureopenai') ? 'system' : 'developer', content: developerMessage },
+        { role: 'system', content: developerMessage },
         { role: 'user', content: truncate(userMessage, AI_MAX_TOKENS, false) },
       ],
       stream: true,
@@ -171,6 +182,15 @@ export const queryChatGpt = async (busId: string | null, developerMessage: strin
     logApp.error('[AI] No response from OpenAI', { busId, developerMessage, userMessage });
     return 'No response from OpenAI';
   } catch (err) {
+    const dbg = err as { cause?: unknown };
+    const chain: unknown[] = [];
+    let cur: unknown = dbg.cause;
+    for (let i = 0; i < 4 && cur; i += 1) {
+      const c = cur as { message?: string; code?: string; name?: string; cause?: unknown };
+      chain.push({ name: c.name, code: c.code, message: c.message });
+      cur = c.cause;
+    }
+    logApp.error('[AI][DEBUG] OpenAI failure', { chain: JSON.stringify(chain) });
     logApp.error('[AI] Cannot query OpenAI', { cause: err });
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error

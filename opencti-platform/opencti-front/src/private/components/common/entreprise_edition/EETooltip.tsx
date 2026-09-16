@@ -48,7 +48,7 @@ const EETooltip = ({
     settings: { id: settingsId },
   } = useAuth();
 
-  if (isEnterpriseEdition && (!forAi || (forAi && enabled && configured))) {
+  if ((isEnterpriseEdition && !forAi) || (forAi && enabled && configured)) {
     return (
       <EETooltipComponent
         title={title ? t_i18n(title) : undefined}

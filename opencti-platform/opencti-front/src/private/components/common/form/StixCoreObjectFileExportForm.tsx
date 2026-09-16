@@ -388,7 +388,7 @@ const StixCoreObjectFileExportForm = ({
                       <Card
                         aria-label={t_i18n('Ask AI')}
                         variant="outlined"
-                        onClick={() => (isEnterpriseEdition && (enabled && configured) ? selectFormat(setFieldValue, 'ai') : null)}
+                        onClick={() => (enabled && configured ? selectFormat(setFieldValue, 'ai') : null)}
                         sx={{
                           textAlign: 'center',
                           height: 150,
