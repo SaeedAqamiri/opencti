@@ -10,11 +10,19 @@
 | **B. Grounded Bench** | L2 — Grounded Generation | container report / AI insights (activity, history, digest) / NLQ | فازهای ۲-۴ |
 | **C. Agent Bench** | L3 — Agentic | MCP search / graph traversal / investigation / write-action / permissions | فاز ۵ |
 
-## داده فریزشده
+## داده فریزشده (چهار دیتاست پروژه)
 
-- `data/enterprise-attack-2026-09-15.json` — snapshot از `mitre-attack/attack-stix-data` (STIX 2.1)
-- `data/manifest.json` + `data/sha256.txt` — هش و شمارش‌های **خام** snapshot (شامل موارد deprecated/revoked؛ ۲۶,۰۸۶ آبجکت)
-- برای تکرارپذیری، هارنس فقط از همین فایل golden می‌سازد.
+| # | Dataset | فایل | وضعیت |
+|---|---|---|---|
+| ۱ | MITRE ATT&CK (strategic/tactical گراف) | `data/enterprise-attack-2026-09-15.json` | ✅ import شد (22,915 آبجکت) |
+| ۲ | **AlienVault OTX snapshot** (operational IOC/indicator) | `data/otx-snapshot-2026-09-16.json` | ✅ فریز + import (ابزار: `fetch_otx_snapshot.py` — bounded به تارگت‌های موجود در گراف، لینک‌گذاری قطعی با نام، بدون heuristic) |
+| ۳ | Threat reports / PDFs (ورودی ساخت‌نیافته) | — | ⏳ |
+| ۴ | Gold test graph (پاسخ قطعی) | — | ⏳ |
+
+- `data/manifest.json` + `data/sha256.txt` — هش و شمارش‌های **خام** snapshot‌ها (شامل موارد deprecated/revoked)
+- فایل‌های JSON دیتاست gitignored هستند (فقط manifest/hash کامیت می‌شود)
+- برای تکرارپذیری، هارنس فقط از همین فایل‌های فریز golden می‌سازد.
+- نکته OTX: timestampهای OTX بدون `Z` هستند؛ `stix_ts()` در ابزار نرمال‌سازی می‌کند (باگ قبلی: رد شدن همه indicatorها با MISSING_REFERENCE).
 
 ## corpora برنامه‌ریزی‌شده (افزودنی‌های آینده)
 
