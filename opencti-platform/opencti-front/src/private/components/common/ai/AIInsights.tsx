@@ -199,7 +199,7 @@ const AIInsights = ({
   const [loading, setLoading] = useState(false);
   const isAdmin = useGranted([SETTINGS_SETPARAMETERS]);
 
-  const { fullyActive, enabled } = useAI();
+  const { fullyActive, enabled, configured } = useAI();
   const { xtmOneConfigured } = useChatbot();
   const useXtmOne = xtmOneConfigured === true;
 
@@ -271,7 +271,7 @@ const AIInsights = ({
   // TODO make the filter "objects" readonly?
   const [containersFilters] = useFiltersState(initialContainersFilters);
   if (!enabled) return null;
-  if (!isEnterpriseEdition && enabled) {
+  if (!configured && !useXtmOne) {
     return (
       <>
         <AiInsightButton

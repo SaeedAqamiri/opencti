@@ -160,9 +160,9 @@ def run_phase3():
 
     # Activity
     try:
-        d = gql('''query A($id: String!, $lang: String) {
+        d = gql('''query A($id: ID!, $lang: String) {
           stixCoreObjectAskAiActivity(id: $id, language: $lang) { result trend }
-        }''', {'id': target['id'], 'lang': 'English'})
+        }''', {'id': target['id'], 'lang': 'English'}, timeout=900)
         act = d['stixCoreObjectAskAiActivity']
         checks = [
             check('non-empty', len(act['result'] or '') > 200, f'len={len(act["result"] or "")}'),
@@ -181,9 +181,9 @@ def run_phase3():
 
     # History
     try:
-        d = gql('''query H($id: String!, $lang: String) {
+        d = gql('''query H($id: ID!, $lang: String) {
           stixCoreObjectAskAiHistory(id: $id, language: $lang) { result }
-        }''', {'id': target['id'], 'lang': 'English'})
+        }''', {'id': target['id'], 'lang': 'English'}, timeout=900)
         res = d['stixCoreObjectAskAiHistory']['result'] or ''
         checks = [check('non-empty', len(res) > 100, f'len={len(res)}'),
                   check('non-error', not res.startswith('An error occurred'), res[:120])]

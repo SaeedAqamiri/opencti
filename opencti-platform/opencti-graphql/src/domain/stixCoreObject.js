@@ -99,7 +99,6 @@ import { queryAi } from '../database/ai-llm';
 import { ENTITY_TYPE_THREAT_ACTOR_INDIVIDUAL } from '../modules/threatActorIndividual/threatActorIndividual-types';
 import { ENTITY_TYPE_IDENTITY_ORGANIZATION } from '../modules/organization/organization-types';
 import { ENTITY_TYPE_EVENT } from '../modules/event/event-types';
-import { checkEnterpriseEdition } from '../enterprise-edition/ee';
 import { AI_BUS } from '../modules/ai/ai-types';
 import { lockResources } from '../lock/master-lock';
 import { editAuthorizedMembers } from '../utils/authorizedMembers';
@@ -1086,7 +1085,6 @@ export const stixCoreObjectEditContext = async (context, user, stixCoreObjectId,
 
 // region ai
 export const aiActivity = async (context, user, args) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('activity');
 
   const { id, language = 'English', forceRefresh = false } = args;
@@ -1127,7 +1125,6 @@ export const aiActivity = async (context, user, args) => {
 };
 
 export const aiForecast = async (context, user, args) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('forecast');
 
   const { id, language = 'English', forceRefresh = false } = args;
@@ -1159,7 +1156,6 @@ export const aiForecast = async (context, user, args) => {
 };
 
 export const aiHistory = async (context, user, args) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('history');
   const { id, language = 'English', forceRefresh = false } = args;
   // Resolve in cache

@@ -30,7 +30,6 @@ import { editAuthorizedMembers } from '../utils/authorizedMembers';
 import { addFilter } from '../utils/filtering/filtering-utils';
 import { FunctionalError } from '../config/errors';
 import conf, { BUS_TOPICS, logApp } from '../config/conf';
-import { checkEnterpriseEdition } from '../enterprise-edition/ee';
 import { getContainerKnowledge, resolveFiles } from '../utils/ai/dataResolutionHelpers';
 import { queryAi } from '../database/ai-llm';
 import { notify } from '../database/redis';
@@ -281,7 +280,6 @@ export const containerEditAuthorizedMembers = async (context, user, entityId, in
 };
 
 export const aiSummary = async (context, user, args) => {
-  await checkEnterpriseEdition(context);
   addAskAiQueryCount('container_summary');
 
   const { busId = null, language = 'English', forceRefresh = false } = args;
