@@ -5,6 +5,7 @@ import { Mistral } from '@mistralai/mistralai';
 import type { ChatCompletionStreamRequest } from '@mistralai/mistralai/models/components';
 import { AuthenticationError, AzureOpenAI, OpenAI } from 'openai';
 import dns from 'node:dns';
+import { z } from 'zod';
 import conf, { BUS_TOPICS, logApp } from '../config/conf';
 import { UnknownError, UnsupportedError } from '../config/errors';
 import { OutputSchema } from '../modules/ai/ai-nlq-schema';
@@ -212,7 +213,10 @@ export const queryAi = async (busId: string | null, developerMessage: string | n
   }
 };
 
-// NLQ AI Query with LangChain's Chat Models
+// NLQ AI Query — structured output via OpenAI-compatible tool calling
+// (LangChain's withStructuredOutput hangs on some OpenAI-compatible gateways,
+// e.g. z.ai; the raw SDK tool-call path is reliable and returns the same
+// zod-validated Output).
 export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
   const badAiConfigError = UnsupportedError('Incorrect AI configuration for NLQ', {
     enabled: AI_ENABLED,
@@ -220,7 +224,7 @@ export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
     endpoint: AI_ENDPOINT,
     model: AI_MODEL,
   });
-  if (!nlqChat) {
+  if (!nlqChat || !client) {
     throw badAiConfigError;
   }
 
@@ -229,11 +233,67 @@ export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
 
   logApp.info('[NLQ] Querying AI model for structured output');
   try {
+    if (AI_TYPE === 'openai') {
+      const roleMap: Record<string, string> = { human: 'user', ai: 'assistant', system: 'system', tool: 'tool', function: 'function' };
+      const messages = promptValue.messages.map((m) => ({
+        role: roleMap[m._getType() as string] ?? 'user',
+        content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+      }));
+      // The NLQ prompt (system rules + few-shot examples) already teaches the
+      // exact output JSON shape; json_object mode is far more reliable on
+      // OpenAI-compatible gateways than a complex anyOf tool schema.
+      const response = await (client as OpenAI).chat.completions.create({
+        model: AI_MODEL,
+        messages: messages as { role: string; content: string }[],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        max_tokens: 16000,
+      });
+      const content = response.choices?.[0]?.message?.content ?? '{}';
+      // Some models wrap the payload ("{"success":true,"data":{…}}") — unwrap common envelopes.
+      let candidate: unknown = JSON.parse(content);
+      if (typeof candidate === 'object' && candidate !== null && 'data' in (candidate as object) && !('filters' in (candidate as object))) {
+        candidate = (candidate as { data: unknown }).data;
+      }
+      const parseWithSalvage = (payload: unknown): Output => {
+        try {
+          return OutputSchema.parse(payload);
+        } catch {
+          // drop invalid filter items, keep the valid ones (better partial than nothing)
+          const obj = (typeof payload === 'object' && payload !== null ? payload : {}) as { mode?: string; filters?: unknown[] };
+          const itemSchema = (OutputSchema as unknown as { shape: { filters: { element: { safeParse: (v: unknown) => { success: boolean } } } } }).shape.filters.element;
+          const filters = (obj.filters ?? []).filter((f) => itemSchema.safeParse(f).success);
+          return OutputSchema.parse({ mode: obj.mode === 'or' ? 'or' : 'and', filters });
+        }
+      };
+      try {
+        return parseWithSalvage(candidate);
+      } catch (e) {
+        // one self-repair round: show the model its invalid JSON + the validation errors
+        if (AI_TYPE !== 'openai') throw e;
+        const repair = await (client as OpenAI).chat.completions.create({
+          model: AI_MODEL,
+          messages: [
+            ...(messages as { role: string; content: string }[]),
+            { role: 'assistant', content: String(content) },
+            { role: 'user', content: `Your previous JSON was invalid: ${String(e).slice(0, 500)}. Return the corrected JSON only, same required shape.` },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0,
+          max_tokens: 16000,
+        });
+        let repaired: unknown = JSON.parse(repair.choices?.[0]?.message?.content ?? '{}');
+        if (typeof repaired === 'object' && repaired !== null && 'data' in (repaired as object) && !('filters' in (repaired as object))) {
+          repaired = (repaired as { data: unknown }).data;
+        }
+        return parseWithSalvage(repaired);
+      }
+    }
     return await nlqChat.withStructuredOutput<Output>(OutputSchema).invoke(promptValue);
   } catch (err) {
     if (err instanceof AuthenticationError) {
       throw badAiConfigError;
     }
-    throw UnknownError('Error when calling the NLQ model', { cause: err, promptValue });
+    throw UnknownError('Error when calling the NLQ model', { cause: err, error_message: String(err).slice(0, 500), promptValue });
   }
 };

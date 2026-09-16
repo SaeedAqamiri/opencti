@@ -210,16 +210,25 @@ def run_phase4():
             filters_raw = d['aiNLQ']['filters']
             filters = json.loads(filters_raw)
             checks.append(check('filters-produced', bool(filters.get('filters')), str(filters)[:120]))
-            golden = set(c['golden_ids'])
-            if golden:
-                data = gql('''query S($filters: FilterGroup!, $first: Int) {
-                  stixCoreObjects(first: $first, filters: $filters) { edges { node { id } } }
-                }''', {'filters': filters, 'first': 10000})
-                got = {e['node']['id'] for e in data['stixCoreObjects']['edges']}
-                j = jaccard(golden, got)
-                prec = len(golden & got) / max(len(got), 1)
-                rec = len(golden & got) / max(len(golden), 1)
-                checks.append(check('jaccard>=0.3', j >= 0.3, f'j={j:.2f} p={prec:.2f} r={rec:.2f}'))
+            golden_names = set(c.get('golden_names') or [])
+            if golden_names:
+                typed = {
+                    'Intrusion-Set': ('intrusionSets', 'IntrusionSet'),
+                    'Tool': ('tools', 'Tool'),
+                    'Malware': ('malwares', 'Malware'),
+                    'Attack-Pattern': ('attackPatterns', 'AttackPattern'),
+                    'Course-Of-Action': ('coursesOfAction', 'CourseOfAction'),
+                }.get(c.get('expect_entity_type'))
+                if typed:
+                    field, frag = typed
+                    data = gql(f'''query S($filters: FilterGroup, $first: Int) {{
+                      {field}(first: $first, filters: $filters) {{ edges {{ node {{ ... on {frag} {{ name }} }} }} }}
+                    }}''', {'filters': filters, 'first': 1000}, timeout=240)
+                    got = {e['node']['name'] for e in data[field]['edges'] if e['node'].get('name')}
+                    j = jaccard(golden_names, got)
+                    prec = len(golden_names & got) / max(len(got), 1)
+                    rec = len(golden_names & got) / max(len(golden_names), 1)
+                    checks.append(check('jaccard>=0.3', j >= 0.3, f'j={j:.2f} p={prec:.2f} r={rec:.2f}'))
         except Exception as e:  # noqa: BLE001
             err = str(e)
             results.append({'case': c['id'], 'phase': 4,

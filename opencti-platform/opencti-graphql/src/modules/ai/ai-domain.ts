@@ -318,6 +318,15 @@ export const convertFilesToStix = async (context: AuthContext, user: AuthUser, a
   return response;
 };
 
+// Prefer exact (case-insensitive) name matches over fuzzy score hits, and
+// skip revoked objects — full-text search otherwise ranks reports/observables
+// mentioning the value (e.g. OTX pulses about APT28) above the actual entity.
+const preferExactNameMatch = (nodes: { id: string; name?: string; revoked?: boolean }[], value: string): string[] => {
+  const lowered = value.toLowerCase();
+  const exact = nodes.filter((n) => !n.revoked && (n.name ?? '').toLowerCase() === lowered);
+  return (exact.length > 0 ? exact : nodes.filter((n) => !n.revoked).length > 0 ? nodes.filter((n) => !n.revoked) : nodes).map((n) => n.id);
+};
+
 const resolveValuesIdsMapForEntityTypes = async (context: AuthContext, user: AuthUser, valuesIdsToResolve: string[], entityTypes: string[]) => {
   const notResolvedValues: string[] = [];
   const mapContent = await Promise.all(valuesIdsToResolve.map(async (value): Promise<[string, string | null]> => {
@@ -325,13 +334,41 @@ const resolveValuesIdsMapForEntityTypes = async (context: AuthContext, user: Aut
     let resultIds: string[] = [];
     // case Stix-Core-Object
     if (entityTypes.every((type) => isStixCoreObject(type))) {
-      const result = await findStixCoreObjectPaginated(context, user, {
-        filters: entityTypesFilter,
-        search: value,
-        orderBy: '_score',
-        orderMode: 'desc',
-      });
-      resultIds = result.edges.map((n) => n.node.id);
+      // 1) exact-name, then alias lookup: full-text _score can rank mentions
+      //    (reports, malware descriptions) above the actual entity, and merged
+      //    entities keep their old names as aliases only.
+      try {
+        const exactFilter = addFilter(addFilter(undefined, 'name', [value]), 'entity_type', entityTypes);
+        const exact = await findStixCoreObjectPaginated(context, user, { filters: exactFilter, first: 3 });
+        if (exact.edges.length > 0) {
+          resultIds = exact.edges.map((n) => n.node.id);
+        } else {
+          try {
+            const aliasFilter = addFilter(addFilter(undefined, 'aliases', [value]), 'entity_type', entityTypes);
+            const alias = await findStixCoreObjectPaginated(context, user, { filters: aliasFilter, first: 3 });
+            if (alias.edges.length > 0) {
+              resultIds = alias.edges.map((n) => n.node.id);
+            }
+          } catch { /* alias filter not applicable for these types */ }
+        }
+        if (resultIds.length === 0) {
+          const result = await findStixCoreObjectPaginated(context, user, {
+            filters: entityTypesFilter,
+            search: value,
+            orderBy: '_score',
+            orderMode: 'desc',
+          });
+          resultIds = preferExactNameMatch(result.edges.map((n) => n.node), value);
+        }
+      } catch {
+        const result = await findStixCoreObjectPaginated(context, user, {
+          filters: entityTypesFilter,
+          search: value,
+          orderBy: '_score',
+          orderMode: 'desc',
+        });
+        resultIds = preferExactNameMatch(result.edges.map((n) => n.node), value);
+      }
     } else if (entityTypes.length === 1 && entityTypes.includes(ENTITY_TYPE_USER)) { // case User
       const result = await findUserPaginated(context, user, {
         filters: entityTypesFilter,
@@ -412,7 +449,6 @@ export const filtersEntityIdsMapping = async (context: AuthContext, user: AuthUs
 };
 
 export const generateNLQresponse = async (context: AuthContext, user: AuthUser, args: MutationAiNlqArgs) => {
-  await checkEnterpriseEdition(context);
   // Counted here (feature entry point) rather than in the LLM client so the
   // metric stays backend-agnostic if NLQ is ever served by XTM One.
   addNlqQueryCount();

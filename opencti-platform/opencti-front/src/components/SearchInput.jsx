@@ -74,7 +74,7 @@ const SearchInput = (props) => {
     }
   }, [keyword]);
 
-  const isAIEnabled = variant === 'topBar' && isEnterpriseEdition && enabled && configured;
+  const isAIEnabled = variant === 'topBar' && enabled && configured;
   const isNLQActivated = isAIEnabled && isNlqMode(mode);
   const isAdmin = useGranted([SETTINGS_SETPARAMETERS]);
   const { settings: { id: settingsId } } = useAuth();

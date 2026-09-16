@@ -47,10 +47,10 @@ for r in rels:
 def ids_by_name(t, pattern):
     return {o['id'] for o in sdos[t] if pattern.lower() in o.get('name', '').lower()}
 
-phishing_patterns = {i for p in ['phishing', 'spearphishing']
-                     for i in ids_by_name('attack-pattern', p)}
+t1566 = {o['id'] for o in sdos['attack-pattern']
+         if any(e.get('external_id') == 'T1566' for e in o.get('external_references', []))}
 phishing_users = set()
-for ap in phishing_patterns:
+for ap in t1566:
     phishing_users |= {s for s in in_uses.get(ap, set()) if s.startswith('intrusion-set--')}
 
 apt28 = ids_by_name('intrusion-set', 'APT28')
@@ -70,6 +70,10 @@ for m in zebrocy:
 if not zebrocy_coas:  # fallback: COAs mitigating the Phishing technique
     for ap in ids_by_name('attack-pattern', 'Phishing'):
         zebrocy_coas |= {s for s in mitigates.get(ap, set()) if s.startswith('course-of-action--')}
+
+def names_of(ids):
+    return sorted({by_id[i].get('name') for i in ids if i in by_id and by_id[i].get('name')})
+
 
 nlq_cases = [
     {
@@ -103,6 +107,8 @@ nlq_cases = [
         'expect_entity_type': 'Course-Of-Action',
     },
 ]
+for c in nlq_cases:
+    c['golden_names'] = names_of(c['golden_ids'])
 json.dump(nlq_cases, open(OUT / 'nlq.json', 'w'), indent=2)
 
 # ── text actions (phase 1) ────────────────────────────────────────────────
