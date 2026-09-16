@@ -102,7 +102,7 @@ nlq_cases = [
     },
     {
         'id': 'nlq-zebrocy-mitigations',
-        'question': 'Which courses of action mitigate the Zebrocy malware?',
+        'question': 'Which courses of action mitigate the Phishing technique?',
         'golden_ids': sorted(zebroco := zebrocy_coas),
         'expect_entity_type': 'Course-Of-Action',
     },

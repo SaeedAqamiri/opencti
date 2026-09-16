@@ -585,6 +585,37 @@ export const jsonFewShotExamples: {
   },
   {
     _comment: '',
+    input: 'Which courses of action mitigate the Phishing technique?',
+    output: {
+      mode: 'and',
+      filters: [
+        {
+          key: 'regardingOf',
+          operator: 'eq',
+          values: [
+            {
+              key: 'relationship_type',
+              values: ['mitigates'],
+            },
+            {
+              key: 'id',
+              values: ['Phishing'],
+            },
+          ],
+          mode: 'or',
+        },
+        {
+          key: 'entity_type',
+          operator: 'eq',
+          values: ['Course-Of-Action'],
+          mode: 'or',
+        },
+      ],
+      filterGroups: [],
+    },
+  },
+  {
+    _comment: '',
     input: 'Find all incidents linked to APT28.',
     output: {
       mode: 'and',
