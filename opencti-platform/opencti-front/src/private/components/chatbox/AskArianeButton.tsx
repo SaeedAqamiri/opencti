@@ -37,8 +37,9 @@ const AskArianeButton = () => {
   const [openValidateTermsOfUse, setOpenValidateTermsOfUse] = useState(false);
 
   // Local opencti-agent chat: EE and Filigran CGU are not required — the chat
-  // is served by the on-prem agent. XTM One chat keeps its full gate stack.
-  const isChatbotEnabled = (isEnterpriseEdition || localAgentMode) && isChatbotAiEnabled();
+  // is served by the on-prem agent. XTM One chat keeps its full gate stack
+  // (isChatbotAiEnabled() is the CGU status, a Filigran-services concept).
+  const isChatbotEnabled = (isEnterpriseEdition && isChatbotAiEnabled()) || localAgentMode;
   const useLegacy = xtmOneConfigured === false && !localAgentMode;
   const localOnly = !isEnterpriseEdition && localAgentMode;
 
