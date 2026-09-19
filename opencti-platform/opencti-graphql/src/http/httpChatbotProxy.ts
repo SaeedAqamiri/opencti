@@ -290,7 +290,9 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
     };
     // Immediate thinking status — the agent runs tools for tens of seconds
     // before its first delta; the widget must show activity, not a frozen "…".
-    emit({ action: 'status', status: 'thinking_text', thinkingContent: 'Analyzing the knowledge graph…' });
+    // REST wire format: events carry `type` (the widget normalizer maps
+    // type/status/content onto its internal actions — `action` is IGNORED).
+    emit({ type: 'status', status: 'thinking_text', content: 'Analyzing the knowledge graph…' });
     const response = await httpClient.post('/ask', {
       question: content,
       mode: 'chat',
@@ -315,7 +317,7 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
           const evt = JSON.parse(payload);
           if (typeof evt.delta === 'string') {
             full += evt.delta;
-            emit({ action: 'stream', content: evt.delta });
+            emit({ type: 'stream', content: evt.delta });
           } else if (evt.task_id) {
             meta = evt;
           }
@@ -326,20 +328,19 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
       const toolCalls = Array.isArray(meta.tool_calls) ? meta.tool_calls : [];
       const incomplete = Boolean(meta.incomplete);
       emit({
-        action: 'done',
-        conversationId: conversationId ?? undefined,
+        type: 'done',
+        conversation_id: conversationId ?? undefined,
         content: full,
-        toolNames: [...new Set(toolCalls)],
-        toolCallCount: toolCalls.length,
+        tool_names: [...new Set(toolCalls)],
+        tool_call_count: toolCalls.length,
         iterations: toolCalls.length,
-        toolCallTrace: toolCalls.map((t: string) => ({ name: t, success: true })),
-        isTruncated: incomplete,
+        is_truncated: incomplete,
       });
       res.end();
     });
     response.data.on('error', (error: Error) => {
       logApp.error('Stream error in local chatbot proxy', { cause: error });
-      emit({ action: 'error', content: 'The local agent stream failed.' });
+      emit({ type: 'error', content: 'The local agent stream failed.' });
       res.end();
     });
     req.on('close', () => {
