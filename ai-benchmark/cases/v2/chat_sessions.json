@@ -1,0 +1,21 @@
+{
+  "endpoint_contract": {
+    "sessions": {
+      "create": "POST /ai-agent/sessions {} -> {id}",
+      "get": "GET /ai-agent/sessions/:id -> {id, messages:[{role, content, ts}]}",
+      "list": "GET /ai-agent/sessions -> [{id}]",
+      "delete": "DELETE /ai-agent/sessions/:id -> 204"
+    },
+    "ask": "POST /ai-agent/ask {question, session_id} -> {answer}",
+    "stream": "POST /ai-agent/ask {question, stream:true} -> SSE (content-type text/event-stream); each data: line is JSON {delta} (optional per event); ends with data: [DONE]",
+    "note": "Functional (infra) suite — no LLM quality claims beyond deterministic nonce persistence markers."
+  },
+  "cases": [
+    {"id": "chat-create-persist", "kind": "persist", "nonce": "BRICK7-KILO-347", "suite": "regression"},
+    {"id": "chat-isolation", "kind": "isolation", "nonce": "BRICK7-KILO-347", "suite": "regression"},
+    {"id": "chat-history-order", "kind": "history_order", "suite": "regression"},
+    {"id": "chat-delete", "kind": "delete", "suite": "regression"},
+    {"id": "chat-list", "kind": "list", "suite": "regression"},
+    {"id": "chat-streaming", "kind": "streaming", "suite": "regression"}
+  ]
+}

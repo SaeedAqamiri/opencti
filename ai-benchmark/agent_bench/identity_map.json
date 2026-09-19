@@ -1,0 +1,2702 @@
+[
+  {
+    "benchmark_entity_key": "malware-advstoreshell",
+    "source_identifier": "S0045",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "ADVSTORESHELL",
+    "aliases": [
+      "ADVSTORESHELL",
+      "AZZY",
+      "EVILTOSS",
+      "NETUI",
+      "Sedreco"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt-c-36",
+    "source_identifier": "G0099",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT-C-36",
+    "aliases": [
+      "APT-C-36",
+      "Blind Eagle",
+      "TAG-144",
+      "AguilaCiega",
+      "APT-Q-98"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt1",
+    "source_identifier": "G0006",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT1",
+    "aliases": [
+      "APT1",
+      "Comment Crew",
+      "Comment Group",
+      "Comment Panda"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt19",
+    "source_identifier": "G0073",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT19",
+    "aliases": [
+      "APT19",
+      "Codoso",
+      "C0d0so0",
+      "Codoso Team",
+      "Sunshop Group"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt28",
+    "source_identifier": "G0007",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT28",
+    "aliases": [
+      "APT28",
+      "IRON TWILIGHT",
+      "SNAKEMACKEREL",
+      "Swallowtail",
+      "Group 74",
+      "Sednit",
+      "Sofacy",
+      "Pawn Storm",
+      "Fancy Bear",
+      "STRONTIUM",
+      "Tsar Team",
+      "Threat Group-4127",
+      "TG-4127",
+      "Forest Blizzard",
+      "FROZENLAKE",
+      "GruesomeLarch"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt29",
+    "source_identifier": "G0016",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT29",
+    "aliases": [
+      "APT29",
+      "IRON RITUAL",
+      "IRON HEMLOCK",
+      "NobleBaron",
+      "Dark Halo",
+      "NOBELIUM",
+      "UNC2452",
+      "YTTRIUM",
+      "The Dukes",
+      "Cozy Bear",
+      "CozyDuke",
+      "SolarStorm",
+      "Blue Kitsune",
+      "UNC3524",
+      "Midnight Blizzard"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt3",
+    "source_identifier": "G0022",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT3",
+    "aliases": [
+      "APT3",
+      "Gothic Panda",
+      "Pirpi",
+      "UPS Team",
+      "Buckeye",
+      "Threat Group-0110",
+      "TG-0110"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt32",
+    "source_identifier": "G0050",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT32",
+    "aliases": [
+      "APT32",
+      "SeaLotus",
+      "OceanLotus",
+      "APT-C-00",
+      "Canvas Cyclone",
+      "BISMUTH"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt33",
+    "source_identifier": "G0064",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT33",
+    "aliases": [
+      "APT33",
+      "HOLMIUM",
+      "Elfin",
+      "Peach Sandstorm"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt37",
+    "source_identifier": "G0067",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT37",
+    "aliases": [
+      "APT37",
+      "InkySquid",
+      "ScarCruft",
+      "Reaper",
+      "Group123",
+      "TEMP.Reaper",
+      "Ricochet Chollima"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt38",
+    "source_identifier": "G0082",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT38",
+    "aliases": [
+      "APT38",
+      "NICKEL GLADSTONE",
+      "BeagleBoyz",
+      "Bluenoroff",
+      "Stardust Chollima",
+      "Sapphire Sleet",
+      "COPERNICIUM"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt39",
+    "source_identifier": "G0087",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT39",
+    "aliases": [
+      "APT39",
+      "ITG07",
+      "Chafer",
+      "Remix Kitten"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt41",
+    "source_identifier": "G0096",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT41",
+    "aliases": [
+      "APT41",
+      "Wicked Panda",
+      "Brass Typhoon",
+      "BARIUM"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt42",
+    "source_identifier": "G1044",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT42",
+    "aliases": [
+      "APT42"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-apt5",
+    "source_identifier": "G1023",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "APT5",
+    "aliases": [
+      "APT5",
+      "Mulberry Typhoon",
+      "MANGANESE",
+      "BRONZE FLEETWOOD",
+      "Keyhole Panda",
+      "UNC2630"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-account-use-policies",
+    "source_identifier": "M1036",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Account Use Policies",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-active-directory-configuration",
+    "source_identifier": "M1015",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Active Directory Configuration",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-agrius",
+    "source_identifier": "G1030",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Agrius",
+    "aliases": [
+      "Agrius",
+      "Pink Sandstorm",
+      "AMERICIUM",
+      "Agonizing Serpens",
+      "BlackShadow"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-antivirus-antimalware",
+    "source_identifier": "M1049",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Antivirus/Antimalware",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-application-developer-guidance",
+    "source_identifier": "M1013",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Application Developer Guidance",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-application-isolation-and-sandboxing",
+    "source_identifier": "M1048",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Application Isolation and Sandboxing",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-aquatic-panda",
+    "source_identifier": "G0143",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Aquatic Panda",
+    "aliases": [
+      "Aquatic Panda"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-audit",
+    "source_identifier": "M1047",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Audit",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-bitter",
+    "source_identifier": "G1002",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "BITTER",
+    "aliases": [
+      "BITTER",
+      "T-APT-17"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-bronze-butler",
+    "source_identifier": "G0060",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "BRONZE BUTLER",
+    "aliases": [
+      "BRONZE BUTLER",
+      "REDBALDKNIGHT",
+      "Tick"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-behavior-prevention-on-endpoint",
+    "source_identifier": "M1040",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Behavior Prevention on Endpoint",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-blackbyte",
+    "source_identifier": "G1043",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "BlackByte",
+    "aliases": [
+      "BlackByte",
+      "Hecamede"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-blue-mockingbird",
+    "source_identifier": "G0108",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Blue Mockingbird",
+    "aliases": [
+      "Blue Mockingbird"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-boot-integrity",
+    "source_identifier": "M1046",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Boot Integrity",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-chopstick",
+    "source_identifier": "S0023",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "CHOPSTICK",
+    "aliases": [
+      "CHOPSTICK",
+      "Backdoor.SofacyX",
+      "SPLM",
+      "Xagent",
+      "X-Agent",
+      "webhp"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-coreshell",
+    "source_identifier": "S0137",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "CORESHELL",
+    "aliases": [
+      "CORESHELL",
+      "Sofacy",
+      "SOURFACE"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-curium",
+    "source_identifier": "G1012",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "CURIUM",
+    "aliases": [
+      "CURIUM",
+      "Crimson Sandstorm",
+      "TA456",
+      "Tortoise Shell",
+      "Yellow Liderc"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-cannon",
+    "source_identifier": "S0351",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Cannon",
+    "aliases": [
+      "Cannon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-chimera",
+    "source_identifier": "G0114",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Chimera",
+    "aliases": [
+      "Chimera"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-cinnamon-tempest",
+    "source_identifier": "G1021",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Cinnamon Tempest",
+    "aliases": [
+      "Cinnamon Tempest",
+      "DEV-0401",
+      "Emperor Dragonfly",
+      "BRONZE STARLIGHT"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-cobalt-group",
+    "source_identifier": "G0080",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Cobalt Group",
+    "aliases": [
+      "Cobalt Group",
+      "GOLD KINGSWOOD",
+      "Cobalt Gang",
+      "Cobalt Spider"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-code-signing",
+    "source_identifier": "M1045",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Code Signing",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-confucius",
+    "source_identifier": "G0142",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Confucius",
+    "aliases": [
+      "Confucius",
+      "Confucius APT"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-contagious-interview",
+    "source_identifier": "G1052",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Contagious Interview",
+    "aliases": [
+      "Contagious Interview",
+      "DeceptiveDevelopment",
+      "Gwisin Gang",
+      "Tenacious Pungsan",
+      "DEV#POPPER",
+      "PurpleBravo",
+      "TAG-121"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-credential-access-protection",
+    "source_identifier": "M1043",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Credential Access Protection",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-daggerfly",
+    "source_identifier": "G1034",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Daggerfly",
+    "aliases": [
+      "Daggerfly",
+      "Evasive Panda",
+      "BRONZE HIGHLAND"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-darkhotel",
+    "source_identifier": "G0012",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Darkhotel",
+    "aliases": [
+      "Darkhotel",
+      "DUBNIUM",
+      "Zigzag Hail"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-data-loss-prevention",
+    "source_identifier": "M1057",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Data Loss Prevention",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-dealerschoice",
+    "source_identifier": "S0243",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "DealersChoice",
+    "aliases": [
+      "DealersChoice"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-disable-or-remove-feature-or-program",
+    "source_identifier": "M1042",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Disable or Remove Feature or Program",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-downdelph",
+    "source_identifier": "S0134",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Downdelph",
+    "aliases": [
+      "Downdelph",
+      "Delphacy"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-dragonfly",
+    "source_identifier": "G0035",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Dragonfly",
+    "aliases": [
+      "Dragonfly",
+      "TEMP.Isotope",
+      "DYMALLOY",
+      "Berserk Bear",
+      "TG-4192",
+      "Crouching Yeti",
+      "IRON LIBERTY",
+      "Energetic Bear",
+      "Ghost Blizzard",
+      "BROMINE"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-drovorub",
+    "source_identifier": "S0502",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Drovorub",
+    "aliases": [
+      "Drovorub"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-exotic-lily",
+    "source_identifier": "G1011",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "EXOTIC LILY",
+    "aliases": [
+      "EXOTIC LILY"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-earth-lusca",
+    "source_identifier": "G1006",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Earth Lusca",
+    "aliases": [
+      "Earth Lusca",
+      "TAG-22",
+      "Charcoal Typhoon",
+      "CHROMIUM",
+      "ControlX"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-ember-bear",
+    "source_identifier": "G1003",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Ember Bear",
+    "aliases": [
+      "Ember Bear",
+      "UNC2589",
+      "Bleeding Bear",
+      "DEV-0586",
+      "Cadet Blizzard",
+      "Frozenvista",
+      "UAC-0056"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-encrypt-sensitive-information",
+    "source_identifier": "M1041",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Encrypt Sensitive Information",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-execution-prevention",
+    "source_identifier": "M1038",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Execution Prevention",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-exploit-protection",
+    "source_identifier": "M1050",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Exploit Protection",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-fin13",
+    "source_identifier": "G1016",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "FIN13",
+    "aliases": [
+      "FIN13",
+      "Elephant Beetle"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-fin6",
+    "source_identifier": "G0037",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "FIN6",
+    "aliases": [
+      "FIN6",
+      "Magecart Group 6",
+      "ITG08",
+      "Skeleton Spider",
+      "TAAL",
+      "Camouflage Tempest"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-fin7",
+    "source_identifier": "G0046",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "FIN7",
+    "aliases": [
+      "FIN7",
+      "GOLD NIAGARA",
+      "ITG14",
+      "Carbon Spider",
+      "ELBRUS",
+      "Sangria Tempest"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-fin8",
+    "source_identifier": "G0061",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "FIN8",
+    "aliases": [
+      "FIN8",
+      "Syssphinx"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-filter-network-traffic",
+    "source_identifier": "M1037",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Filter Network Traffic",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-forfiles",
+    "source_identifier": "S0193",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Forfiles",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-fox-kitten",
+    "source_identifier": "G0117",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Fox Kitten",
+    "aliases": [
+      "Fox Kitten",
+      "UNC757",
+      "Parisite",
+      "Pioneer Kitten",
+      "RUBIDIUM",
+      "Lemon Sandstorm"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-fysbis",
+    "source_identifier": "S0410",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Fysbis",
+    "aliases": [
+      "Fysbis"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-gallium",
+    "source_identifier": "G0093",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "GALLIUM",
+    "aliases": [
+      "GALLIUM",
+      "Granite Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-gamaredon-group",
+    "source_identifier": "G0047",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Gamaredon Group",
+    "aliases": [
+      "Gamaredon Group",
+      "IRON TILDEN",
+      "Primitive Bear",
+      "ACTINIUM",
+      "Armageddon",
+      "Shuckworm",
+      "DEV-0157",
+      "Aqua Blizzard",
+      "NastyShrew"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-gorgon-group",
+    "source_identifier": "G0078",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Gorgon Group",
+    "aliases": [
+      "Gorgon Group"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-hafnium",
+    "source_identifier": "G0125",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "HAFNIUM",
+    "aliases": [
+      "HAFNIUM",
+      "Operation Exchange Marauder",
+      "Silk Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-hexane",
+    "source_identifier": "G1001",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "HEXANE",
+    "aliases": [
+      "HEXANE",
+      "Lyceum",
+      "Siamesekitten",
+      "Spirlin"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-hidedrv",
+    "source_identifier": "S0135",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "HIDEDRV",
+    "aliases": [
+      "HIDEDRV"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-higaisa",
+    "source_identifier": "G0126",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Higaisa",
+    "aliases": [
+      "Higaisa"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-inc-ransom",
+    "source_identifier": "G1032",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "INC Ransom",
+    "aliases": [
+      "INC Ransom",
+      "GOLD IONIC"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-inception",
+    "source_identifier": "G0100",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Inception",
+    "aliases": [
+      "Inception",
+      "Inception Framework",
+      "Cloud Atlas"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-indrik-spider",
+    "source_identifier": "G0119",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Indrik Spider",
+    "aliases": [
+      "Indrik Spider",
+      "Evil Corp",
+      "Manatee Tempest",
+      "DEV-0243",
+      "UNC2165"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-jhuhugit",
+    "source_identifier": "S0044",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "JHUHUGIT",
+    "aliases": [
+      "JHUHUGIT",
+      "Trojan.Sofacy",
+      "Seduploader",
+      "JKEYSKW",
+      "Sednit",
+      "GAMEFISH",
+      "SofacyCarberp"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-ke3chang",
+    "source_identifier": "G0004",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Ke3chang",
+    "aliases": [
+      "Ke3chang",
+      "APT15",
+      "Mirage",
+      "Vixen Panda",
+      "GREF",
+      "Playful Dragon",
+      "RoyalAPT",
+      "NICKEL",
+      "Nylon Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-koadic",
+    "source_identifier": "S0250",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Koadic",
+    "aliases": [
+      "Koadic"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-komplex",
+    "source_identifier": "S0162",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Komplex",
+    "aliases": [
+      "Komplex"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-lamehug",
+    "source_identifier": "S9035",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "LAMEHUG",
+    "aliases": [
+      "LAMEHUG",
+      "PROMPTSTEAL"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-lapsus",
+    "source_identifier": "G1004",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "LAPSUS$",
+    "aliases": [
+      "LAPSUS$",
+      "DEV-0537",
+      "Strawberry Tempest"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-lazarus-group",
+    "source_identifier": "G0032",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Lazarus Group",
+    "aliases": [
+      "Lazarus Group",
+      "Labyrinth Chollima",
+      "HIDDEN COBRA",
+      "Guardians of Peace",
+      "ZINC",
+      "NICKEL ACADEMY",
+      "Diamond Sleet"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-lazyscripter",
+    "source_identifier": "G0140",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "LazyScripter",
+    "aliases": [
+      "LazyScripter"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-leviathan",
+    "source_identifier": "G0065",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Leviathan",
+    "aliases": [
+      "Leviathan",
+      "MUDCARP",
+      "Kryptonite Panda",
+      "Gadolinium",
+      "BRONZE MOHAWK",
+      "TEMP.Jumper",
+      "APT40",
+      "TEMP.Periscope",
+      "Gingham Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-limit-access-to-resource-over-network",
+    "source_identifier": "M1035",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Limit Access to Resource Over Network",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-limit-hardware-installation",
+    "source_identifier": "M1034",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Limit Hardware Installation",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-limit-software-installation",
+    "source_identifier": "M1033",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Limit Software Installation",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-lojax",
+    "source_identifier": "S0397",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "LoJax",
+    "aliases": [
+      "LoJax"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-lotus-blossom",
+    "source_identifier": "G0030",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Lotus Blossom",
+    "aliases": [
+      "Lotus Blossom",
+      "DRAGONFISH",
+      "Spring Dragon",
+      "RADIUM",
+      "Raspberry Typhoon",
+      "Bilbug",
+      "Thrip"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-luminousmoth",
+    "source_identifier": "G1014",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "LuminousMoth",
+    "aliases": [
+      "LuminousMoth"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-magic-hound",
+    "source_identifier": "G0059",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Magic Hound",
+    "aliases": [
+      "Magic Hound",
+      "TA453",
+      "COBALT ILLUSION",
+      "Charming Kitten",
+      "ITG18",
+      "Phosphorus",
+      "Newscaster",
+      "APT35",
+      "Mint Sandstorm"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-malteiro",
+    "source_identifier": "G1026",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Malteiro",
+    "aliases": [
+      "Malteiro"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-medusa-group",
+    "source_identifier": "G1051",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Medusa Group",
+    "aliases": [
+      "Medusa Group"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-mimikatz",
+    "source_identifier": "S0002",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Mimikatz",
+    "aliases": [
+      "Mimikatz"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-mirrorface",
+    "source_identifier": "G1054",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "MirrorFace",
+    "aliases": [
+      "MirrorFace",
+      "Earth Kasha"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-molerats",
+    "source_identifier": "G0021",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Molerats",
+    "aliases": [
+      "Molerats",
+      "Operation Molerats",
+      "Gaza Cybergang"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-moonstone-sleet",
+    "source_identifier": "G1036",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Moonstone Sleet",
+    "aliases": [
+      "Moonstone Sleet",
+      "Storm-1789"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-muddywater",
+    "source_identifier": "G0069",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "MuddyWater",
+    "aliases": [
+      "MuddyWater",
+      "Earth Vetala",
+      "MERCURY",
+      "Static Kitten",
+      "Seedworm",
+      "TEMP.Zagros",
+      "Mango Sandstorm",
+      "TA450",
+      "MuddyKrill"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-multi-factor-authentication",
+    "source_identifier": "M1032",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Multi-factor Authentication",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-mustang-panda",
+    "source_identifier": "G0129",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Mustang Panda",
+    "aliases": [
+      "Mustang Panda",
+      "TA416",
+      "RedDelta",
+      "BRONZE PRESIDENT",
+      "STATELY TAURUS",
+      "FIREANT",
+      "CAMARO DRAGON",
+      "EARTH PRETA",
+      "HIVE0154",
+      "TWILL TYPHOON",
+      "TANTALUM",
+      "LUMINOUS MOTH",
+      "UNC6384",
+      "TEMP.Hex",
+      "Red Lich",
+      "ClumsyToad"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-net",
+    "source_identifier": "S0039",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Net",
+    "aliases": [
+      "Net",
+      "net.exe"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-network-intrusion-prevention",
+    "source_identifier": "M1031",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Network Intrusion Prevention",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-network-segmentation",
+    "source_identifier": "M1030",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Network Segmentation",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-oldbait",
+    "source_identifier": "S0138",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "OLDBAIT",
+    "aliases": [
+      "OLDBAIT",
+      "Sasfis"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-oilrig",
+    "source_identifier": "G0049",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "OilRig",
+    "aliases": [
+      "OilRig",
+      "COBALT GYPSY",
+      "IRN2",
+      "APT34",
+      "Helix Kitten",
+      "Evasive Serpens",
+      "Hazel Sandstorm",
+      "EUROPIUM",
+      "ITG13",
+      "Earth Simnavaz",
+      "Crambus",
+      "TA452"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-operating-system-configuration",
+    "source_identifier": "M1028",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Operating System Configuration",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-out-of-band-communications-channel",
+    "source_identifier": "M1060",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Out-of-Band Communications Channel",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-password-policies",
+    "source_identifier": "M1027",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Password Policies",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-patchwork",
+    "source_identifier": "G0040",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Patchwork",
+    "aliases": [
+      "Patchwork",
+      "Hangover Group",
+      "Dropping Elephant",
+      "Chinastrats",
+      "MONSOON",
+      "Operation Hangover"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-play",
+    "source_identifier": "G1040",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Play",
+    "aliases": [
+      "Play"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-pre-compromise",
+    "source_identifier": "M1056",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Pre-compromise",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-privileged-account-management",
+    "source_identifier": "M1026",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Privileged Account Management",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-privileged-process-integrity",
+    "source_identifier": "M1025",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Privileged Process Integrity",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-redcurl",
+    "source_identifier": "G1039",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "RedCurl",
+    "aliases": [
+      "RedCurl"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-remote-data-storage",
+    "source_identifier": "M1029",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Remote Data Storage",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-responder",
+    "source_identifier": "S0174",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Responder",
+    "aliases": [
+      "Responder"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-restrict-file-and-directory-permissions",
+    "source_identifier": "M1022",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Restrict File and Directory Permissions",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-restrict-registry-permissions",
+    "source_identifier": "M1024",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Restrict Registry Permissions",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-restrict-web-based-content",
+    "source_identifier": "M1021",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Restrict Web-Based Content",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-rocke",
+    "source_identifier": "G0106",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Rocke",
+    "aliases": [
+      "Rocke"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-saint-bear",
+    "source_identifier": "G1031",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Saint Bear",
+    "aliases": [
+      "Saint Bear",
+      "Storm-0587",
+      "TA471",
+      "UAC-0056",
+      "Lorec53"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-sandworm-team",
+    "source_identifier": "G0034",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Sandworm Team",
+    "aliases": [
+      "Sandworm Team",
+      "ELECTRUM",
+      "Telebots",
+      "IRON VIKING",
+      "BlackEnergy (Group)",
+      "Quedagh",
+      "Voodoo Bear",
+      "IRIDIUM",
+      "Seashell Blizzard",
+      "FROZENBARENTS",
+      "APT44"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-scattered-spider",
+    "source_identifier": "G1015",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Scattered Spider",
+    "aliases": [
+      "Scattered Spider",
+      "Roasted 0ktapus",
+      "Octo Tempest",
+      "Storm-0875",
+      "UNC3944"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-sea-turtle",
+    "source_identifier": "G1041",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Sea Turtle",
+    "aliases": [
+      "Sea Turtle",
+      "Teal Kurma",
+      "Marbled Dust",
+      "Cosmic Wolf",
+      "SILICON"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-shinyhunters",
+    "source_identifier": "G1057",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "ShinyHunters",
+    "aliases": [
+      "ShinyHunters",
+      "UNC6240",
+      "Bling Libra"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-sidecopy",
+    "source_identifier": "G1008",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "SideCopy",
+    "aliases": [
+      "SideCopy"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-sidewinder",
+    "source_identifier": "G0121",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Sidewinder",
+    "aliases": [
+      "Sidewinder",
+      "T-APT-04",
+      "Rattlesnake"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-silence",
+    "source_identifier": "G0091",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Silence",
+    "aliases": [
+      "Silence",
+      "Whisper Spider"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-software-configuration",
+    "source_identifier": "M1054",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Software Configuration",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-star-blizzard",
+    "source_identifier": "G1033",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Star Blizzard",
+    "aliases": [
+      "Star Blizzard",
+      "SEABORGIUM",
+      "Callisto Group",
+      "TA446",
+      "COLDRIVER"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-stealth-falcon",
+    "source_identifier": "G0038",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Stealth Falcon",
+    "aliases": [
+      "Stealth Falcon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-storm-0501",
+    "source_identifier": "G1053",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Storm-0501",
+    "aliases": [
+      "Storm-0501"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-storm-1811",
+    "source_identifier": "G1046",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Storm-1811",
+    "aliases": [
+      "Storm-1811"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-ta2541",
+    "source_identifier": "G1018",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "TA2541",
+    "aliases": [
+      "TA2541"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-ta505",
+    "source_identifier": "G0092",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "TA505",
+    "aliases": [
+      "TA505",
+      "Hive0065",
+      "Spandex Tempest",
+      "CHIMBORAZO"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-ta551",
+    "source_identifier": "G0127",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "TA551",
+    "aliases": [
+      "TA551",
+      "GOLD CABIN",
+      "Shathak"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-teampcp",
+    "source_identifier": "G1056",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "TeamPCP",
+    "aliases": [
+      "TeamPCP",
+      "PCPCat",
+      "ShellForce",
+      "DeadCatx3",
+      "SHADOW-WATER-058",
+      "UNC6780"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-teamtnt",
+    "source_identifier": "G0139",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "TeamTNT",
+    "aliases": [
+      "TeamTNT"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-threat-group-3390",
+    "source_identifier": "G0027",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Threat Group-3390",
+    "aliases": [
+      "Threat Group-3390",
+      "Earth Smilodon",
+      "TG-3390",
+      "Emissary Panda",
+      "BRONZE UNION",
+      "APT27",
+      "Iron Tiger",
+      "LuckyMouse",
+      "Linen Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-threat-intelligence-program",
+    "source_identifier": "M1019",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Threat Intelligence Program",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-toddycat",
+    "source_identifier": "G1022",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "ToddyCat",
+    "aliases": [
+      "ToddyCat"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-tor",
+    "source_identifier": "S0183",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Tor",
+    "aliases": [
+      "Tor"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-transparent-tribe",
+    "source_identifier": "G0134",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Transparent Tribe",
+    "aliases": [
+      "Transparent Tribe",
+      "COPPER FIELDSTONE",
+      "APT36",
+      "Mythic Leopard",
+      "ProjectM"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-tropic-trooper",
+    "source_identifier": "G0081",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Tropic Trooper",
+    "aliases": [
+      "Tropic Trooper",
+      "Pirate Panda",
+      "KeyBoy"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-turla",
+    "source_identifier": "G0010",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Turla",
+    "aliases": [
+      "Turla",
+      "IRON HUNTER",
+      "Group 88",
+      "Waterbug",
+      "WhiteBear",
+      "Snake",
+      "Krypton",
+      "Venomous Bear",
+      "Secret Blizzard",
+      "BELUGASTURGEON"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-unc3886",
+    "source_identifier": "G1048",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "UNC3886",
+    "aliases": [
+      "UNC3886"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-usbstealer",
+    "source_identifier": "S0136",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "USBStealer",
+    "aliases": [
+      "USBStealer",
+      "USB Stealer",
+      "Win32/USBStealer"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-update-software",
+    "source_identifier": "M1051",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Update Software",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-user-account-control",
+    "source_identifier": "M1052",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "User Account Control",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-user-account-management",
+    "source_identifier": "M1018",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "User Account Management",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-user-training",
+    "source_identifier": "M1017",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "User Training",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-void-manticore",
+    "source_identifier": "G1055",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "VOID MANTICORE",
+    "aliases": [
+      "VOID MANTICORE",
+      "COBALT MYSTIQUE",
+      "Handala Hack",
+      "Homeland Justice",
+      "Karma",
+      "Karmabelow80",
+      "BANISHED KITTEN",
+      "Red Sandstorm"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-volt-typhoon",
+    "source_identifier": "G1017",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Volt Typhoon",
+    "aliases": [
+      "Volt Typhoon",
+      "BRONZE SILHOUETTE",
+      "Vanguard Panda",
+      "DEV-0391",
+      "UNC3236",
+      "Voltzite",
+      "Insidious Taurus",
+      "DazedToad"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "course-of-action-vulnerability-scanning",
+    "source_identifier": "M1016",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "course-of-action",
+    "display_name": "Vulnerability Scanning",
+    "aliases": [],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-wirte",
+    "source_identifier": "G0090",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "WIRTE",
+    "aliases": [
+      "WIRTE",
+      "Ashen Lepus"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-wevtutil",
+    "source_identifier": "S0645",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Wevtutil",
+    "aliases": [
+      "Wevtutil"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-windshift",
+    "source_identifier": "G0112",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Windshift",
+    "aliases": [
+      "Windshift",
+      "Bahamut"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-winexe",
+    "source_identifier": "S0191",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "Winexe",
+    "aliases": [
+      "Winexe"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-winter-vivern",
+    "source_identifier": "G1035",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Winter Vivern",
+    "aliases": [
+      "Winter Vivern",
+      "TA473",
+      "UAC-0114"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-wizard-spider",
+    "source_identifier": "G0102",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "Wizard Spider",
+    "aliases": [
+      "Wizard Spider",
+      "UNC1878",
+      "TEMP.MixMaster",
+      "Grim Spider",
+      "FIN12",
+      "GOLD BLACKBURN",
+      "ITG23",
+      "Periwinkle Tempest",
+      "DEV-0193",
+      "Pistachio Tempest",
+      "DEV-0237"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-xagentosx",
+    "source_identifier": "S0161",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "XAgentOSX",
+    "aliases": [
+      "XAgentOSX",
+      "OSX.Sofacy"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-xtunnel",
+    "source_identifier": "S0117",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "XTunnel",
+    "aliases": [
+      "XTunnel",
+      "Trojan.Shunnael",
+      "X-Tunnel",
+      "XAPS"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-zirconium",
+    "source_identifier": "G0128",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "ZIRCONIUM",
+    "aliases": [
+      "ZIRCONIUM",
+      "APT31",
+      "Violet Typhoon"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-zebrocy",
+    "source_identifier": "S0251",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "Zebrocy",
+    "aliases": [
+      "Zebrocy",
+      "Zekapab"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-certutil",
+    "source_identifier": "S0160",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "certutil",
+    "aliases": [
+      "certutil",
+      "certutil.exe"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "tool-cipher-exe",
+    "source_identifier": "S1205",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "tool",
+    "display_name": "cipher.exe",
+    "aliases": [
+      "cipher.exe"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "intrusion-set-menupass",
+    "source_identifier": "G0045",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "intrusion-set",
+    "display_name": "menuPass",
+    "aliases": [
+      "menuPass",
+      "Cicada",
+      "POTASSIUM",
+      "Stone Panda",
+      "APT10",
+      "Red Apollo",
+      "CVNX",
+      "HOGFISH",
+      "BRONZE RIVERSIDE"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "malware-regeorg",
+    "source_identifier": "S1187",
+    "source_version": "2026-09-15",
+    "opencti_identifier": "",
+    "entity_type": "malware",
+    "display_name": "reGeorg",
+    "aliases": [
+      "reGeorg"
+    ],
+    "provenance": "source-native"
+  },
+  {
+    "benchmark_entity_key": "indicator:otx-apt28",
+    "source_identifier": "SHA-256",
+    "source_version": "2026-09-16",
+    "opencti_identifier": "",
+    "entity_type": "indicator",
+    "display_name": "SHA-256",
+    "aliases": [],
+    "provenance": "converter"
+  },
+  {
+    "benchmark_entity_key": "gold:alpha-group",
+    "source_identifier": "intrusion-set--80c084c8-f5f1-40df-8918-004b4da546e0",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "dd2cbe84-e289-4589-a22d-eef26b26dc94",
+    "entity_type": "intrusion-set",
+    "display_name": "Gold Alpha",
+    "aliases": [
+      "Group Alpha",
+      "Alpha Group"
+    ],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:beta-group",
+    "source_identifier": "intrusion-set--26483742-617a-45c9-8aa4-d5b2b2ce2824",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "86448bb6-c294-4a02-a81c-7e035335871e",
+    "entity_type": "intrusion-set",
+    "display_name": "Gold Beta",
+    "aliases": [
+      "The Beta Crew"
+    ],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:alpha-name-tool",
+    "source_identifier": "tool--ac0904e6-85a5-4b43-820c-f1b1af6cc15a",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "4d517ffa-d63f-40bf-84c1-4eb4e1f7e8ad",
+    "entity_type": "tool",
+    "display_name": "Alpha Group",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:m1",
+    "source_identifier": "malware--4ead8db9-ccb7-43e5-8874-57fd4efa63c4",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "4d6ec26b-27e4-41f5-9f3a-eb851879b734",
+    "entity_type": "malware",
+    "display_name": "GoldM1",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:m2",
+    "source_identifier": "malware--841a59c7-2e96-40e3-8872-e19617c8f445",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "0b0b5eb8-4968-4f01-9cad-c93347a7fe8f",
+    "entity_type": "malware",
+    "display_name": "GoldM2",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:probe-tool",
+    "source_identifier": "tool--c85a8f9d-8c7b-47d6-863a-0b263a5e6350",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "308c7497-1449-4053-a873-edc9a2f34c53",
+    "entity_type": "tool",
+    "display_name": "GoldProbe",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:dep-technique",
+    "source_identifier": "attack-pattern--fa29a988-cc6f-4545-8e31-6bad76c7df62",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "e5a8de50-3266-4b3c-bf56-e6fceb29c83f",
+    "entity_type": "attack-pattern",
+    "display_name": "Gold Legacy Technique",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:unused-technique",
+    "source_identifier": "attack-pattern--6d447fde-3b8d-4d62-8fde-49bed2b0615a",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "c3d8a039-6e04-4df3-9c70-3d9397e137d2",
+    "entity_type": "attack-pattern",
+    "display_name": "Gold Unused Technique",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:campaign-1",
+    "source_identifier": "campaign--6c325358-bfdc-4684-85f4-1674fb719666",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "ef43b31e-0766-49c5-8009-8f79ebafea34",
+    "entity_type": "campaign",
+    "display_name": "Operation Goldrush",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:injection-report",
+    "source_identifier": "report--4685a6ea-9aa7-462b-82a2-94a580a28e13",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "f7361529-5853-421e-8a0a-f53beac93e5f",
+    "entity_type": "report",
+    "display_name": "Gold Injection Report",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-001",
+    "source_identifier": "indicator--e176ee50-5688-4cc2-8d39-adac318b95e3",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "ed0b8264-8a50-400a-a555-f468cfb32f0f",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-001",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-002",
+    "source_identifier": "indicator--9c21256c-3a3b-4c2c-8bb0-c62e4e93bf98",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "9d65a2a9-0ea1-4de1-b8b9-afba3e1f8d7a",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-002",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-003",
+    "source_identifier": "indicator--b68c7cd4-6e9d-4825-8d49-7f186fd6d71f",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "9ddfadc5-62a3-46b9-b4ba-d13521ba82e9",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-003",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-004",
+    "source_identifier": "indicator--a0425ec6-1ad6-4c2f-8d7a-da0e2b8670c0",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "db45c8b1-b8e3-4a6e-879f-f7258b3e06fe",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-004",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-005",
+    "source_identifier": "indicator--b9a394d9-9ee5-4e14-89e0-b36625c949f8",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "41649dae-381f-4b9a-a29e-71e8e56d2e39",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-005",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-006",
+    "source_identifier": "indicator--45ec6216-65d7-4e82-8f18-198397f7c8ac",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "5ee8483c-6f25-4a2b-8c5f-f75eb8a89973",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-006",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-007",
+    "source_identifier": "indicator--19e7d0b7-bf85-457a-8834-2c20a1913c18",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "7e43368c-3501-4357-81e8-9fd730f8b5fe",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-007",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-008",
+    "source_identifier": "indicator--7f665d04-9956-412f-8a52-487659122cf3",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "0cea2a01-aaa4-44fd-b947-f4c8e4a47971",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-008",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-009",
+    "source_identifier": "indicator--a959e7d9-315c-41e3-8055-9cff33ccdd18",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "7aa585ff-ba1a-4f38-98fc-f805531153bf",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-009",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-010",
+    "source_identifier": "indicator--11b78ef9-01bd-4504-803f-5ae28a405363",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "7de6f6d2-5405-4673-9422-e1ee7e97c05c",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-010",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-011",
+    "source_identifier": "indicator--dde7bae6-beb5-4c25-8d42-ec6cc9380287",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "89e39473-068c-4c25-a802-6a336f9e9aa6",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-011",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-012",
+    "source_identifier": "indicator--5b975432-922e-437e-885b-eeae8c9627fe",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "2531a096-fc98-4416-854f-28e6110cc629",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-012",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-013",
+    "source_identifier": "indicator--3e219305-3a82-4fbf-83b5-cfcf0ef6dda8",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "609d5b3f-4290-4ef3-9ec0-bc01cff59c07",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-013",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-014",
+    "source_identifier": "indicator--59b6e3c7-0cb9-4aec-895c-eaacac57327f",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "41de2dea-77d7-442a-8ac8-51ed1b43eda4",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-014",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-015",
+    "source_identifier": "indicator--5bba6398-cb31-49d3-8db2-401c95af51f0",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "fe2bc725-e402-478b-8c37-4a47fe269d2a",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-015",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-016",
+    "source_identifier": "indicator--429e0b24-a386-4616-8aaf-81fdf5b21750",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "f386252d-6e2f-4072-aac0-2b7cf46958b4",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-016",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-017",
+    "source_identifier": "indicator--45d1c088-6e62-4474-81b3-34cef0ff5f68",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "9aa1c3fe-3037-4c2d-bcec-a976c376d9c5",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-017",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-018",
+    "source_identifier": "indicator--37b45837-6a8d-4624-8a7b-8133ddaa1cda",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "2c560628-94b0-41ee-a7fa-19804760e31e",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-018",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-019",
+    "source_identifier": "indicator--a69956a5-7cbf-44de-855b-6f1af2c0861e",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "6cbc540e-a73c-45ff-9cc4-0c9c72cd1cf0",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-019",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-020",
+    "source_identifier": "indicator--2a9b6ae7-b6ee-4b81-8112-94c01a5f01a2",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "f1ea755f-993c-4f7a-bdaf-e0fe1a0d68d9",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-020",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-021",
+    "source_identifier": "indicator--40180e44-018c-4097-8794-73a648c71cdc",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "12623ecb-6a3d-46cf-a8bb-0fbf3e0a21f0",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-021",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-022",
+    "source_identifier": "indicator--5b93bc66-b20f-4eb7-8049-d513eba78a1d",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "fdc73b17-4066-43be-962f-14de6b2a5171",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-022",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-023",
+    "source_identifier": "indicator--01b152f7-ce60-4e83-8320-3b476c14cad2",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "13be977c-1ddc-4792-994d-87ab3e355262",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-023",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-024",
+    "source_identifier": "indicator--1c3b5913-4dc6-4287-8fa6-9aa782602b63",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "c480d96a-08af-4641-8773-9d5c3cf4fb76",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-024",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-025",
+    "source_identifier": "indicator--c99aff66-c027-44f1-80c7-545a18910360",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "c0398da9-4836-48c0-9835-60f0b62a61f4",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-025",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-026",
+    "source_identifier": "indicator--9276156a-cd2a-4d4a-88b8-0a86836855b0",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "c7354011-88f2-4db3-bdca-64aec90fcfb5",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-026",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-027",
+    "source_identifier": "indicator--95db8a19-64f6-4ea0-8c46-79b8323b23e6",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "a38556fa-32f4-4c31-aac5-1158115917f5",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-027",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-028",
+    "source_identifier": "indicator--7e3229d3-a265-4bcb-84d7-7407023e28d9",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "bb583f6c-6334-4232-bf24-ade44f56d0d1",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-028",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-029",
+    "source_identifier": "indicator--3e1e059e-258a-4345-8ac1-77ac2d73914a",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "c7617066-f344-42a7-a055-a02aed37c17f",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-029",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:ind-030",
+    "source_identifier": "indicator--800078a4-4d29-42e7-848b-f88b6ee04b48",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "27fdfcf4-d812-4a90-bdfa-80d6ef6d7c04",
+    "entity_type": "indicator",
+    "display_name": "Gold IOC-030",
+    "aliases": [],
+    "provenance": "gold-graph"
+  },
+  {
+    "benchmark_entity_key": "gold:victim-sector",
+    "source_identifier": "identity--d9cc71a3-4cb0-4756-8486-03500bb255c1",
+    "source_version": "fixture-v1.1",
+    "opencti_identifier": "69d765ae-a593-487b-a956-be54a784f0b0",
+    "entity_type": "sector",
+    "display_name": "Gold Utilities",
+    "aliases": [],
+    "provenance": "gold-graph"
+  }
+]

@@ -1,0 +1,64 @@
+[
+  {
+    "id": "f2s-cisa-347a",
+    "kind": "cisa",
+    "advisory": "aa23-347a",
+    "ioc_recall_gate": 0.5,
+    "hallucination_gate": 0.2,
+    "technique_recall_gate": 0.7,
+    "suite": "regression"
+  },
+  {
+    "id": "f2s-cisa-320a",
+    "kind": "cisa",
+    "advisory": "aa22-320a",
+    "ioc_recall_gate": 0.5,
+    "hallucination_gate": 0.2,
+    "technique_recall_gate": 0.7,
+    "suite": "regression"
+  },
+  {
+    "id": "f2s-narrative-goldgraph",
+    "kind": "narrative",
+    "text": "# Internal incident report 2026-09-19\n\nOur team tracked Operation Goldrush, a campaign operation observed between June and August of this year.\nThe threat group Gold Alpha was documented in our telemetry during the intrusion.\nThe malware family GoldM1 was documented in our telemetry during the intrusion.\nThe tool GoldProbe was documented in our telemetry during the intrusion.\nThe attack technique Gold Legacy Technique was documented in our telemetry during the intrusion.\nThe campaign operation Operation Goldrush was documented in our telemetry during the intrusion.\nThe threat group Gold Beta was documented in our telemetry during the intrusion.\n\n## Findings\n- We assess with high confidence that Gold Alpha uses GoldM1.\n- We assess with high confidence that Gold Alpha uses GoldProbe.\n- We assess with high confidence that Gold Alpha uses Gold Legacy Technique.\n- We assess with high confidence that Operation Goldrush is attributed to Gold Alpha.\n\nIndicators of compromise were collected from customer sandboxes and shared with the constituency. No further links between the tooling clusters were identified at the time of writing.\n",
+    "entity_gold": [
+      "Gold Alpha",
+      "Gold Beta",
+      "Gold Legacy Technique",
+      "GoldM1",
+      "GoldProbe",
+      "Operation Goldrush"
+    ],
+    "relation_gold": [
+      [
+        "Gold Alpha",
+        "uses",
+        "GoldM1"
+      ],
+      [
+        "Gold Alpha",
+        "uses",
+        "GoldProbe"
+      ],
+      [
+        "Gold Alpha",
+        "uses",
+        "Gold Legacy Technique"
+      ],
+      [
+        "Operation Goldrush",
+        "attributed-to",
+        "Gold Alpha"
+      ]
+    ],
+    "decoy_names": [
+      "Gold Injection Report",
+      "Gold Unused Technique",
+      "GoldM2"
+    ],
+    "entity_recall_gate": 0.8,
+    "relation_recall_gate": 0.5,
+    "decoy_max": 0,
+    "suite": "regression"
+  }
+]

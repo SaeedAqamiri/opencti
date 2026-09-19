@@ -1,0 +1,36 @@
+{
+  "endpoint_contract": {
+    "transform": "POST /ai-agent/transform {bundle, operation} -> {bundle: <STIX 2.1 bundle>}",
+    "send": "POST /ai-agent/ask {question, mode: 'analyze_bundle', bundle_ref} -> {answer, cited_entity_names}",
+    "note": "operation in {refine_description}; read-only guarantee checked via platform object count before/after."
+  },
+  "cases": [
+    {
+      "id": "pb-transform-fixture",
+      "kind": "transform",
+      "bundle_from": "gold_graph/fixture.json",
+      "bundle_selector": "full",
+      "operation": "refine_description",
+      "checks": ["valid-bundle", "entity-preservation>=1.0", "no-hallucinated-entities", "type-whitelist", "deterministic", "platform-readonly"],
+      "suite": "regression"
+    },
+    {
+      "id": "pb-transform-otx-report",
+      "kind": "transform",
+      "bundle_from": "data/otx-snapshot-2026-09-16.json",
+      "bundle_selector": "report[0]",
+      "operation": "refine_description",
+      "checks": ["valid-bundle", "entity-preservation>=1.0", "no-hallucinated-entities", "type-whitelist", "deterministic", "platform-readonly"],
+      "suite": "regression"
+    },
+    {
+      "id": "pb-send-fixture",
+      "kind": "send",
+      "bundle_from": "gold_graph/fixture.json",
+      "bundle_selector": "full",
+      "min_cited": 4,
+      "checks": ["cited-min", "no-external-entities", "platform-readonly"],
+      "suite": "regression"
+    }
+  ]
+}

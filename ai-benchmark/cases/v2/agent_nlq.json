@@ -1,0 +1,30 @@
+{
+  "endpoint_contract": {
+    "url": "/ask",
+    "method": "POST",
+    "body": {"question": "<nlq question>", "mode": "nlq"},
+    "response": {
+      "answer": "string (human-readable)",
+      "nlq_filters": {
+        "mode": "and",
+        "filters": [
+          {"key": "entity_type", "operator": "eq", "values": ["Tool"]},
+          {"key": "relationship_or", "operator": "relationship_or", "values": ["uses", "related-to"]}
+        ]
+      }
+    },
+    "note": "nlq_filters must be an OpenCTI FilterGroup directly executable via the platform GraphQL API. Grader executes it exactly like phase 4 (aiNLQ)."
+  },
+  "questions_from": "cases/nlq*.json (all ids, both suites)",
+  "extra_cases": [
+    {
+      "id": "anlq-x-neighbors-apt28",
+      "suite": "heldout",
+      "question": "Which intrusion sets share at least 20 techniques with APT28? Return the intrusion sets as a filter.",
+      "expect_entity_type": "Intrusion-Set",
+      "golden_names": "computed from gold graph + platform at golden build time (nlq_expanded.json: nlq-x-neighbors-apt28)",
+      "golden_ref": "nlq-x-neighbors-apt28",
+      "note": "the set-aggregation case that single-shot aiNLQ could NOT express (held-out since phase 4); the agent bench (t12-neighbors-apt28-20) proves the agent CAN compute it — here it must return the equivalent filter."
+    }
+  ]
+}

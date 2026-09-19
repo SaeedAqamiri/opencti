@@ -1,0 +1,69 @@
+{
+  "advisory": "aa22-320a",
+  "title_line": "Summary",
+  "provenance": {
+    "page": "https://www.cisa.gov/news-events/aa22-320a",
+    "stix": "data/cisa/raw/aa22-320a.stix.xml",
+    "note": "IOC gold = official CISA STIX 1.2 set; technique gold = regex on frozen text"
+  },
+  "ioc_gold": [
+    {
+      "value": "182.54.217.2/mdepoy.txt",
+      "stix_type": "url",
+      "title": "Malicious URL Indicator"
+    },
+    {
+      "value": "us-nation-ny.cf",
+      "stix_type": "domain-name",
+      "title": "Malicious FQDN Indicator"
+    },
+    {
+      "value": "51.89.181.64",
+      "stix_type": "ipv4-addr",
+      "title": "Malicious IPv4 Indicator"
+    },
+    {
+      "value": "182.54.217.2",
+      "stix_type": "ipv4-addr",
+      "title": "Malicious IPv4 Indicator"
+    },
+    {
+      "value": "144.76.136.153",
+      "stix_type": "ipv4-addr",
+      "title": "Malicious IPv4 Indicator"
+    },
+    {
+      "value": "transfer.sh",
+      "stix_type": "domain-name",
+      "title": "Malicious FQDN Indicator"
+    }
+  ],
+  "ioc_values": [
+    "144.76.136.153",
+    "182.54.217.2",
+    "182.54.217.2/mdepoy.txt",
+    "51.89.181.64",
+    "transfer.sh",
+    "us-nation-ny.cf"
+  ],
+  "technique_gold": [
+    "T1003.001",
+    "T1016.001",
+    "T1018",
+    "T1021.001",
+    "T1053.005",
+    "T1059.001",
+    "T1070.004",
+    "T1078.001",
+    "T1090",
+    "T1098",
+    "T1105",
+    "T1136.001",
+    "T1136.002",
+    "T1190",
+    "T1555",
+    "T1562.001"
+  ],
+  "text_sha256": "e568b6c134a03d70ed67de7c1f71fed3cd5e01e3212337c9bda43ecc7811b692",
+  "text_chars": 19802
+}

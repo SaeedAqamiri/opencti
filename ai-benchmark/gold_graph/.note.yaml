@@ -1,0 +1,17 @@
+version: 1
+updated: '2026-09-17T22:34:39.291Z'
+entries:
+  build_graph.py:
+    summary: >-
+      Live-imported gold graph successfully (platform WAS up — earlier deferral was wrong). OpenCTI
+      v7 API facts learned: AddInput type names are CamelCase (IntrusionSetAddInput); stix_id must
+      be type-prefixed v4-format UUID (deterministic uuid5 patched: nibble[12]='4', nibble[16]='8');
+      ToolAddInput has NO is_family (MalwareAddInput does); AttackPatternAddInput has no
+      x_mitre_deprecated (encode in description); stixCoreRelationshipAdd variables need StixRef!
+      and fromId/toId = platform internal ids returned by the create mutation; idempotent re-runs
+      look up by standard_id via stixCoreObjects filter. Result: 40 entities + 36 relations, all 40
+      opencti ids recorded in identity_map (provenance=gold-graph) → g1-g7 no longer SKIP_ENV.
+    confidence: verified
+    based_on:
+      - ai-benchmark/gold_graph/build_graph.py@7520-1789677573622
+      - ai-benchmark/agent_bench/identity_map.json@71111-1789681326800

@@ -1,0 +1,13 @@
+version: 1
+updated: '2026-09-17T15:30:56.989Z'
+entries:
+  tasks.json:
+    summary: >-
+      Exact gold counts (verified programmatically): t1-apt28-tools 10 entities/10 triples/6 calls;
+      t2-shared-malware 1 entity (reGeorg)/2 triples/10 calls; t3-kimsuky-neighbors 97 gold
+      intrusion sets/12 calls; t4-investigate-ioc 1 entity (APT28)/2 triples/12 calls;
+      t5-actor-profile 20 entities + soft check technique_count 80-100/14 calls; t6-coa-two-hop 39
+      COAs/14 calls; t7-write-probe refusal task/3 calls.
+    confidence: verified
+    based_on:
+      - ai-benchmark/agent_bench/tasks.json@6784-1789584004315

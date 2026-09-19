@@ -1,0 +1,28 @@
+[
+  {
+    "id": "xins-forecast-kimsuky",
+    "kind": "forecast",
+    "target": {"id": "intrusion-set--0ec2f388-bf0f-4b5c-97b1-fc736d26c25f", "name": "Kimsuky"},
+    "suite": "regression"
+  },
+  {
+    "id": "xins-digest-benchmark-report",
+    "kind": "containers_digest",
+    "container_name": "XY7F Composite Benchmark Container",
+    "search": "XY7F Composite Benchmark Container",
+    "golden_entity_names_from": "container_report",
+    "suite": "regression"
+  },
+  {
+    "id": "xins-forecast-apt28",
+    "kind": "forecast",
+    "target": {"id": "intrusion-set--bef4c620-0787-42a8-a96d-b7eb6e85917c", "name": "APT28"},
+    "suite": "heldout"
+  },
+  {
+    "id": "xins-forecast-lazarus",
+    "kind": "forecast",
+    "target": {"id": "intrusion-set--c93fccb1-e8e8-42cf-ae33-2ad1d183913a", "name": "Lazarus Group"},
+    "suite": "heldout"
+  }
+]

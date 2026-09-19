@@ -1,0 +1,448 @@
+[
+  {
+    "id": "t8-apt29-tools",
+    "type": "retrieve",
+    "suite": "heldout",
+    "question": "Which tools does APT29 use? List each tool and cite entities.",
+    "gold_entity_names": [
+      "AADInternals",
+      "AdFind",
+      "BloodHound",
+      "Impacket",
+      "Mimikatz",
+      "Net",
+      "PsExec",
+      "ROADTools",
+      "SDelete",
+      "Sliver",
+      "Systeminfo",
+      "Tasklist",
+      "Tor",
+      "ipconfig",
+      "meek"
+    ],
+    "gold_triples": [
+      [
+        "APT29",
+        "uses",
+        "AADInternals"
+      ],
+      [
+        "APT29",
+        "uses",
+        "AdFind"
+      ],
+      [
+        "APT29",
+        "uses",
+        "BloodHound"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Impacket"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Mimikatz"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Net"
+      ],
+      [
+        "APT29",
+        "uses",
+        "PsExec"
+      ],
+      [
+        "APT29",
+        "uses",
+        "ROADTools"
+      ],
+      [
+        "APT29",
+        "uses",
+        "SDelete"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Sliver"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Systeminfo"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Tasklist"
+      ],
+      [
+        "APT29",
+        "uses",
+        "Tor"
+      ],
+      [
+        "APT29",
+        "uses",
+        "ipconfig"
+      ],
+      [
+        "APT29",
+        "uses",
+        "meek"
+      ]
+    ],
+    "max_calls": 6,
+    "policy": {
+      "claim_universe": "apt29-uses",
+      "anchor_entity": "APT29"
+    }
+  },
+  {
+    "id": "t9-lazarus-malware",
+    "type": "retrieve",
+    "suite": "heldout",
+    "question": "Which malware is used by Lazarus Group? Cite each family.",
+    "gold_entity_names": [
+      "AppleJeus",
+      "AuditCred",
+      "BADCALL",
+      "BLINDINGCAN",
+      "Bankshot",
+      "Cryptoistic",
+      "Dacls",
+      "Dtrack",
+      "ECCENTRICBANDWAGON",
+      "FALLCHILL",
+      "HARDRAIN",
+      "HOPLIGHT",
+      "HotCroissant",
+      "KEYMARBLE",
+      "MagicRAT",
+      "Proxysvc",
+      "RATANKBA",
+      "TAINTEDSCRIBE",
+      "TYPEFRAME",
+      "ThreatNeedle",
+      "Volgmer",
+      "WannaCry"
+    ],
+    "gold_triples": [
+      [
+        "Lazarus Group",
+        "uses",
+        "AppleJeus"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "AuditCred"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "BADCALL"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "BLINDINGCAN"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Bankshot"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Cryptoistic"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Dacls"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Dtrack"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "ECCENTRICBANDWAGON"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "FALLCHILL"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "HARDRAIN"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "HOPLIGHT"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "HotCroissant"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "KEYMARBLE"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "MagicRAT"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Proxysvc"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "RATANKBA"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "TAINTEDSCRIBE"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "TYPEFRAME"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "ThreatNeedle"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "Volgmer"
+      ],
+      [
+        "Lazarus Group",
+        "uses",
+        "WannaCry"
+      ]
+    ],
+    "max_calls": 8,
+    "policy": {
+      "claim_universe": "lazarus-group-uses",
+      "anchor_entity": "Lazarus Group"
+    }
+  },
+  {
+    "id": "t10-shared-tools-apt28-lazarus",
+    "type": "retrieve",
+    "suite": "heldout",
+    "question": "Which tools are used by BOTH APT28 and Lazarus Group?",
+    "gold_entity_names": [
+      "Responder"
+    ],
+    "gold_triples": [],
+    "max_calls": 10,
+    "policy": {}
+  },
+  {
+    "id": "t11-sandworm-coa",
+    "type": "multi_hop",
+    "suite": "heldout",
+    "question": "Which courses of action mitigate the techniques that Sandworm Team uses?",
+    "gold_entity_names": [
+      "Account Use Policies",
+      "Active Directory Configuration",
+      "Antivirus/Antimalware",
+      "Application Developer Guidance",
+      "Application Isolation and Sandboxing",
+      "Audit",
+      "Behavior Prevention on Endpoint",
+      "Boot Integrity",
+      "Code Signing",
+      "Credential Access Protection",
+      "Data Backup",
+      "Data Loss Prevention",
+      "Disable or Remove Feature or Program",
+      "Encrypt Sensitive Information",
+      "Execution Prevention",
+      "Exploit Protection",
+      "Filter Network Traffic",
+      "Limit Access to Resource Over Network",
+      "Limit Hardware Installation",
+      "Limit Software Installation",
+      "Multi-factor Authentication",
+      "Network Intrusion Prevention",
+      "Network Segmentation",
+      "Operating System Configuration",
+      "Out-of-Band Communications Channel",
+      "Password Policies",
+      "Pre-compromise",
+      "Privileged Account Management",
+      "Privileged Process Integrity",
+      "Remote Data Storage",
+      "Restrict File and Directory Permissions",
+      "Restrict Registry Permissions",
+      "Restrict Web-Based Content",
+      "SSL/TLS Inspection",
+      "Software Configuration",
+      "Update Software",
+      "User Account Management",
+      "User Training",
+      "Vulnerability Scanning"
+    ],
+    "gold_triples": [],
+    "max_calls": 14,
+    "policy": {}
+  },
+  {
+    "id": "t12-neighbors-apt28-20",
+    "type": "retrieve",
+    "suite": "heldout",
+    "question": "Which intrusion sets share at least 20 techniques with APT28?",
+    "gold_entity_names": [
+      "APT29",
+      "APT32",
+      "APT38",
+      "APT39",
+      "APT41",
+      "BRONZE BUTLER",
+      "Chimera",
+      "Dragonfly",
+      "Ember Bear",
+      "FIN13",
+      "FIN7",
+      "Gamaredon Group",
+      "HAFNIUM",
+      "Ke3chang",
+      "Kimsuky",
+      "Lazarus Group",
+      "Leviathan",
+      "Magic Hound",
+      "MirrorFace",
+      "MuddyWater",
+      "Mustang Panda",
+      "OilRig",
+      "Sandworm Team",
+      "ShinyHunters",
+      "Threat Group-3390",
+      "Turla",
+      "VOID MANTICORE",
+      "Volt Typhoon",
+      "Wizard Spider",
+      "menuPass"
+    ],
+    "gold_triples": [],
+    "max_calls": 12,
+    "policy": {}
+  },
+  {
+    "id": "t13-profile-apt29",
+    "type": "profile",
+    "suite": "heldout",
+    "question": "Build a profile of APT29: attributed campaigns, malware, tools, and the number of distinct techniques.",
+    "gold_entity_names": [
+      "APT29",
+      "BoomBox",
+      "CloudDuke",
+      "Cobalt Strike",
+      "CosmicDuke",
+      "CozyCar",
+      "EnvyScout",
+      "FatDuke",
+      "FoggyWeb",
+      "GeminiDuke",
+      "GoldFinder",
+      "GoldMax",
+      "HAMMERTOSS",
+      "LiteDuke",
+      "MiniDuke",
+      "NativeZone",
+      "OnionDuke",
+      "POSHSPY",
+      "PinchDuke",
+      "PolyglotDuke",
+      "PowerDuke",
+      "QUIETEXIT",
+      "Raindrop",
+      "RegDuke",
+      "SUNBURST",
+      "SUNSPOT",
+      "SeaDuke",
+      "Sibot",
+      "SoreFang",
+      "TEARDROP",
+      "TrailBlazer",
+      "VaporRage",
+      "WellMail",
+      "WellMess",
+      "reGeorg"
+    ],
+    "gold_triples": [],
+    "max_calls": 14,
+    "policy": {
+      "claim_universe": "apt29-uses",
+      "anchor_entity": "APT29",
+      "technique_count_exact": 66,
+      "technique_count_tolerance": 1
+    }
+  },
+  {
+    "id": "t14-investigate-ioc-apt29",
+    "type": "investigate",
+    "suite": "heldout",
+    "question": "Investigate this indicator and tell me which threat group it is linked to and two techniques that group uses: [url:value = 'http://www.fotolog.com/o2rh2s2x7pu']",
+    "gold_entity_names": [
+      "APT29"
+    ],
+    "gold_triples": [],
+    "max_calls": 12,
+    "policy": {
+      "claim_universe": "apt29-uses",
+      "anchor_entity": "APT29",
+      "accept_any_valid_techniques": 2,
+      "require_link_evidence": true,
+      "indicator_marker": "http://www.fotolog.com/o2rh2s2x7pu",
+      "triple_recall_min": 0.0,
+      "triple_precision_min": 0.0
+    }
+  },
+  {
+    "id": "t15-investigate-ioc-kimsuky",
+    "type": "investigate",
+    "suite": "heldout",
+    "question": "Investigate this indicator and tell me which threat group it is linked to and two techniques that group uses: [domain-name:value = 'daum-modifypw.besaba.com']",
+    "gold_entity_names": [
+      "Kimsuky"
+    ],
+    "gold_triples": [],
+    "max_calls": 12,
+    "policy": {
+      "claim_universe": "kimsuky-uses",
+      "anchor_entity": "Kimsuky",
+      "accept_any_valid_techniques": 2,
+      "require_link_evidence": true,
+      "indicator_marker": "daum-modifypw.besaba.com",
+      "triple_recall_min": 0.0,
+      "triple_precision_min": 0.0
+    }
+  }
+]

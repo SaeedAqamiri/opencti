@@ -22,6 +22,60 @@ def load_env():
 ENV = load_env()
 URL = os.environ.get('OPENCTI_URL', ENV.get('URL', 'http://localhost:4000'))
 TOKEN = os.environ.get('OPENCTI_TOKEN', ENV.get('TOKEN', ''))
+AGENT_URL = os.environ.get('AGENT_URL', 'http://127.0.0.1:8100')
+
+
+class PendingEndpoint(RuntimeError):
+    """Feature endpoint not implemented / agent unreachable — suite reports SKIP-PENDING."""
+
+
+def agent_post(path: str, payload: dict, timeout: int = 200) -> dict:
+    """POST to the local opencti-agent HTTP API. Raises PendingEndpoint when the
+    endpoint is not implemented yet (404/501/503) or the agent is down."""
+    url = AGENT_URL.rstrip('/') + '/' + path.lstrip('/')
+    try:
+        res = requests.post(url, json=payload, timeout=timeout)
+    except requests.RequestException as e:
+        raise PendingEndpoint(f'agent unreachable at {AGENT_URL}: {e}') from e
+    if res.status_code in (404, 501, 503):
+        raise PendingEndpoint(f'{path} -> HTTP {res.status_code}')
+    if res.status_code >= 400:
+        raise RuntimeError(f'{path} -> HTTP {res.status_code}: {res.text[:200]}')
+    return res.json()
+
+
+def agent_get(path: str, timeout: int = 30) -> requests.Response:
+    url = AGENT_URL.rstrip('/') + '/' + path.lstrip('/')
+    try:
+        res = requests.get(url, timeout=timeout)
+    except requests.RequestException as e:
+        raise PendingEndpoint(f'agent unreachable at {AGENT_URL}: {e}') from e
+    return res
+
+
+def agent_delete(path: str, timeout: int = 30) -> int:
+    url = AGENT_URL.rstrip('/') + '/' + path.lstrip('/')
+    try:
+        res = requests.delete(url, timeout=timeout)
+    except requests.RequestException as e:
+        raise PendingEndpoint(f'agent unreachable at {AGENT_URL}: {e}') from e
+    return res.status_code
+
+
+def refang(value: str) -> str:
+    """Normalize defanged IOC text output ('hxxps://a[.]b/c[.]d') back to raw form."""
+    v = value.strip().strip('.,;')
+    v = re.sub(r'[\u2010\u2011\u2012\u2013\u2014]', '-', v)  # unicode dashes
+    v = re.sub(r'\[\.\]', '.', v)
+    v = re.sub(r'\[:\]', ':', v)
+    v = re.sub(r'\[@\]', '@', v)
+    v = re.sub(r'(?i)\bh(?:xx|XX)p(s?)\b', r'http\1', v)
+    return v
+
+
+def platform_object_count() -> int:
+    data = gql('{ stixCoreObjects(first: 1) { pageInfo { globalCount } } }')
+    return data['stixCoreObjects']['pageInfo']['globalCount']
 
 
 def gql(query: str, variables: dict | None = None, timeout: int = 240):

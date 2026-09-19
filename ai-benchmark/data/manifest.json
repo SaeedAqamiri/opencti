@@ -20,5 +20,61 @@
     "x-mitre-matrix": 1,
     "identity": 1,
     "marking-definition": 1
-  }
+  },
+  "otx_snapshot": {
+    "file": "otx-snapshot-2026-09-16.json",
+    "frozen_at": "2026-09-16",
+    "sha256": "e9bb6b2c1f71df860431bbf26929dd3c710f0e49c0faa2b1df0b45bd68cdc96e",
+    "targets": {
+      "APT28": [
+        "apt28",
+        "sofacy",
+        "fancy bear",
+        "pawn storm"
+      ],
+      "APT29": [
+        "apt29",
+        "cozy bear",
+        "the dukes"
+      ],
+      "Kimsuky": [
+        "kimsuky"
+      ],
+      "Sandworm": [
+        "sandworm",
+        "voodoo bear"
+      ],
+      "Lazarus": [
+        "lazarus",
+        "hidden cobra"
+      ],
+      "Zebrocy": [
+        "zebrocy"
+      ]
+    },
+    "pulses_per_target": 2,
+    "indicators_per_pulse": 50,
+    "counts": {
+      "indicators": 246,
+      "links_to_att&ck": 175,
+      "reports": 10
+    }
+  },
+  "cisa_advisories": {
+    "aa23-347a": {
+      "file": "cisa/aa23-347a.txt",
+      "sha256": "30149818ec883cf78ba22810ca15135285195616e7d763d55bc488ea4f019257",
+      "ioc_count": 33,
+      "technique_count": 35,
+      "source": "https://www.cisa.gov/news-events/aa23-347a"
+    },
+    "aa22-320a": {
+      "file": "cisa/aa22-320a.txt",
+      "sha256": "e568b6c134a03d70ed67de7c1f71fed3cd5e01e3212337c9bda43ecc7811b692",
+      "ioc_count": 6,
+      "technique_count": 16,
+      "source": "https://www.cisa.gov/news-events/aa22-320a"
+    }
+  },
+  "cisa_frozen_at": "2026-09-19"
 }

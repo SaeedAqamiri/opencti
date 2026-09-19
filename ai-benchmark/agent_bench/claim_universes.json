@@ -1,0 +1,6161 @@
+{
+  "apt28-uses": [
+    [
+      "APT28",
+      "uses",
+      "ADVSTORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive Collected Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive via Utility"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Artificial Intelligence"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Automated Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Brute Force"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CHOPSTICK"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cannon"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cloud Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Communication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Component Object Model Hijacking"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Credentials"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data Transfer Size Limits"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Information Repositories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Network Shared Drive"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "DealersChoice"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Domains"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Downdelph"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drive-by Compromise"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drovorub"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Evil Twin"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Web Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Stealth"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Forfiles"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Fysbis"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Gather Victim Org Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "HIDEDRV"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Files and Directories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Window"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Impersonation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "JHUHUGIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Junk Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Koadic"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Komplex"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LAMEHUG"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LSASS Memory"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LoJax"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Local Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Logon Script (Windows)"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mail Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Masquerading"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Multi-hop Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "NTDS"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Net"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Denial of Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Devices"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Sniffing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OLDBAIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OS Credential Dumping"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Office Test"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Pass the Hash"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Guessing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Peripheral Device Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Phishing for Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Process Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Replication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Responder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "APT28",
+      "uses",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Screen Capture"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Search Open Technical Databases"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Sharepoint"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Steal Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Symmetric Cryptography"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Template Injection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Token Impersonation/Theft"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tool"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tor"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "APT28",
+      "uses",
+      "USBStealer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Virtual Private Server"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wevtutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wi-Fi Networks"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Windows Command Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Winexe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XAgentOSX"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XTunnel"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Zebrocy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "certutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "cipher.exe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "reGeorg"
+    ]
+  ],
+  "apt28-apt29-uses": [
+    [
+      "APT28",
+      "uses",
+      "ADVSTORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive Collected Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive via Utility"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Artificial Intelligence"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Automated Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Brute Force"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CHOPSTICK"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cannon"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cloud Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Communication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Component Object Model Hijacking"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Credentials"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data Transfer Size Limits"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Information Repositories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Network Shared Drive"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "DealersChoice"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Domains"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Downdelph"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drive-by Compromise"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drovorub"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Evil Twin"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Web Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Stealth"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Forfiles"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Fysbis"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Gather Victim Org Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "HIDEDRV"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Files and Directories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Window"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Impersonation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "JHUHUGIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Junk Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Koadic"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Komplex"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LAMEHUG"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LSASS Memory"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LoJax"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Local Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Logon Script (Windows)"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mail Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Masquerading"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Multi-hop Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "NTDS"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Net"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Denial of Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Devices"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Sniffing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OLDBAIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OS Credential Dumping"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Office Test"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Pass the Hash"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Guessing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Peripheral Device Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Phishing for Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Process Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Replication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Responder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "APT28",
+      "uses",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Screen Capture"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Search Open Technical Databases"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Sharepoint"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Steal Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Symmetric Cryptography"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Template Injection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Token Impersonation/Theft"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tool"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tor"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "APT28",
+      "uses",
+      "USBStealer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Virtual Private Server"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wevtutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wi-Fi Networks"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Windows Command Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Winexe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XAgentOSX"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XTunnel"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Zebrocy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "certutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "cipher.exe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "reGeorg"
+    ],
+    [
+      "APT29",
+      "uses",
+      "AADInternals"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Accessibility Features"
+    ],
+    [
+      "APT29",
+      "uses",
+      "AdFind"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Binary Padding"
+    ],
+    [
+      "APT29",
+      "uses",
+      "BloodHound"
+    ],
+    [
+      "APT29",
+      "uses",
+      "BoomBox"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Boot or Logon Initialization Scripts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Bypass User Account Control"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud API"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Account"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Administration Command"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CloudDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cobalt Strike"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CosmicDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CozyCar"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Device Registration"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Digital Certificates"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Disable or Modify Cloud Log"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Domain Fronting"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Dynamic Resolution"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Encrypted Channel"
+    ],
+    [
+      "APT29",
+      "uses",
+      "EnvyScout"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "APT29",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "FatDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "APT29",
+      "uses",
+      "FoggyWeb"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GeminiDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GoldFinder"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GoldMax"
+    ],
+    [
+      "APT29",
+      "uses",
+      "HAMMERTOSS"
+    ],
+    [
+      "APT29",
+      "uses",
+      "HTML Smuggling"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Hide Infrastructure"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Hybrid Identity"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Impacket"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Internet Connection Discovery"
+    ],
+    [
+      "APT29",
+      "uses",
+      "LSA Secrets"
+    ],
+    [
+      "APT29",
+      "uses",
+      "LiteDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Local Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malware"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mark-of-the-Web Bypass"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "APT29",
+      "uses",
+      "MiniDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mshta"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Multi-Factor Authentication Request Generation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Multi-hop Proxy"
+    ],
+    [
+      "APT29",
+      "uses",
+      "NativeZone"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Net"
+    ],
+    [
+      "APT29",
+      "uses",
+      "OnionDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "POSHSPY"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Pass the Ticket"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Password Guessing"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PinchDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PolyglotDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PowerDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PsExec"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Python"
+    ],
+    [
+      "APT29",
+      "uses",
+      "QUIETEXIT"
+    ],
+    [
+      "APT29",
+      "uses",
+      "RC Scripts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "ROADTools"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Raindrop"
+    ],
+    [
+      "APT29",
+      "uses",
+      "RegDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SDelete"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SUNBURST"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SUNSPOT"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Scheduled Task"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SeaDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Security Account Manager"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Sibot"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Sliver"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Software Packing"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SoreFang"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing via Service"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Steal Application Access Token"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Steal or Forge Authentication Certificates"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Systeminfo"
+    ],
+    [
+      "APT29",
+      "uses",
+      "TEARDROP"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tasklist"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tool"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tor"
+    ],
+    [
+      "APT29",
+      "uses",
+      "TrailBlazer"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "VaporRage"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "APT29",
+      "uses",
+      "WellMail"
+    ],
+    [
+      "APT29",
+      "uses",
+      "WellMess"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Windows Management Instrumentation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Windows Management Instrumentation Event Subscription"
+    ],
+    [
+      "APT29",
+      "uses",
+      "ipconfig"
+    ],
+    [
+      "APT29",
+      "uses",
+      "meek"
+    ],
+    [
+      "APT29",
+      "uses",
+      "reGeorg"
+    ]
+  ],
+  "apt28-profile": [
+    [
+      "APT28",
+      "uses",
+      "ADVSTORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive Collected Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Archive via Utility"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Artificial Intelligence"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Automated Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Bootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Brute Force"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CHOPSTICK"
+    ],
+    [
+      "APT28",
+      "uses",
+      "CORESHELL"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cannon"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Cloud Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Communication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Component Object Model Hijacking"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Credentials"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data Transfer Size Limits"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Information Repositories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Network Shared Drive"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Data from Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "DealersChoice"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Domains"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Downdelph"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drive-by Compromise"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Drovorub"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Evil Twin"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exfiltration Over Web Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation for Stealth"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "APT28",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Forfiles"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Fysbis"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Gather Victim Org Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "HIDEDRV"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Files and Directories"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Hidden Window"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Impersonation"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "JHUHUGIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Junk Data"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Koadic"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Komplex"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LAMEHUG"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LSASS Memory"
+    ],
+    [
+      "APT28",
+      "uses",
+      "LoJax"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Local Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Logon Script (Windows)"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mail Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Masquerading"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Multi-hop Proxy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "NTDS"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Net"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Denial of Service"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Devices"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Network Sniffing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OLDBAIT"
+    ],
+    [
+      "APT28",
+      "uses",
+      "OS Credential Dumping"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Office Test"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Pass the Hash"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Guessing"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Peripheral Device Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Phishing for Information"
+    ],
+    [
+      "APT28",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Process Discovery"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Data Staging"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Replication Through Removable Media"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Responder"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rootkit"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "APT28",
+      "uses",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Screen Capture"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Search Open Technical Databases"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Sharepoint"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Steal Application Access Token"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Symmetric Cryptography"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Template Injection"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Token Impersonation/Theft"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tool"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Tor"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "APT28",
+      "uses",
+      "USBStealer"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Virtual Private Server"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wevtutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Wi-Fi Networks"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Windows Command Shell"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Winexe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XAgentOSX"
+    ],
+    [
+      "APT28",
+      "uses",
+      "XTunnel"
+    ],
+    [
+      "APT28",
+      "uses",
+      "Zebrocy"
+    ],
+    [
+      "APT28",
+      "uses",
+      "certutil"
+    ],
+    [
+      "APT28",
+      "uses",
+      "cipher.exe"
+    ],
+    [
+      "APT28",
+      "uses",
+      "reGeorg"
+    ]
+  ],
+  "apt28-coa": [
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Application Access Token"
+    ],
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Brute Force"
+    ],
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Password Guessing"
+    ],
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Password Spraying"
+    ],
+    [
+      "Account Use Policies",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Active Directory Configuration",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "Active Directory Configuration",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Active Directory Configuration",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Antivirus/Antimalware",
+      "mitigates",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "Antivirus/Antimalware",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Antivirus/Antimalware",
+      "mitigates",
+      "PowerShell"
+    ],
+    [
+      "Antivirus/Antimalware",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Antivirus/Antimalware",
+      "mitigates",
+      "Template Injection"
+    ],
+    [
+      "Application Developer Guidance",
+      "mitigates",
+      "Application Access Token"
+    ],
+    [
+      "Application Developer Guidance",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Drive-by Compromise"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Exploitation for Stealth"
+    ],
+    [
+      "Application Isolation and Sandboxing",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Application Access Token"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Archive Collected Data"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Archive via Utility"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Sharepoint"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Audit",
+      "mitigates",
+      "Steal Application Access Token"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Malicious File"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Office Test"
+    ],
+    [
+      "Behavior Prevention on Endpoint",
+      "mitigates",
+      "Replication Through Removable Media"
+    ],
+    [
+      "Boot Integrity",
+      "mitigates",
+      "Bootkit"
+    ],
+    [
+      "Code Signing",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Code Signing",
+      "mitigates",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Code Signing",
+      "mitigates",
+      "PowerShell"
+    ],
+    [
+      "Credential Access Protection",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Credential Access Protection",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Data Loss Prevention",
+      "mitigates",
+      "Data from Local System"
+    ],
+    [
+      "Data Loss Prevention",
+      "mitigates",
+      "Data from Removable Media"
+    ],
+    [
+      "Data Loss Prevention",
+      "mitigates",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "Data Loss Prevention",
+      "mitigates",
+      "Exfiltration Over Web Service"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Communication Through Removable Media"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "External Remote Services"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "PowerShell"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Replication Through Removable Media"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Template Injection"
+    ],
+    [
+      "Disable or Remove Feature or Program",
+      "mitigates",
+      "Web Shell"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Application Access Token"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Automated Collection"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "NTDS"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Network Sniffing"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Remote Email Collection"
+    ],
+    [
+      "Encrypt Sensitive Information",
+      "mitigates",
+      "Wi-Fi Networks"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Hidden Window"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Malicious File"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "PowerShell"
+    ],
+    [
+      "Execution Prevention",
+      "mitigates",
+      "Windows Command Shell"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Drive-by Compromise"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Exploitation for Stealth"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Exploit Protection",
+      "mitigates",
+      "Rundll32"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Mail Protocols"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Multi-hop Proxy"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Network Denial of Service"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Filter Network Traffic",
+      "mitigates",
+      "Web Protocols"
+    ],
+    [
+      "Limit Access to Resource Over Network",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Limit Access to Resource Over Network",
+      "mitigates",
+      "External Remote Services"
+    ],
+    [
+      "Limit Access to Resource Over Network",
+      "mitigates",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Limit Hardware Installation",
+      "mitigates",
+      "Replication Through Removable Media"
+    ],
+    [
+      "Limit Software Installation",
+      "mitigates",
+      "Hidden Window"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Brute Force"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "External Remote Services"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Network Sniffing"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Password Guessing"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Password Spraying"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Remote Email Collection"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Trusted Relationship"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Multi-factor Authentication",
+      "mitigates",
+      "Wi-Fi Networks"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Bidirectional Communication"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Data Transfer Size Limits"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Evil Twin"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "External Proxy"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Junk Data"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Mail Protocols"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Malicious Link"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Symmetric Cryptography"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Template Injection"
+    ],
+    [
+      "Network Intrusion Prevention",
+      "mitigates",
+      "Web Protocols"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "External Remote Services"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Network Sniffing"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Trusted Relationship"
+    ],
+    [
+      "Network Segmentation",
+      "mitigates",
+      "Wi-Fi Networks"
+    ],
+    [
+      "Operating System Configuration",
+      "mitigates",
+      "Communication Through Removable Media"
+    ],
+    [
+      "Operating System Configuration",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Operating System Configuration",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Out-of-Band Communications Channel",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "Out-of-Band Communications Channel",
+      "mitigates",
+      "Remote Email Collection"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "Brute Force"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "NTDS"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "Password Guessing"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "Password Spraying"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Password Policies",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Artificial Intelligence"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Credentials"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Domains"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Email Accounts"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Gather Victim Org Information"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Network Devices"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Search Open Technical Databases"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Tool"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Virtual Private Server"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Vulnerability Scanning"
+    ],
+    [
+      "Pre-compromise",
+      "mitigates",
+      "Web Services"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Bootkit"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "NTDS"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Pass the Hash"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "PowerShell"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Token Impersonation/Theft"
+    ],
+    [
+      "Privileged Account Management",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Privileged Process Integrity",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "Privileged Process Integrity",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "Remote Data Storage",
+      "mitigates",
+      "Automated Collection"
+    ],
+    [
+      "Remote Data Storage",
+      "mitigates",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "Restrict File and Directory Permissions",
+      "mitigates",
+      "Clear Windows Event Logs"
+    ],
+    [
+      "Restrict File and Directory Permissions",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "Restrict File and Directory Permissions",
+      "mitigates",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Restrict Registry Permissions",
+      "mitigates",
+      "Logon Script (Windows)"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Application Access Token"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Bidirectional Communication"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Drive-by Compromise"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Exfiltration Over Web Service"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "External Remote Services"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Malicious Link"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Restrict Web-Based Content",
+      "mitigates",
+      "Steal Application Access Token"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Dynamic Data Exchange"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Office Test"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Phishing for Information"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Software Configuration",
+      "mitigates",
+      "Spearphishing Link"
+    ],
+    [
+      "Threat Intelligence Program",
+      "mitigates",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "Threat Intelligence Program",
+      "mitigates",
+      "Exploitation for Stealth"
+    ],
+    [
+      "Threat Intelligence Program",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Threat Intelligence Program",
+      "mitigates",
+      "Impersonation"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Drive-by Compromise"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Exploitation for Stealth"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Pass the Hash"
+    ],
+    [
+      "Update Software",
+      "mitigates",
+      "Password Guessing"
+    ],
+    [
+      "User Account Control",
+      "mitigates",
+      "Pass the Hash"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Brute Force"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Network Sniffing"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Pass the Hash"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Sharepoint"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Steal Application Access Token"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Token Impersonation/Theft"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Trusted Relationship"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "User Account Management",
+      "mitigates",
+      "Web Shell"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Cloud Accounts"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Data from Information Repositories"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Drive-by Compromise"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Evil Twin"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Impersonation"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "LSASS Memory"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Malicious File"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Malicious Link"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Masquerading"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "NTDS"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "OS Credential Dumping"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Phishing for Information"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Sharepoint"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Spearphishing Attachment"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Spearphishing Link"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Steal Application Access Token"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Template Injection"
+    ],
+    [
+      "User Training",
+      "mitigates",
+      "Valid Accounts"
+    ],
+    [
+      "Vulnerability Scanning",
+      "mitigates",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Vulnerability Scanning",
+      "mitigates",
+      "Exploitation of Remote Services"
+    ]
+  ],
+  "kimsuky-neighbors": [],
+  "apt29-uses": [
+    [
+      "APT29",
+      "uses",
+      "AADInternals"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Accessibility Features"
+    ],
+    [
+      "APT29",
+      "uses",
+      "AdFind"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Additional Email Delegate Permissions"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Binary Padding"
+    ],
+    [
+      "APT29",
+      "uses",
+      "BloodHound"
+    ],
+    [
+      "APT29",
+      "uses",
+      "BoomBox"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Boot or Logon Initialization Scripts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Bypass User Account Control"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud API"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Account"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Administration Command"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cloud Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CloudDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Cobalt Strike"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CosmicDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "CozyCar"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Device Registration"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Digital Certificates"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Disable or Modify Cloud Log"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Domain Fronting"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Dynamic Resolution"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Encrypted Channel"
+    ],
+    [
+      "APT29",
+      "uses",
+      "EnvyScout"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Exploitation for Privilege Escalation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "APT29",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "FatDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "APT29",
+      "uses",
+      "FoggyWeb"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GeminiDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GoldFinder"
+    ],
+    [
+      "APT29",
+      "uses",
+      "GoldMax"
+    ],
+    [
+      "APT29",
+      "uses",
+      "HAMMERTOSS"
+    ],
+    [
+      "APT29",
+      "uses",
+      "HTML Smuggling"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Hide Infrastructure"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Hybrid Identity"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Impacket"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Internet Connection Discovery"
+    ],
+    [
+      "APT29",
+      "uses",
+      "LSA Secrets"
+    ],
+    [
+      "APT29",
+      "uses",
+      "LiteDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Local Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Malware"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mark-of-the-Web Bypass"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "APT29",
+      "uses",
+      "MiniDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Mshta"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Multi-Factor Authentication Request Generation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Multi-hop Proxy"
+    ],
+    [
+      "APT29",
+      "uses",
+      "NativeZone"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Net"
+    ],
+    [
+      "APT29",
+      "uses",
+      "OnionDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "POSHSPY"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Pass the Ticket"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Password Guessing"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PinchDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PolyglotDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PowerDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "APT29",
+      "uses",
+      "PsExec"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Python"
+    ],
+    [
+      "APT29",
+      "uses",
+      "QUIETEXIT"
+    ],
+    [
+      "APT29",
+      "uses",
+      "RC Scripts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "ROADTools"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Raindrop"
+    ],
+    [
+      "APT29",
+      "uses",
+      "RegDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SDelete"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SUNBURST"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SUNSPOT"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Scheduled Task"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SeaDuke"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Security Account Manager"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Sibot"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Sliver"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Software Packing"
+    ],
+    [
+      "APT29",
+      "uses",
+      "SoreFang"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Spearphishing via Service"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Steal Application Access Token"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Steal or Forge Authentication Certificates"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Systeminfo"
+    ],
+    [
+      "APT29",
+      "uses",
+      "TEARDROP"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tasklist"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tool"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Tor"
+    ],
+    [
+      "APT29",
+      "uses",
+      "TrailBlazer"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "APT29",
+      "uses",
+      "VaporRage"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "APT29",
+      "uses",
+      "WellMail"
+    ],
+    [
+      "APT29",
+      "uses",
+      "WellMess"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Windows Management Instrumentation"
+    ],
+    [
+      "APT29",
+      "uses",
+      "Windows Management Instrumentation Event Subscription"
+    ],
+    [
+      "APT29",
+      "uses",
+      "ipconfig"
+    ],
+    [
+      "APT29",
+      "uses",
+      "meek"
+    ],
+    [
+      "APT29",
+      "uses",
+      "reGeorg"
+    ]
+  ],
+  "lazarus-group-uses": [
+    [
+      "Lazarus Group",
+      "uses",
+      "Account Manipulation"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "AppleJeus"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Application Window Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Archive Collected Data"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Archive via Custom Method"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Archive via Library"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "AuditCred"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "BADCALL"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "BLINDINGCAN"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Bankshot"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Bootkit"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Clear Command History"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Code Signing"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Create Process with Token"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Cryptoistic"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "DLL"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Dacls"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Data Destruction"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Digital Certificates"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Disable or Modify Tools"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Disk Content Wipe"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Disk Structure Wipe"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Domains"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Drive-by Compromise"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Dtrack"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Dynamic API Resolution"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Dynamic-link Library Injection"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "ECCENTRICBANDWAGON"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Email Addresses"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Embedded Payloads"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Exfiltration Over C2 Channel"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Exfiltration Over Unencrypted Non-C2 Protocol"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "External Proxy"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "FALLCHILL"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Fallback Channels"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Gather Victim Org Information"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "HARDRAIN"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "HOPLIGHT"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Hidden Files and Directories"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "HotCroissant"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Indicator Removal"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Indirect Command Execution"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Internal Defacement"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Internal Proxy"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "KEYMARBLE"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "KernelCallbackTable"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Local Data Staging"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Local Storage Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "MagicRAT"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Malware"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Masquerade Task or Service"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Mshta"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Multi-Stage Channels"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Name Resolution Poisoning and SMB Relay"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Native API"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Network Service Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Non-Standard Port"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Password Spraying"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Process Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Protocol or Service Impersonation"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Proxysvc"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Query Registry"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "RATANKBA"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "RawDisk"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Reflective Code Loading"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Remote Desktop Protocol"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Rename Legitimate Utilities"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Responder"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "SSH"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Scheduled Task"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Server"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Service Stop"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Shortcut Modification"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Social Media Accounts"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Spearphishing via Service"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Standard Encoding"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Symmetric Cryptography"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Binary Proxy Execution"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Information Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Network Configuration Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Network Connections Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Owner/User Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Shutdown/Reboot"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "System Time Discovery"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "TAINTEDSCRIBE"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "TYPEFRAME"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "ThreatNeedle"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Tool"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Visual Basic"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Volgmer"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "WannaCry"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Windows Command Shell"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Windows Host Firewall"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Windows Management Instrumentation"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "Windows Service"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "netsh"
+    ],
+    [
+      "Lazarus Group",
+      "uses",
+      "route"
+    ]
+  ],
+  "sandworm-team-uses": [
+    [
+      "Sandworm Team",
+      "uses",
+      "AcidPour"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "AcidRain"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Acquire Infrastructure"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Bad Rabbit"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "BlackEnergy"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Botnet"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Business Relationships"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Cobalt Strike"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Command Obfuscation"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Compromise Software Supply Chain"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Credentials from Web Browsers"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Cyclops Blink"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Data Destruction"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Data Encrypted for Impact"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Databases"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Disk Structure Wipe"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Domain Account"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Domain Accounts"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Domain Properties"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Domains"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Email Account"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Email Addresses"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Empire"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Employee Names"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Endpoint Denial of Service"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Exaramel for Linux"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Exaramel for Windows"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Exfiltration Over C2 Channel"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Exploitation for Client Execution"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "External Defacement"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "GreyEnergy"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Impacket"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Industroyer"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Industroyer2"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Inhibit System Recovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Invoke-PSImage"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Kapeka"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "KillDisk"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "LSASS Memory"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Lateral Tool Transfer"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Malware"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Masquerading"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "NTDS"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Native API"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Neo-reGeorg"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Net"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Network Sniffing"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Non-Standard Port"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "NotPetya"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Obfuscated Files or Information"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Olympic Destroyer"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "P.A.S. Webshell"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "PoshC2"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Prestige"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Proxy"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "PsExec"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Remote Access Tools"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Remote System Discovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "SDelete"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "SMB/Windows Admin Shares"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Scheduled Task"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Search Open Websites/Domains"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Search Victim-Owned Websites"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Server"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Service Stop"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Social Media Accounts"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Software"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Software Deployment Tools"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Standard Encoding"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Steal Web Session Cookie"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Supply Chain Compromise"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "System Information Discovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "System Network Connections Discovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "System Owner/User Discovery"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Tool"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Trusted Relationship"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Upload Malware"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "VPNFilter"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Valid Accounts"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Visual Basic"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Vulnerabilities"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Vulnerability Scanning"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "Sandworm Team",
+      "uses",
+      "Windows Management Instrumentation"
+    ]
+  ],
+  "kimsuky-uses": [
+    [
+      "Kimsuky",
+      "uses",
+      "Acquire Infrastructure"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Additional Local or Domain Groups"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Adversary-in-the-Middle"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Amadey"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "AppleSeed"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Archive via Custom Method"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Archive via Utility"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Automated Exfiltration"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "BabyShark"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Bidirectional Communication"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Binary Padding"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Brave Prince"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Browser Extensions"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Browser Information Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Browser Session Hijacking"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "CSPY Downloader"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Change Default File Association"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Clipboard Data"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Code Signing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Code Signing Certificates"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Command Obfuscation"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Component Object Model"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Compression"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Credentials In Files"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Credentials from Web Browsers"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Data from Local System"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Dead Drop Resolver"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Delay Execution"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Deobfuscate/Decode Files or Information"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Develop Capabilities"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Disable or Modify System Firewall"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Disable or Modify Tools"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Domains"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Double File Extension"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Dynamic API Resolution"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Dynamic Resolution"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Dynamic-link Library Injection"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Email Accounts"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Email Addresses"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Email Forwarding Rule"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Employee Names"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Encrypted/Encoded File"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Establish Accounts"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Exfiltration Over C2 Channel"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Exfiltration to Cloud Storage"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Exploit Public-Facing Application"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Exploits"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "External Remote Services"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "File Deletion"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "File Transfer Protocols"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "File and Directory Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Financial Theft"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Gather Victim Org Information"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "GoBear"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Gold Dragon"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Gomir"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "HTTPTroy"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Hidden Users"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Hidden Window"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Ignore Process Interrupts"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Impersonation"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Ingress Tool Transfer"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Internal Spearphishing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "JavaScript"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Junk Code Insertion"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "KGH_SPY"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Keylogging"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "LNK Icon Smuggling"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "LSASS Memory"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Local Account"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Local Accounts"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Local Data Staging"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Local Storage Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Mail Protocols"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Malicious Copy and Paste"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Malicious File"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Malicious Link"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Malware"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Masquerade Task or Service"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Match Legitimate Resource Name or Location"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Mimikatz"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Modify Registry"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Mshta"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Multi-Factor Authentication Interception"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Mutual Exclusion"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "NOKKI"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Native API"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Network Sniffing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Non-Standard Encoding"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Obfuscated Files or Information"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Pass the Hash"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Phishing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Phishing for Information"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "PowerShell"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Private Keys"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Process Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Process Hollowing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Process Injection"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "PsExec"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Python"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "QuasarRAT"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Query Public AI Services"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Query Registry"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Reflective Code Loading"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Registry Run Keys / Startup Folder"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Regsvr32"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Remote Desktop Protocol"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Remote Desktop Software"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Remote Email Collection"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Rundll32"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Scheduled Task"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Screen Capture"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Search Engines"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Search Open Technical Databases"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Search Victim-Owned Websites"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Security Software Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Server"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Service Stop"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Social Media"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Social Media Accounts"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Software Packing"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Spearphishing Attachment"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Spearphishing Link"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Steal Web Session Cookie"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Checks"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Information Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Network Configuration Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Owner/User Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Service Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "System Time Discovery"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "TRANSLATEXT"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Timestomp"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Tool"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Traffic Signaling"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Troll Stealer"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Upload Malware"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Visual Basic"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Web Portal Capture"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Web Protocols"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Web Services"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Web Shell"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Windows Command Shell"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "Windows Service"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "certutil"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "gh0st RAT"
+    ],
+    [
+      "Kimsuky",
+      "uses",
+      "schtasks"
+    ]
+  ],
+  "gold-graph": [
+    [
+      "Gold Alpha",
+      "uses",
+      "Gold Legacy Technique"
+    ],
+    [
+      "Gold Alpha",
+      "uses",
+      "GoldM1"
+    ],
+    [
+      "Gold Alpha",
+      "uses",
+      "GoldProbe"
+    ],
+    [
+      "Gold Beta",
+      "uses",
+      "Alpha Group"
+    ],
+    [
+      "Gold IOC-001",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-002",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-003",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-004",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-005",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-006",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-007",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-008",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-009",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-010",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-011",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-012",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-013",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-014",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-015",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-016",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-017",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-018",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-019",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-020",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-021",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-022",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-023",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-024",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-025",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-026",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-027",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-028",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-029",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "Gold IOC-030",
+      "related-to",
+      "Gold Beta"
+    ],
+    [
+      "GoldM1",
+      "related-to",
+      "GoldM2"
+    ],
+    [
+      "Operation Goldrush",
+      "attributed-to",
+      "Gold Alpha"
+    ]
+  ]
+}

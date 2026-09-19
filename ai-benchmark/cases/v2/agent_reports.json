@@ -1,0 +1,32 @@
+{
+  "endpoint_contract": {
+    "ask": "POST /ai-agent/ask {question} — agent-side replacement for the SDL-only platform mutations (aiThreatGenerateReport / aiConvertIndicator have NO resolver in this checkout).",
+    "note": "Cases grade agent-generated threat reports and indicator→STIX conversion artifacts."
+  },
+  "cases": [
+    {
+      "id": "arep-threat-apt28",
+      "kind": "threat_report",
+      "target": "APT28",
+      "gold_entity_names_ref": "agent_bench/tasks.json t1-apt28-tools gold_entity_names",
+      "checks": ["entity-recall>=0.5", "min-length", "structure-headings>=3", "no-null-garbage"],
+      "suite": "regression"
+    },
+    {
+      "id": "arep-indicator-convert",
+      "kind": "indicator_convert",
+      "indicators_from": "data/otx-snapshot-2026-09-16.json",
+      "indicator_count": 3,
+      "checks": ["pattern-valid", "value-preserved", "type-correct", "no-extra-values"],
+      "suite": "regression"
+    },
+    {
+      "id": "arep-victim-gold-utilities",
+      "kind": "victim_report",
+      "target": "Gold Utilities",
+      "victim_setup": "victim sector + targets relations come from gold_graph/fixture.json v1.1 (victim-sector, alpha-group/campaign-1 targets it) — SKIP-ENV when not imported",
+      "checks": ["mentions-entity", "victim-attribution", "min-length", "structure-headings>=3", "no-null-garbage", "no-error"],
+      "suite": "regression"
+    }
+  ]
+}
