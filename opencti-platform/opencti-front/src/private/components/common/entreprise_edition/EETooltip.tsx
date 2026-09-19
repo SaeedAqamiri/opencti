@@ -33,10 +33,14 @@ const EETooltip = ({
   children,
   title,
   forAi,
+  bypassEE,
 }: {
   children: ReactElement;
   title?: string;
   forAi?: boolean;
+  /** Skip the EE intercept entirely — for features served locally (e.g. the
+      opencti-agent chat) that never touch Filigran EE services. */
+  bypassEE?: boolean;
 }) => {
   const { t_i18n } = useFormatter();
   const [feedbackCreation, setFeedbackCreation] = useState(false);
@@ -48,7 +52,7 @@ const EETooltip = ({
     settings: { id: settingsId },
   } = useAuth();
 
-  if ((isEnterpriseEdition && !forAi) || (forAi && enabled && configured)) {
+  if (bypassEE || (isEnterpriseEdition && !forAi) || (forAi && enabled && configured)) {
     return (
       <EETooltipComponent
         title={title ? t_i18n(title) : undefined}

@@ -29,6 +29,7 @@ import useTopBanner from '../utils/hooks/useTopBanner';
 const HomeDashboard = lazy(() => import('./components/HomeDashboard'));
 const StixObjectOrStixRelationship = lazy(() => import('./components/StixObjectOrStixRelationship'));
 const RootSearchBulk = lazy(() => import('./components/SearchBulkContainer'));
+const AgentPanel = lazy(() => import('./components/agent/AgentPanel'));
 const RootAnalyses = lazy(() => import('./components/analyses/Root'));
 const RootCases = lazy(() => import('./components/cases/Root'));
 const RootEvents = lazy(() => import('./components/events/Root'));
@@ -141,6 +142,7 @@ const Index = ({ settings }: IndexProps) => {
                   <Route path="/search/*" element={boundaryWrapper(RootSearch)} />
                   <Route path="/id/:id" element={boundaryWrapper(StixObjectOrStixRelationship)} />
                   <Route path="/search_bulk" element={boundaryWrapper(RootSearchBulk)} />
+                  <Route path="/agent" element={boundaryWrapper(AgentPanel)} />
                   <Route path="/analyses/*" element={boundaryWrapper(RootAnalyses)} />
                   <Route path="/cases/*" element={boundaryWrapper(RootCases)} />
                   <Route path="/events/*" element={boundaryWrapper(RootEvents)} />

@@ -78,6 +78,7 @@ export default defineConfig(({ mode, command }) => {
         [`${basePath}/stream`]: backProxy(),
         [`${basePath}/storage`]: backProxy(),
         [`${basePath}/schema`]: backProxy(),
+        [`${basePath}/ai-agent`]: backProxy(),
         '^/.*/embedded/.*': backProxy(),
         [`${basePath}/taxii2`]: backProxy(),
         [`${basePath}/feeds`]: backProxy(),

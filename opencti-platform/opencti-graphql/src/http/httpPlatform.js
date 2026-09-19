@@ -47,6 +47,7 @@ import {
   postChatbotMessageApprove,
   getChatbotPendingApprovals,
 } from './httpChatbotProxy';
+import { postAiAgentAsk, postAiAgentSession, getAiAgentSessions, getAiAgentSession, deleteAiAgentSession } from './httpAgentProxy';
 import { PROVIDERS } from '../modules/authenticationProvider/providers-configuration';
 import { CERT_PROVIDER } from '../modules/authenticationProvider/provider-cert';
 import { HEADERS_PROVIDER } from '../modules/authenticationProvider/provider-headers';
@@ -627,6 +628,13 @@ const createApp = async (app, schema) => {
   app.post(`${basePath}/chatbot/agent/stream`, postAgentMessageStream);
   // Legacy Flowise proxy (used when xtm_one_token is NOT set)
   app.post(`${basePath}/chatbot`, getLegacyChatbotProxy);
+
+  // -- opencti-agent proxy (local read-only threat-intel agent, v3)
+  app.post(`${basePath}/ai-agent/ask`, postAiAgentAsk);
+  app.post(`${basePath}/ai-agent/sessions`, postAiAgentSession);
+  app.get(`${basePath}/ai-agent/sessions`, getAiAgentSessions);
+  app.get(`${basePath}/ai-agent/sessions/:sid`, getAiAgentSession);
+  app.delete(`${basePath}/ai-agent/sessions/:sid`, deleteAiAgentSession);
 
   // Other routes - Render index.html
   app.get('*any', async (_, res) => {

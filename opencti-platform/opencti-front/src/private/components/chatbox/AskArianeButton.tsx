@@ -30,14 +30,17 @@ const AskArianeButton = () => {
   const { height: topBannerHeight } = useTopBanner();
   const {
     isOpen, mode, openChat, closeChat, setMode,
-    setSidebarWidth, setIsResizing, xtmOneConfigured,
+    setSidebarWidth, setIsResizing, xtmOneConfigured, localAgentMode,
   } = useChatbot();
 
   const isCGUStatusPending = filigran_chatbot_ai_cgu_status === CGUStatus.pending;
   const [openValidateTermsOfUse, setOpenValidateTermsOfUse] = useState(false);
 
-  const isChatbotEnabled = isEnterpriseEdition && isChatbotAiEnabled();
-  const useLegacy = xtmOneConfigured === false;
+  // Local opencti-agent chat: EE and Filigran CGU are not required — the chat
+  // is served by the on-prem agent. XTM One chat keeps its full gate stack.
+  const isChatbotEnabled = (isEnterpriseEdition || localAgentMode) && isChatbotAiEnabled();
+  const useLegacy = xtmOneConfigured === false && !localAgentMode;
+  const localOnly = !isEnterpriseEdition && localAgentMode;
 
   // Total height of all floating banners stacked above the top bar.
   // Forwarded to the legacy chatbot so its window sticks under the real top bar.
@@ -75,7 +78,9 @@ const AskArianeButton = () => {
   }, [useLegacy, isOpen]);
 
   const toggleChatbot = () => {
-    if (filigran_chatbot_ai_cgu_status === CGUStatus.enabled) {
+    // Local agent mode needs no Filigran CGU; XTM One mode does.
+    const cguOk = localOnly || filigran_chatbot_ai_cgu_status === CGUStatus.enabled;
+    if (cguOk) {
       if (isOpen) {
         closeChat();
       } else {
@@ -91,6 +96,7 @@ const AskArianeButton = () => {
       {/* `clickable={false}` keeps the chip a plain element inside the button —
           see fds-migration/MIGRATION-DECISIONS.md#ee-badge-inside-button */}
       <EETooltip
+        bypassEE={localOnly}
         title={isCGUStatusPending && !hasRightToValidateCGU ? t_i18n('Ask Ariane isn\'t activated yet. Please reach out to your administrator to enable this feature.') : 'Open chatbot'}
       >
         <Button
@@ -99,7 +105,7 @@ const AskArianeButton = () => {
           onClick={toggleChatbot}
           // The `ia` variant gradients the LABEL only; the icon keeps `currentColor`, near-black in light.
           startIcon={<FiligranIcon icon={LogoXtmOneIcon} size="small" style={{ color: 'var(--color-filigran-ia-primary)' }} />}
-          endIcon={isEnterpriseEdition
+          endIcon={isEnterpriseEdition || localOnly
             ? undefined
             : <EEChip clickable={false} style={{ marginInlineStart: 0 }} />}
         >
@@ -107,8 +113,9 @@ const AskArianeButton = () => {
         </Button>
       </EETooltip>
 
-      {/* V3 XTM One panel (xtm_one_token configured) */}
-      {isChatbotEnabled && isOpen && !useLegacy && xtmOneConfigured === true && (
+      {/* V3 XTM One panel (xtm_one_token configured) — same panel serves the
+          local agent in localOnly mode; the backend /chatbot/* routes branch. */}
+      {isChatbotEnabled && isOpen && !useLegacy && (xtmOneConfigured === true || localAgentMode) && (
         <AskArianePanel
           mode={mode}
           onClose={closeChat}
@@ -116,6 +123,7 @@ const AskArianeButton = () => {
           onWidthChange={setSidebarWidth}
           onResizeStart={() => setIsResizing(true)}
           onResizeEnd={() => setIsResizing(false)}
+          localOnly={localOnly}
         />
       )}
 

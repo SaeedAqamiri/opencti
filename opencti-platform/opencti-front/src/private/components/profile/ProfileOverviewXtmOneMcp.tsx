@@ -26,8 +26,9 @@ const ProfileOverviewXtmOneMcp = () => {
   const { t_i18n } = useFormatter();
   let xtmOneConfigured: boolean | null = null;
   let xtmOneUrl: string | null = null;
+  let agentMcpUrl: string | null = null;
   try {
-    ({ xtmOneConfigured, xtmOneUrl } = useChatbot());
+    ({ xtmOneConfigured, xtmOneUrl, agentMcpUrl } = useChatbot());
   } catch (_) {
     // Graceful fallback if rendered outside of ChatbotProvider (e.g. tests
     // mounting <Profile /> directly) - same pattern as utils/hooks/useAI.ts.
@@ -35,7 +36,37 @@ const ProfileOverviewXtmOneMcp = () => {
 
   const safeXtmOneUrl = toSafeHttpUrl(xtmOneUrl)?.replace(/\/+$/, '') ?? null;
   if (xtmOneConfigured !== true || !safeXtmOneUrl) {
-    return null;
+    // Local deployment fallback: the local opencti-agent exposes the same kind
+    // of MCP endpoint (read-only) without any XTM One subscription.
+    if (!agentMcpUrl) {
+      return null;
+    }
+    return (
+      <Card title={t_i18n('Local MCP server')}>
+        <Typography variant="body1" gutterBottom>
+          {t_i18n('This platform is paired with a local MCP (Model Context Protocol) server exposing read-only access to the OpenCTI knowledge graph. AI clients such as Cursor or Claude Desktop can search and read threat intelligence with it.')}
+        </Typography>
+        <div style={{ marginTop: 16 }}>
+          <Label>{t_i18n('MCP endpoint URL')}</Label>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <pre style={{ flex: 1, minWidth: 0, margin: 0, overflowX: 'auto' }}>{agentMcpUrl}</pre>
+            <Tooltip title={t_i18n('Copy MCP endpoint URL')}>
+              <IconButton
+                variant="default"
+                priority="tertiary"
+                size="sm"
+                aria-label={t_i18n('Copy MCP endpoint URL')}
+                onClick={() => copyToClipboard(t_i18n, agentMcpUrl ?? '')}
+                icon={<ContentCopyOutlined fontSize="small" />}
+              />
+            </Tooltip>
+          </Stack>
+        </div>
+        <Typography variant="body2" style={{ marginTop: 16 }}>
+          {t_i18n('The endpoint is served by the local opencti-agent (read-only) and accepts MCP-compatible clients on this machine.')}
+        </Typography>
+      </Card>
+    );
   }
 
   const mcpEndpointUrl = `${safeXtmOneUrl}/mcp/opencti`;

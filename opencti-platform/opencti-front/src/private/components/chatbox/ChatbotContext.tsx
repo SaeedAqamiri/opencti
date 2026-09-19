@@ -9,6 +9,10 @@ interface ChatbotContextType {
   isResizing: boolean;
   xtmOneConfigured: boolean | null;
   xtmOneUrl: string | null;
+  /** Local opencti-agent MCP endpoint (from /chatbot/config), null when unset. */
+  agentMcpUrl: string | null;
+  /** Local opencti-agent chat mode: no XTM One, no EE/CGU gate. */
+  localAgentMode: boolean;
   openChat: () => void;
   closeChat: () => void;
   toggleChat: () => void;
@@ -32,6 +36,8 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
   const [isOpen, setIsOpen] = useState(() => localStorage.getItem(CHAT_OPEN_STORAGE_KEY) === 'true');
   const [xtmOneConfigured, setXtmOneConfigured] = useState<boolean | null>(null);
   const [xtmOneUrl, setXtmOneUrl] = useState<string | null>(null);
+  const [agentMcpUrl, setAgentMcpUrl] = useState<string | null>(null);
+  const [agentConfigured, setAgentConfigured] = useState<boolean>(false);
   const [mode, setModeState] = useState<ChatMode>(() => {
     const stored = localStorage.getItem(CHAT_MODE_STORAGE_KEY);
     return (stored as ChatMode) || 'sidebar';
@@ -52,10 +58,14 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
       .then((data) => {
         setXtmOneConfigured(data?.xtm_one_configured === true);
         setXtmOneUrl(typeof data?.xtm_one_url === 'string' ? data.xtm_one_url : null);
+        setAgentMcpUrl(typeof data?.agent_mcp_url === 'string' ? data.agent_mcp_url : null);
+        setAgentConfigured(data?.agent_configured === true);
       })
       .catch(() => {
         setXtmOneConfigured(false);
         setXtmOneUrl(null);
+        setAgentMcpUrl(null);
+        setAgentConfigured(false);
       });
   }, []);
 
@@ -92,13 +102,15 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
     isResizing,
     xtmOneConfigured,
     xtmOneUrl,
+    agentMcpUrl,
+    localAgentMode: agentConfigured,
     openChat,
     closeChat,
     toggleChat,
     setMode,
     setSidebarWidth,
     setIsResizing,
-  }), [isOpen, mode, sidebarWidth, isResizing, xtmOneConfigured, xtmOneUrl, openChat, closeChat, toggleChat, setMode, setSidebarWidth]);
+  }), [isOpen, mode, sidebarWidth, isResizing, xtmOneConfigured, xtmOneUrl, agentMcpUrl, agentConfigured, openChat, closeChat, toggleChat, setMode, setSidebarWidth]);
 
   return (
     <ChatbotContext.Provider value={value}>

@@ -142,6 +142,12 @@ const authenticateAndVerify = async (req: Express.Request, res: Express.Response
   const licenseInfo = getEnterpriseEditionInfo(settings);
   const isLicenseValidated = pem !== undefined && licenseInfo.license_validated;
 
+  // Local opencti-agent mode: no Filigran CGU / EE requirement — the chat is
+  // served by the on-prem agent, not by Filigran services.
+  if (!xtmOneClient.isConfigured() && isAgentConfigured()) {
+    return context;
+  }
+
   if (!isChatbotCGUAccepted || !isLicenseValidated) {
     logApp.info('Chatbot not enabled', { cguStatus: settings.filigran_chatbot_ai_cgu_status, isLicenseValidated });
     res.status(400).json({ error: 'Chatbot is not enabled' });
@@ -149,6 +155,184 @@ const authenticateAndVerify = async (req: Express.Request, res: Express.Response
   }
 
   return context;
+};
+
+// ── local opencti-agent chat (M6) ────────────────────────────────────────
+// When XTM One is NOT configured but the local opencti-agent is, the same
+// /chatbot/* REST contract is served from the agent: sessions CRUD and an SSE
+// message stream speaking the @filigran/chatbot action protocol
+// (status / stream / done), so AskArianePanel works unchanged.
+const AGENT_API_URL = nconf.get('ai:agent_api_url') || 'http://127.0.0.1:8100';
+
+export const isAgentConfigured = (): boolean => !!nconf.get('ai:agent_api_url')
+  && nconf.get('ai:agent_enabled') !== false;
+
+const LOCAL_AGENT = {
+  agent_id: 'opencti-agent',
+  agent_name: 'Local Agent',
+  agent_slug: 'opencti-agent',
+  agent_description: 'Local read-only OpenCTI research agent',
+};
+
+export const getChatbotAgents = async (req: Express.Request, res: Express.Response) => {
+  try {
+    const context = await createAuthenticatedContext(req, res, 'chatbot');
+    if (!context?.user) return;
+    if (xtmOneClient.isConfigured()) {
+      // preserve the XTM One path exactly
+      const rawAgents = await xtmOneClient.listAgentsForIntent(context, (req.query.intent as string) || 'global.assistant');
+      res.json((rawAgents ?? []).map((a) => ({
+        id: a.agent_id, name: a.agent_name, slug: a.agent_slug, description: a.agent_description,
+      })));
+      return;
+    }
+    res.json([{
+      id: LOCAL_AGENT.agent_id, name: LOCAL_AGENT.agent_name,
+      slug: LOCAL_AGENT.agent_slug, description: LOCAL_AGENT.agent_description,
+    }]);
+  } catch (e: unknown) {
+    logApp.error('Error in chatbot agents (local)', { cause: e });
+    res.status(503).send({ status: 'error', error: (e as Error).message });
+  }
+};
+
+const agentHttpClient = (res: Express.Response) => getHttpClient({
+  baseURL: AGENT_API_URL,
+  responseType: 'json',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nconf.get('ai:agent_token') || ''}` },
+});
+
+export const chatbotSessionLocalProxy = async (req: Express.Request, res: Express.Response) => {
+  const context = await createAuthenticatedContext(req, res, 'chatbot');
+  if (!context?.user) return;
+  try {
+    const httpClient = agentHttpClient(res);
+    const sid = String(req.params?.conversationId ?? '');
+    const path = sid ? `/sessions/${encodeURIComponent(sid)}` : '/sessions';
+    const method = req.method as 'GET' | 'POST' | 'DELETE';
+    const response = method === 'POST'
+      ? await httpClient.post(path, req.body ?? {}, { timeout: 30_000 })
+      : method === 'DELETE'
+        ? await httpClient.delete(path, { timeout: 30_000 })
+        : await httpClient.get(path, { timeout: 30_000 });
+    if (response.status === 204) {
+      res.status(204).end();
+      return;
+    }
+    const data = response.data ?? {};
+    if (Array.isArray(data)) {
+      // list → widget ChatConversationSummary[]
+      res.json(data.map((s: Record<string, unknown>) => ({
+        conversationId: s.id,
+        title: s.title ?? '(session)',
+        updatedAt: s.updatedAt,
+        messageCount: s.messageCount,
+        agentName: LOCAL_AGENT.agent_name,
+      })));
+      return;
+    }
+    // single session → widget history shape
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    res.json({
+      conversationId: data.id ?? sid,
+      agentName: LOCAL_AGENT.agent_name,
+      messages: messages.map((m: Record<string, unknown>) => ({
+        id: `${data.id}-${m.ts ?? ''}`,
+        role: m.role,
+        content: m.content,
+        timestamp: m.ts ?? null,
+        toolNames: m.toolNames ?? [],
+      })),
+    });
+  } catch (e: unknown) {
+    logApp.error('Error in local chatbot session proxy', { cause: e });
+    res.status(503).send({ status: 'error', error: 'opencti-agent API is unreachable' });
+  }
+};
+
+// POST /chatbot/messages (local) — bridges the widget protocol to the agent's
+// streaming /ask. The agent re-chunks the finished answer (infra streaming).
+export const postChatbotMessageLocal = async (req: Express.Request, res: Express.Response) => {
+  const context = await createAuthenticatedContext(req, res, 'chatbot');
+  if (!context?.user) return;
+  addChatbotMessageCount();
+  try {
+    const content = String(req.body?.content ?? req.body?.message ?? '').trim();
+    const conversationId = req.body?.conversation_id ?? req.body?.conversationId ?? null;
+    const httpClient = getHttpClient({
+      baseURL: AGENT_API_URL,
+      responseType: 'stream',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${nconf.get('ai:agent_token') || ''}` },
+    });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const emit = (payload: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+    const response = await httpClient.post('/ask', {
+      question: content,
+      mode: 'chat',
+      ...(conversationId ? { session_id: conversationId } : {}),
+      stream: true,
+    }, { timeout: 0 });
+    // Parse the agent SSE ({delta} / final / [DONE]) and re-emit widget actions.
+    let full = '';
+    let meta: Record<string, unknown> = {};
+    let buffer = '';
+    response.data.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString('utf-8');
+      let idx: number;
+      // eslint-disable-next-line no-cond-assign
+      while ((idx = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(payload);
+          if (typeof evt.delta === 'string') {
+            full += evt.delta;
+            emit({ action: 'stream', content: evt.delta });
+          } else if (evt.task_id) {
+            meta = evt;
+          }
+        } catch { /* partial line across chunks */ }
+      }
+    });
+    response.data.on('end', () => {
+      const toolCalls = Array.isArray(meta.tool_calls) ? meta.tool_calls : [];
+      const incomplete = Boolean(meta.incomplete);
+      emit({
+        action: 'done',
+        conversationId: conversationId ?? undefined,
+        content: full,
+        toolNames: [...new Set(toolCalls)],
+        toolCallCount: toolCalls.length,
+        iterations: toolCalls.length,
+        toolCallTrace: toolCalls.map((t: string) => ({ name: t, success: true })),
+        isTruncated: incomplete,
+      });
+      res.end();
+    });
+    response.data.on('error', (error: Error) => {
+      logApp.error('Stream error in local chatbot proxy', { cause: error });
+      emit({ action: 'error', content: 'The local agent stream failed.' });
+      res.end();
+    });
+    req.on('close', () => {
+      response.data.destroy();
+    });
+  } catch (e: unknown) {
+    logApp.error('Error in local chatbot message proxy', { cause: e });
+    if (!res.headersSent) {
+      res.status(503).send({ status: 'error', error: 'opencti-agent API is unreachable' });
+    } else {
+      res.end();
+    }
+  }
 };
 
 // ── GET /chatbot/config ──────────────────────────────────────────────────
@@ -163,6 +347,10 @@ export const getChatbotConfig = async (req: Express.Request, res: Express.Respon
     res.json({
       xtm_one_url: XTM_ONE_URL || null,
       xtm_one_configured: xtmOneClient.isConfigured(),
+      // Local opencti-agent MCP endpoint (profile card) — null unless configured.
+      agent_mcp_url: nconf.get('ai:agent_mcp_url') || null,
+      // Local opencti-agent chat availability (AskAriane gate in local mode).
+      agent_configured: isAgentConfigured(),
     });
   } catch (e: unknown) {
     logApp.error('Error in chatbot config', { cause: e });
@@ -172,34 +360,14 @@ export const getChatbotConfig = async (req: Express.Request, res: Express.Respon
 
 // ── GET /chatbot/agents ─────────────────────────────────────────────────
 // Returns available agents from the stored intent catalog (no XTM One call).
-export const getChatbotAgents = async (req: Express.Request, res: Express.Response) => {
-  try {
-    const context = await authenticateAndVerify(req, res);
-    if (!context) return;
-
-    const intent = (req.query.intent as string) || 'global.assistant';
-    const rawAgents = await xtmOneClient.listAgentsForIntent(context, intent);
-    const agents = (rawAgents ?? [])
-      .map((a) => ({
-        id: a.agent_id,
-        name: a.agent_name,
-        slug: a.agent_slug,
-        description: a.agent_description,
-      }));
-
-    res.json(agents);
-  } catch (e: unknown) {
-    logApp.error('Error in chatbot agents', { cause: e });
-    const { message } = e as Error;
-    res.status(503).send({ status: 'error', error: message });
-  }
-};
-
 // ── POST /chatbot/sessions ──────────────────────────────────────────────
 // Proxies to XTM One Platform Chat API to create/resume a conversation.
 export const postChatbotSession = async (req: Express.Request, res: Express.Response) => {
   try {
     const context = await authenticateAndVerify(req, res);
+    if (!xtmOneClient.isConfigured()) {
+      return chatbotSessionLocalProxy(req, res);
+    }
     if (!context?.user) return;
     const jwt = await issueXtmJwt(context.user, XTM_ONE_URL);
     const httpClient = getXtmClient('json', {
@@ -230,6 +398,9 @@ export const postChatbotSession = async (req: Express.Request, res: Express.Resp
 export const getChatbotSessions = async (req: Express.Request, res: Express.Response) => {
   try {
     const context = await authenticateAndVerify(req, res);
+    if (!xtmOneClient.isConfigured()) {
+      return chatbotSessionLocalProxy(req, res);
+    }
     if (!context?.user) return;
     const jwt = await issueXtmJwt(context.user, XTM_ONE_URL);
     const httpClient = getXtmClient('json', {
@@ -257,6 +428,9 @@ export const getChatbotSessions = async (req: Express.Request, res: Express.Resp
 export const deleteChatbotSession = async (req: Express.Request, res: Express.Response) => {
   try {
     const context = await authenticateAndVerify(req, res);
+    if (!xtmOneClient.isConfigured()) {
+      return chatbotSessionLocalProxy(req, res);
+    }
     if (!context?.user) return;
     const conversationId = String(req.params.conversationId ?? '');
     if (!conversationId || !UUID_RE.test(conversationId)) {
@@ -432,6 +606,9 @@ export const getChatbotPendingApprovals = async (req: Express.Request, res: Expr
 export const postChatbotMessage = async (req: Express.Request, res: Express.Response) => {
   try {
     const context = await authenticateAndVerify(req, res);
+    if (!xtmOneClient.isConfigured()) {
+      return postChatbotMessageLocal(req, res);
+    }
     if (!context?.user) return;
 
     if (!req.body) {

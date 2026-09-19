@@ -22,6 +22,9 @@ interface AskArianePanelProps {
   onWidthChange?: (width: number) => void;
   onResizeStart?: () => void;
   onResizeEnd?: () => void;
+  /** Local opencti-agent mode: no XTM One extras (HITL approve, steering,
+      uploads) — the panel must not promise routes the agent doesn't serve. */
+  localOnly?: boolean;
 }
 
 const AskArianePanel: React.FC<AskArianePanelProps> = ({
@@ -31,6 +34,7 @@ const AskArianePanel: React.FC<AskArianePanelProps> = ({
   onWidthChange,
   onResizeStart,
   onResizeEnd,
+  localOnly = false,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -145,27 +149,31 @@ const AskArianePanel: React.FC<AskArianePanelProps> = ({
       apiEndpoints={{
         agents: '/agents',
         messages: '/messages',
-        // Mid-run steering — must be set explicitly because the chatbot
-        // default ('/chat/messages/steer') assumes XTM One-style paths,
-        // while the OpenCTI proxy exposes '/messages/steer'.
-        steer: '/messages/steer',
-        // Human-in-the-loop tool approval. Setting `approve` is what makes the
-        // widget advertise `supports_tool_approval`, and that flag is a promise
-        // to answer — XTM One pauses the turn and waits indefinitely — so it
-        // must name a route the OpenCTI proxy actually serves
-        // (`httpPlatform.js`), never XTM One's own path.
-        approve: '/messages/approve',
-        // Reload recovery: `approval_required` arrives once on the SSE stream,
-        // so a refresh loses the prompt (and the `tool_call_id`s a decision has
-        // to name) while the turn goes on waiting. Read as
-        // `{apiBaseUrl}/conversations/{conversation_id}/pending-approvals`.
-        pendingApprovals: '/conversations',
         sessions: '/sessions',
-        upload: '/upload',
-        download: '/files',
+        // XTM One-only extras — omitted in local mode so the widget never
+        // advertises HITL approval / steering / uploads the agent can't serve.
+        ...(localOnly ? {} : {
+          // Mid-run steering — must be set explicitly because the chatbot
+          // default ('/chat/messages/steer') assumes XTM One-style paths,
+          // while the OpenCTI proxy exposes '/messages/steer'.
+          steer: '/messages/steer',
+          // Human-in-the-loop tool approval. Setting `approve` is what makes the
+          // widget advertise `supports_tool_approval`, and that flag is a promise
+          // to answer — XTM One pauses the turn and waits indefinitely — so it
+          // must name a route the OpenCTI proxy actually serves
+          // (`httpPlatform.js`), never XTM One's own path.
+          approve: '/messages/approve',
+          // Reload recovery: `approval_required` arrives once on the SSE stream,
+          // so a refresh loses the prompt (and the `tool_call_id`s a decision has
+          // to name) while the turn goes on waiting. Read as
+          // `{apiBaseUrl}/conversations/{conversation_id}/pending-approvals`.
+          pendingApprovals: '/conversations',
+          upload: '/upload',
+          download: '/files',
+        }),
       }}
       user={{ firstName }}
-      disableFileManagement={false}
+      disableFileManagement={localOnly}
       t={tChatbot}
       accentColor={accentColor}
       logoIcon={logoIcon}
