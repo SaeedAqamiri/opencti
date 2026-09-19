@@ -46,6 +46,7 @@ import {
   getLegacyChatbotProxy,
   postChatbotMessageApprove,
   getChatbotPendingApprovals,
+  getChatbotChatStubLocal,
 } from './httpChatbotProxy';
 import { postAiAgentAsk, postAiAgentSession, getAiAgentSessions, getAiAgentSession, deleteAiAgentSession } from './httpAgentProxy';
 import { PROVIDERS } from '../modules/authenticationProvider/providers-configuration';
@@ -616,6 +617,10 @@ const createApp = async (app, schema) => {
   app.get(`${basePath}/chatbot/sessions`, getChatbotSessions);
   app.delete(`${basePath}/chatbot/sessions/:conversationId`, deleteChatbotSession);
   app.post(`${basePath}/chatbot/messages`, postChatbotMessage);
+  // Widget-internal endpoints — clean local stubs (XTM One keeps 404 fallback).
+  app.get(`${basePath}/chatbot/chat/suggestions`, getChatbotChatStubLocal);
+  app.get(`${basePath}/chatbot/chat/prompts`, getChatbotChatStubLocal);
+  app.get(`${basePath}/chatbot/chat/quota`, getChatbotChatStubLocal);
   app.post(`${basePath}/chatbot/messages/steer`, postChatbotMessageSteer);
   // Human-in-the-loop tool approval: the decision channel back into a turn
   // paused mid-answer, and the recovery read a reloaded page uses to get the

@@ -164,6 +164,23 @@ const authenticateAndVerify = async (req: Express.Request, res: Express.Response
 // (status / stream / done), so AskArianePanel works unchanged.
 const AGENT_API_URL = nconf.get('ai:agent_api_url') || 'http://127.0.0.1:8100';
 
+// Widget-internal endpoints (suggestions/prompts/quota) are XTM One services.
+// The widget falls back gracefully on failure, but serving clean empties in
+// local mode kills the 500 noise in the browser console.
+export const getChatbotChatStubLocal = async (req: Express.Request, res: Express.Response) => {
+  const context = await createAuthenticatedContext(req, res, 'chatbot');
+  if (!context?.user) return;
+  if (xtmOneClient.isConfigured()) {
+    res.sendStatus(404);
+    return;
+  }
+  if (req.path.endsWith('/quota')) {
+    res.json({ used: 0, limit: null, period: 'day' });
+    return;
+  }
+  res.json([]);
+};
+
 export const isAgentConfigured = (): boolean => !!nconf.get('ai:agent_api_url')
   && nconf.get('ai:agent_enabled') !== false;
 
@@ -271,6 +288,9 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
     const emit = (payload: Record<string, unknown>) => {
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
     };
+    // Immediate thinking status — the agent runs tools for tens of seconds
+    // before its first delta; the widget must show activity, not a frozen "…".
+    emit({ action: 'status', status: 'thinking_text', thinkingContent: 'Analyzing the knowledge graph…' });
     const response = await httpClient.post('/ask', {
       question: content,
       mode: 'chat',
