@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type Express from 'express';
 import nconf from 'nconf';
 import Busboy from 'busboy';
@@ -279,7 +279,14 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
   addChatbotMessageCount();
   try {
     const content = String(req.body?.content ?? req.body?.message ?? '').trim();
-    const conversationId = req.body?.conversation_id ?? req.body?.conversationId ?? null;
+    // The widget learns the conversation id from the `done` event and only
+    // then includes it on subsequent messages. When the first message of a
+    // chat arrives without one, mint it here and echo it back — otherwise
+    // every turn stays stateless and the agent never remembers the chat.
+    let conversationId = req.body?.conversation_id ?? req.body?.conversationId ?? null;
+    if (typeof conversationId !== 'string' || !conversationId.trim()) {
+      conversationId = randomUUID();
+    }
     const httpClient = getHttpClient({
       baseURL: AGENT_API_URL,
       responseType: 'stream',
