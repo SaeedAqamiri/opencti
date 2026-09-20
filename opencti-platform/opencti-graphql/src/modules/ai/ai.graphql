@@ -40,6 +40,7 @@ type Mutation {
 
     # Generic text
     aiImproveWriting(id: ID!, content: String!, format: Format): String @auth(for: [KNOWLEDGE_KNUPDATE])
+    aiTranslate(id: ID!, content: String!, format: Format, language: String!): String @auth(for: [KNOWLEDGE_KNUPDATE])
     aiFixSpelling(id: ID!, content: String!, format: Format): String @auth(for: [KNOWLEDGE_KNUPDATE])
     aiMakeShorter(id: ID!, content: String!, format: Format): String @auth(for: [KNOWLEDGE_KNUPDATE])
     aiMakeLonger(id: ID!, content: String!, format: Format): String @auth(for: [KNOWLEDGE_KNUPDATE])

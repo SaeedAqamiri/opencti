@@ -1,0 +1,13 @@
+version: 1
+updated: '2026-09-15T08:47:01.361Z'
+entries:
+  EETooltip.tsx:
+    summary: >-
+      EETooltip wraps EE feature buttons and intercepts clicks for non-EE users
+      (EnterpriseEditionAgreement for admins / FeedbackCreation otherwise). Branch ai-ungate changed
+      the passthrough condition at line 51 to `(isEnterpriseEdition && !forAi) || (forAi && enabled
+      && configured)` so AI buttons (forAi=true) work with just useAI() configured+enabled, while
+      non-AI EE tooltips keep their EE gate.
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/entreprise_edition/EETooltip.tsx@3724-1789461807147

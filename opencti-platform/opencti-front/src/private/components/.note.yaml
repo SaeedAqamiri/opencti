@@ -1,0 +1,24 @@
+version: 1
+updated: '2026-09-19T03:25:09.834Z'
+entries:
+  agent:
+    summary: >-
+      AgentPanel.tsx — the v3 UI surface for opencti-agent: FDS Input + Button + Spinner and
+      MarkdownDisplay (remarkGfm+commonmark) for the answer; plain fetch('/ai-agent/ask',
+      same-origin credentials) — deliberately NO Relay/graphql fragment, so no relay compile needed;
+      180s AbortSignal timeout; errors via MESSAGING$.notifyError; shows cited entity list under the
+      markdown answer. Reachable at /agent behind platform auth.
+    confidence: verified
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/agent/AgentPanel.tsx@2662-1789715538363
+relations:
+  - from: profile/ProfileOverviewXtmOneMcp.tsx
+    to: chatbox/ChatbotContext.tsx
+    description: >-
+      ProfileOverviewXtmOneMcp renders a LOCAL 'MCP server' card (agent_mcp_url from
+      /chatbot/config) when XTM One is unconfigured — pairing with the agent's streamable-http MCP
+      endpoint on :8101/mcp.
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/profile/ProfileOverviewXtmOneMcp.tsx@5200-1789785536698

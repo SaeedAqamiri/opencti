@@ -16,6 +16,7 @@ import { useFormatter } from '../../../../components/i18n';
 import { FilterGroup } from '../../../../utils/filters/filtersHelpers-types';
 import { getDefaultAiLanguage } from '../../../../utils/ai/Common';
 import { fetchQuery } from '../../../../relay/environment';
+import { insightsCacheGet, insightsCacheSet } from '../../../../utils/ai/insightsCache';
 import { cleanHtmlTags, copyToClipboard } from '../../../../utils/utils';
 import { daysAgo, monthsAgo } from '../../../../utils/Time';
 import { RelayError } from '../../../../relay/relayTypes';
@@ -285,10 +286,22 @@ const LegacyAISummaryContainers = ({ busId, isContainer, filters, loading, setLo
     language,
   };
   useEffect(() => {
+    const cacheKey = `digest:${(queryParams as { search?: string }).search ?? ''}`;
+    const cached = insightsCacheGet(cacheKey, 'digest', language);
+    if (cached) {
+      setResult({ containersAskAiSummary: { result: cached.result, topics: undefined, updated_at: new Date(cached.fetchedAt).toISOString() } } as never);
+      setContent(cached.result);
+      return;
+    }
     setLoading(true);
     fetchQuery(aISummaryContainersQuery, queryParams).toPromise().then((data) => {
       const resultData = data as AISummaryContainersContainersAskAiSummaryQuery$data;
       if (resultData && resultData.containersAskAiSummary) {
+        insightsCacheSet(cacheKey, 'digest', language, {
+          result: resultData.containersAskAiSummary.result ?? '',
+          trend: null,
+          confidence: null,
+        });
         setErrorMessage(undefined);
         setResult(resultData);
         setContent(resultData.containersAskAiSummary.result ?? '');

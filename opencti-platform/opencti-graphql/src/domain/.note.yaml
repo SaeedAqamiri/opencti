@@ -1,0 +1,19 @@
+version: 1
+updated: '2026-09-18T22:22:32.896Z'
+entries:
+  stixCoreObject.js:
+    summary: >-
+      AI insights resolvers: aiActivity (threats=[Threat-Actor-*,Intrusion-Set,Campaign,Malware];
+      victims=locations/sectors) returns {result, trend} where trend only for threats; aiForecast
+      returns {result, updated_at} - the AiForecast GraphQL type HAS a confidence field but the
+      resolver NEVER sets it (always null - product gap, benchmark phase 5 check 'valid-confidence'
+      intentionally fails); aiHistory summarizes the last 200 audit logs of the entity; all cached
+      in aiResponseCache for AI_INSIGHTS_REFRESH_TIMEOUT minutes. Container digest = aiSummary in
+      domain/container.js: takes search/filters args, fetches up to 10 containers via
+      topEntitiesList (platform full-text search - not exact match), builds content from
+      description+files+getContainerKnowledge knowledge sentences.
+    confidence: inferred
+    based_on:
+      - opencti-platform/opencti-graphql/src/domain/stixCoreObject.js@72064-1789563433245
+      - opencti-platform/opencti-graphql/src/domain/container.js@17315-1789563433246
+      - opencti-platform/opencti-graphql/src/database/middleware-loader.ts@26077-1789313542964

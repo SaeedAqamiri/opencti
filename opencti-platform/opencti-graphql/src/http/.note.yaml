@@ -1,0 +1,21 @@
+version: 1
+updated: '2026-09-19T14:44:05.125Z'
+entries:
+  httpChatbotProxy.ts:
+    summary: >-
+      Local chat bridge (postChatbotMessageLocal) — HARD-WON WIRE FORMAT: the @filigran/chatbot
+      widget with backendType='rest' parses SSE data: lines through normalizer T() which reads
+      e.type — 'stream' {content}, 'status' {status, content|tools, elapsed_s}, 'done' {content,
+      conversation_id, tool_names, tool_call_count, iterations, is_truncated} — all SNAKE_CASE;
+      events carrying the internal 'action' shape are normalized to noop and SILENTLY DROPPED
+      (symptom: frozen '…' with healthy upstream SSE). thinking_text carries text in 'content' (not
+      thinkingContent). Widget generates conversation ids CLIENT-SIDE → the agent must auto-create
+      unknown session ids (SESSIONS.ensure). Widget-internal GETs
+      /chatbot/chat/{suggestions,prompts,quota} fail-soft to props but got local stubs to kill 500
+      noise (quota {used,limit:null,period}). AskAriane gate chain (three independent gates):
+      EETooltip click-intercept (needs bypassEE prop — fires BEFORE button onClick),
+      isChatbotAiEnabled() which IS the CGU status (platformModulesHelper), and the panel render
+      condition.
+    based_on:
+      - opencti-platform/opencti-front/node_modules/@filigran/chatbot/dist/index.js
+      - opencti-platform/opencti-graphql/src/http/httpChatbotProxy.ts@61775-1789820170557

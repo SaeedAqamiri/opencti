@@ -186,6 +186,10 @@ export const ASK_AI_FEATURES = [
   'forecast',
   'history',
   'container_summary',
+  'improve_writing',
+  'translate',
+  'entity_report',
+  'convert_indicator',
 ] as const;
 export type AskAiFeature = typeof ASK_AI_FEATURES[number];
 export const AI_INSIGHT_CACHE_STATES = ['hit', 'miss'] as const;

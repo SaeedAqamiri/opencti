@@ -14,6 +14,7 @@ import { AISummaryActivitySubscription, AISummaryActivitySubscription$data } fro
 import { useFormatter } from '../../../../components/i18n';
 import { getDefaultAiLanguage } from '../../../../utils/ai/Common';
 import { fetchQuery } from '../../../../relay/environment';
+import { insightsCacheGet, insightsCacheSet } from '../../../../utils/ai/insightsCache';
 import { copyToClipboard, cleanHtmlTags } from '../../../../utils/utils';
 import { type AgentOption } from '../../../../utils/ai/agentApi';
 import useAgentStream from '../../../../utils/ai/useAgentStream';
@@ -181,10 +182,20 @@ const LegacyAISummaryActivity = ({ id, loading, setLoading }: AISummaryActivityP
     language,
   };
   useEffect(() => {
+    const cached = insightsCacheGet(id, 'activity', language);
+    if (cached) {
+      setResult({ stixCoreObjectAskAiActivity: { result: cached.result, trend: cached.trend ?? undefined, updated_at: new Date(cached.fetchedAt).toISOString() } } as never);
+      setContent(cached.result);
+      return;
+    }
     setLoading(true);
     fetchQuery(aISummaryActivityQuery, queryParams).toPromise().then((data) => {
       const resultData = data as AISummaryActivityStixCoreObjectAskAiActivityQuery$data;
       if (resultData && resultData.stixCoreObjectAskAiActivity) {
+        insightsCacheSet(id, 'activity', language, {
+          result: resultData.stixCoreObjectAskAiActivity.result ?? '',
+          trend: resultData.stixCoreObjectAskAiActivity.trend ?? null,
+        });
         setResult(resultData);
         setContent(resultData.stixCoreObjectAskAiActivity.result ?? '');
         setLoading(false);
@@ -198,6 +209,10 @@ const LegacyAISummaryActivity = ({ id, loading, setLoading }: AISummaryActivityP
     fetchQuery(aISummaryActivityQuery, { ...queryParams, forceRefresh: true }).toPromise().then((data) => {
       const resultData = data as AISummaryActivityStixCoreObjectAskAiActivityQuery$data;
       if (resultData && resultData.stixCoreObjectAskAiActivity) {
+        insightsCacheSet(id, 'activity', language, {
+          result: resultData.stixCoreObjectAskAiActivity.result ?? '',
+          trend: resultData.stixCoreObjectAskAiActivity.trend ?? null,
+        });
         setResult(resultData);
         setContent(resultData.stixCoreObjectAskAiActivity.result ?? '');
         setLoading(false);

@@ -21,10 +21,14 @@ import {
   fixSpelling,
   generateContainerReport,
   generateNLQresponse,
+  generateEntityReport,
+  convertIndicator,
+  improveWriting,
   makeLonger,
   makeShorter,
   summarize,
   summarizeFiles,
+  translate,
 } from './ai-domain';
 import { BUS_TOPICS } from '../../config/conf';
 import { AI_BUS } from './ai-types';
@@ -41,6 +45,11 @@ const aiResolvers: Resolvers = {
     aiChangeTone: (_, { id, content, format, tone }, context) => changeTone(context, context.user, id, content, format, tone),
     aiSummarize: (_, { id, content, format }, context) => summarize(context, context.user, id, content, format),
     aiExplain: (_, { id, content }, context) => explain(context, context.user, id, content),
+    aiImproveWriting: (_, { id, content, format }, context) => improveWriting(context, context.user, id, content, format),
+    aiThreatGenerateReport: (_, { id, threatId, paragraphs, tone, format }, context) => generateEntityReport(context, context.user, id, threatId, paragraphs ?? undefined, tone ?? undefined, format ?? undefined),
+    aiVictimGenerateReport: (_, { id, victimId, paragraphs, tone, format }, context) => generateEntityReport(context, context.user, id, victimId, paragraphs ?? undefined, tone ?? undefined, format ?? undefined),
+    aiConvertIndicator: (_, { id, indicatorId, format }, context) => convertIndicator(context, context.user, id, indicatorId, format),
+    aiTranslate: (_, { id, content, format, language }, context) => translate(context, context.user, id, content, format, language),
     aiNLQ: (_, args, context) => generateNLQresponse(context, context.user, args),
   },
   Subscription: {

@@ -18,6 +18,7 @@ import { isFilterGroupNotEmpty } from '../../../utils/filters/filtersUtils';
 import useAuth from '../../../utils/hooks/useAuth';
 import useDraftContext from '../../../utils/hooks/useDraftContext';
 import useEnterpriseEdition from '../../../utils/hooks/useEnterpriseEdition';
+import useAI from '../../../utils/hooks/useAI';
 import useGranted, { KNOWLEDGE, KNOWLEDGE_KNASKIMPORT } from '../../../utils/hooks/useGranted';
 import useQueryLoading from '../../../utils/hooks/useQueryLoading';
 import { decodeSearchKeyword, handleSearchByFilter, handleSearchByKeyword } from '../../../utils/SearchUtils';
@@ -85,6 +86,9 @@ const TopBarComponent: FunctionComponent<TopBarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const isEnterpriseEdition = useEnterpriseEdition();
+  // NLQ routes to the (locally ungated) aiNLQ whenever the platform AI is
+  // enabled AND an LLM is configured — same contract as EETooltip forAi.
+  const ai = useAI();
   const { t_i18n } = useFormatter();
   const {
     bannerSettings: { bannerHeightNumber },
@@ -191,7 +195,7 @@ const TopBarComponent: FunctionComponent<TopBarProps> = ({
   };
 
   const handleSearch = (searchKeyword: string, askAI = false, agentSlug?: string) => {
-    if (askAI && isEnterpriseEdition) {
+    if (askAI && ai.enabled && ai.configured) {
       nlqSearch(searchKeyword, agentSlug);
     } else {
       handleSearchByKeyword(searchKeyword, 'knowledge', navigate);

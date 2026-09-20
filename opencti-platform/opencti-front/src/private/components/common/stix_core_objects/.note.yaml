@@ -1,0 +1,25 @@
+version: 1
+updated: '2026-09-19T00:14:30.552Z'
+entries:
+  StixCoreObjectFileExport.tsx:
+    summary: >-
+      TWO different 'Generate an export' dialogs exist: (1) StixCoreObjectFilesAndHistory dialog
+      (Data tab 'Exported files' card icon; testid StixCoreObjectFilesAndHistoryExportDialog) —
+      plain SelectFieldFds format list from export CONNECTOR scopes only, NO AI option; (2)
+      StixCoreObjectFileExportForm (testid StixCoreObjectFileExportDialog, MUI Stepper Format/Form)
+      — the AI path: 'Ask AI' Card (aria-label='Ask AI', gated isContainer && enabled && configured;
+      format value 'ai' → handleOpenAskAi → StixCoreObjectAskAI 'Select options' →
+      aiContainerGenerateReport → ResponseDialog → Accept → destination Main content/New file). UI
+      entry: container Content tab → 'Mappable content' row ⋮ menu (aria-label 'Open menu') →
+      'Generate a PDF export' MenuItem (needs KNUPLOAD+KNGETEXPORT, not EE). Verified end-to-end
+      live 2026-09-19 with 200 on the wire. Gotchas: with defaultValues.format preset the dialog
+      opens at Form step — click the 'Format' StepButton to reach the cards. Playwright: Radix/FDS
+      Select popups don't respond to synthetic events and hidden-mounted MUI dialogs need
+      __reactProps onClick invocation; real user clicks always work.
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/stix_core_objects/StixCoreObjectFileExport.tsx@16760-1789313542588
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/stix_core_objects/StixCoreObjectContentFiles.tsx@13600-1789313542588
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/stix_core_objects/StixCoreObjectFilesAndHistory.jsx@23552-1789313542588

@@ -17,7 +17,9 @@ import { logApp } from '../../config/conf';
 import { FunctionalError, UnknownError } from '../../config/errors';
 import { queryAi, queryNLQAi } from '../../database/ai-llm';
 import { elSearchFiles } from '../../database/file-search';
-import { storeLoadById } from '../../database/middleware-loader';
+import { storeLoadById, fullEntitiesThroughRelationsToList } from '../../database/middleware-loader';
+import { ENTITY_TYPE_IDENTITY, ABSTRACT_STIX_OBJECT } from '../../schema/general';
+import { RELATION_CREATED_BY } from '../../schema/stixRefRelationship';
 import { isEmptyField } from '../../database/utils';
 import { generateFilterKeysSchema } from '../../domain/filterKeysSchema';
 import { findStixCoreObjectPaginated } from '../../domain/stixCoreObject';
@@ -65,6 +67,46 @@ export const fixSpelling = async (context: AuthContext, user: AuthUser, id: stri
   - If no mistake is detected, just return the original text without anything else.
   - Do NOT change the length of the text.
   - Your response should match the provided content format which is ${format}. Be sure to respect this format and to NOT output anything else than the format and the intended content.
+
+  # Content
+  ${content}
+  `;
+  const response = await queryAi(id, SYSTEM_PROMPT, prompt, user);
+  return response;
+};
+
+// Generic writing improvement (SDL-declared for years, resolver added on the
+// local ai-ungate branch): same contract as fixSpelling, no EE gate.
+export const improveWriting = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text) => {
+  addAskAiQueryCount('improve_writing');
+  if (content.length < 5) {
+    return `Content is too short (${content.length})`;
+  }
+  const prompt = `
+  # Instructions
+  - Improve the provided text: fix grammar and spelling, improve clarity, flow and professional tone.
+  - Preserve the original meaning, structure, length and technical facts. Never add or invent information.
+  - Your response should match the provided content format which is ${format}. Be sure to respect this format and to NOT output anything else than the format and the intended content.
+
+  # Content
+  ${content}
+  `;
+  const response = await queryAi(id, SYSTEM_PROMPT, prompt, user);
+  return response;
+};
+
+// Faithful translation into a target language (no summarizing, no rewriting).
+export const translate = async (context: AuthContext, user: AuthUser, id: string, content: string, format: InputMaybe<Format> = Format.Text, language: string) => {
+  addAskAiQueryCount('translate');
+  if (content.length < 5) {
+    return `Content is too short (${content.length})`;
+  }
+  const prompt = `
+  # Instructions
+  - Translate the provided text into ${language}.
+  - This is a FAITHFUL translation: preserve the meaning, structure, length, formatting and all technical facts (indicator values, hashes, names, codes) exactly.
+  - Do NOT summarize, paraphrase beyond translation, or add any information.
+  - Your response should match the provided content format which is ${format}. Be sure to respect this format and to NOT output anything else than the translated content.
 
   # Content
   ${content}
@@ -211,6 +253,76 @@ export const generateContainerReport = async (context: AuthContext, user: AuthUs
   `;
   const response = await queryAi(id, SYSTEM_PROMPT, prompt, user);
   return response.replace('```html', '').replace('```markdown', '').replace('```', '').trim();
+};
+
+// ── resolver-backed threat/victim reports + indicator conversion (ai-ungate) ──
+// The SDL declared aiThreatGenerateReport / aiVictimGenerateReport /
+// aiConvertIndicator for years without any resolver (dead schema). These
+// implementations follow generateContainerReport's grounding pattern.
+
+const ENTITY_REPORT_SYSTEM_PROMPT = 'You are an assistant aimed to generate complete report about entities from a cyber threat intelligence knowledge graph based on the STIX 2.1 model.';
+
+const buildEntityKnowledge = async (context: AuthContext, user: AuthUser, entityId: string) => {
+  const relations = await fullEntitiesThroughRelationsToList(context, user, entityId, '*', [ABSTRACT_STIX_OBJECT]);
+  const sentences = relations
+    .map((r: any) => `${r.from?.name ?? '?'} ${r.relationship_type ?? 'related-to'} ${r.to?.name ?? '?'}${r.description ? ` (${String(r.description).slice(0, 200)})` : ''}`)
+    .join('\n');
+  return sentences;
+};
+
+export const generateEntityReport = async (
+  context: AuthContext, user: AuthUser, id: string, entityId: string,
+  paragraphs = 8, tone: Tone = Tone.Tactical, format: Format = Format.Html,
+) => {
+  addAskAiQueryCount('entity_report');
+  const entity = await storeLoadById(context, user, entityId, ABSTRACT_STIX_OBJECT) as any & { entity_type: string; name: string; description?: string };
+  if (!entity) throw FunctionalError('Entity not found', { entityId });
+  const knowledge = await buildEntityKnowledge(context, user, entity.id);
+  if (isEmptyField(knowledge) || knowledge.length === 0) {
+    return 'Not enough data to generate a report for this entity.';
+  }
+  const author = await fullEntitiesThroughRelationsToList(context, user, entity.id, RELATION_CREATED_BY, [ENTITY_TYPE_IDENTITY]);
+  const authorName = (author.at(0) as { name?: string } | undefined)?.name ?? 'Unknown';
+  const entityName = (entity as { name?: string }).name ?? '';
+  const prompt = `
+  # Instructions
+  - Generate a complete and structured report about the ${entity.entity_type} named ${entityName} using the knowledge graph facts below.
+  - The report should be ${paragraphs} paragraphs of approximately 5 lines each, with a ${tone} focus.
+  - Structure: overview, relationships to other entities (tools, malware, targets, techniques), notable facts, and a short assessment.
+  - For all technical indicators found, generate a table at the end.
+  - Your response should be in ${format} format. Do not output anything else.
+  - Reference facts ONLY from the knowledge below; do not invent information.
+
+  # Context
+  - Entity: ${entityName} (${entity.entity_type})
+  - Description: ${entity.description ?? 'none'}
+  - Author: ${authorName}
+
+  # Knowledge
+  ${knowledge}
+  `;
+  const response = await queryAi(id, ENTITY_REPORT_SYSTEM_PROMPT, prompt, user);
+  return response.replace('```html', '').replace('```markdown', '').replace('```', '').trim();
+};
+
+export const convertIndicator = async (context: AuthContext, user: AuthUser, id: string, indicatorId: string, format: any) => {
+  addAskAiQueryCount('convert_indicator');
+  const indicator = await storeLoadById(context, user, indicatorId, 'Indicator') as any;
+  if (!indicator) throw FunctionalError('Indicator not found', { indicatorId });
+  const prompt = `
+  # Instructions
+  - Convert the indicator below into a valid ${format} detection rule / representation.
+  - Derive it ONLY from the indicator's pattern, type and description. Do not invent values.
+  - Respond with ONLY the converted artifact (no explanations, no markdown fences).
+
+  # Indicator
+  - Name: ${indicator.name}
+  - Pattern: ${indicator.pattern}
+  - Pattern type: ${indicator.pattern_type}
+  - Description: ${indicator.description ?? 'none'}
+  `;
+  const response = await queryAi(id, SYSTEM_PROMPT, prompt, user);
+  return response.replace('```', '').trim();
 };
 
 // TODO This function is deprecated (AI Insights)

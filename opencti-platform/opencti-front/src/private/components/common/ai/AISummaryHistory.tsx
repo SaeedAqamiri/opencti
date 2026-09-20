@@ -13,6 +13,7 @@ import { AISummaryHistoryStixCoreObjectAskAiHistoryQuery$data } from '@component
 import { useFormatter } from '../../../../components/i18n';
 import { getDefaultAiLanguage } from '../../../../utils/ai/Common';
 import { fetchQuery } from '../../../../relay/environment';
+import { insightsCacheGet, insightsCacheSet } from '../../../../utils/ai/insightsCache';
 import { copyToClipboard, cleanHtmlTags } from '../../../../utils/utils';
 import { type AgentOption } from '../../../../utils/ai/agentApi';
 import useAgentStream from '../../../../utils/ai/useAgentStream';
@@ -117,10 +118,19 @@ const LegacyAISummaryHistory = ({ id, loading, setLoading }: AISummaryHistoryPro
     language,
   };
   useEffect(() => {
+    const cached = insightsCacheGet(id, 'history', language);
+    if (cached) {
+      setResult({ stixCoreObjectAskAiHistory: { result: cached.result, updated_at: new Date(cached.fetchedAt).toISOString() } } as never);
+      setContent(cached.result);
+      return;
+    }
     setLoading(true);
     fetchQuery(aISummaryHistoryQuery, queryParams).toPromise().then((data) => {
       const resultData = data as AISummaryHistoryStixCoreObjectAskAiHistoryQuery$data;
       if (resultData && resultData.stixCoreObjectAskAiHistory) {
+        insightsCacheSet(id, 'history', language, {
+          result: resultData.stixCoreObjectAskAiHistory.result ?? '',
+        });
         setResult(resultData);
         setContent(resultData.stixCoreObjectAskAiHistory.result ?? '');
         setLoading(false);

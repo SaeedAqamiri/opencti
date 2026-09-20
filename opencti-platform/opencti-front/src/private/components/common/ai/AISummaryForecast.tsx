@@ -12,6 +12,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { AISummaryForecastSubscription, AISummaryForecastSubscription$data } from './__generated__/AISummaryForecastSubscription.graphql';
 import { useFormatter } from '../../../../components/i18n';
 import { fetchQuery } from '../../../../relay/environment';
+import { insightsCacheGet, insightsCacheSet } from '../../../../utils/ai/insightsCache';
 import { getDefaultAiLanguage } from '../../../../utils/ai/Common';
 import { copyToClipboard, cleanHtmlTags } from '../../../../utils/utils';
 import { type AgentOption } from '../../../../utils/ai/agentApi';
@@ -120,10 +121,19 @@ const LegacyAISummaryForecast = ({ id, loading, setLoading }: AISummaryForecastP
     language,
   };
   useEffect(() => {
+    const cached = insightsCacheGet(id, 'forecast', language);
+    if (cached) {
+      setResult({ stixCoreObjectAskAiForecast: { result: cached.result, updated_at: new Date(cached.fetchedAt).toISOString() } } as never);
+      setContent(cached.result);
+      return;
+    }
     setLoading(true);
     fetchQuery(aISummaryForecastQuery, queryParams).toPromise().then((data) => {
       const resultData = data as AISummaryForecastStixCoreObjectAskAiForecastQuery$data;
       if (resultData && resultData.stixCoreObjectAskAiForecast) {
+        insightsCacheSet(id, 'forecast', language, {
+          result: resultData.stixCoreObjectAskAiForecast.result ?? '',
+        });
         setResult(resultData);
         setContent(resultData.stixCoreObjectAskAiForecast.result ?? '');
         setLoading(false);

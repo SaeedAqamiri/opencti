@@ -1,0 +1,12 @@
+version: 1
+updated: '2026-09-15T08:47:01.361Z'
+entries:
+  TextFieldAskAI.tsx:
+    summary: >-
+      Ask-AI button for text/html/markdown fields; renders menu with the 6 AI actions and commits
+      TextFieldAskAI*Mutation GraphQL mutations. Gate removed on ai-ungate: handleOpenMenu no longer
+      requires useEnterpriseEdition(); it opens the menu unless XTM One CGU is pending
+      (isCGUStatusPending). showAIButton:121 already allowed display without EE.
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/form/TextFieldAskAI.tsx@17323-1789461807147

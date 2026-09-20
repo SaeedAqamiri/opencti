@@ -1,0 +1,28 @@
+version: 1
+updated: '2026-09-18T22:22:32.896Z'
+entries:
+  ai-domain.ts:
+    summary: >-
+      AI domain on ai-ungate: all EE gates removed except deprecated summarizeFiles:218 and
+      convertFilesToStix:278. filtersEntityIdsMapping resolver upgraded (phase 4):
+      resolveValuesIdsMapForEntityTypes for Stix-Core-Object tries (a) exact 'name' filter query,
+      (b) 'aliases' filter query (merged entities keep old names as aliases only — e.g. APT29 lives
+      as UNC2452 after import upsert), (c) full-text _score with preferExactNameMatch helper (exact
+      name + non-revoked preference). Without this, OTX reports mentioning 'APT28' hijack
+      resolution.
+    based_on:
+      - opencti-platform/opencti-graphql/src/modules/ai/ai-domain.ts@22489-1789408657857
+      - opencti-platform/opencti-graphql/src/modules/ai/ai-domain.ts@22448-1789509143208
+      - opencti-platform/opencti-graphql/src/modules/ai/ai-domain.ts@24448-1789575595796
+  ai-resolver.ts:
+    summary: >-
+      ai-resolver.ts registers only 10 mutation resolvers: aiContainerGenerateReport,
+      aiSummarizeFiles, aiConvertFilesToStix, aiFixSpelling, aiMakeShorter, aiMakeLonger,
+      aiChangeTone, aiSummarize, aiExplain, aiNLQ. The SDL also DECLARES aiThreatGenerateReport,
+      aiVictimGenerateReport, aiConvertIndicator, aiImproveWriting (ai.graphql lines 33-42) but NO
+      resolver exists in this checkout - calling them returns null silently. Therefore the
+      agent_reports benchmark phase 10 measures the AGENT-side replacements instead.
+    confidence: inferred
+    based_on:
+      - opencti-platform/opencti-graphql/src/modules/ai/ai-resolver.ts@2417-1789313543010
+      - opencti-platform/opencti-graphql/src/modules/ai/ai.graphql@2080-1789313543010

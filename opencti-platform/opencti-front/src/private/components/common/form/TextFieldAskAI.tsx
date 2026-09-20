@@ -4,12 +4,15 @@ import Dialog from '@common/dialog/Dialog';
 import FiligranIcon from '@components/common/FiligranIcon';
 import { TextFieldAskAIChangeToneMutation, TextFieldAskAIChangeToneMutation$data } from '@components/common/form/__generated__/TextFieldAskAIChangeToneMutation.graphql';
 import { TextFieldAskAIExplainMutation, TextFieldAskAIExplainMutation$data } from '@components/common/form/__generated__/TextFieldAskAIExplainMutation.graphql';
+import { TextFieldAskAITranslateMutation, TextFieldAskAITranslateMutation$data } from '@components/common/form/__generated__/TextFieldAskAITranslateMutation.graphql';
+import { TextFieldAskAIImproveWritingMutation, TextFieldAskAIImproveWritingMutation$data } from '@components/common/form/__generated__/TextFieldAskAIImproveWritingMutation.graphql';
 import { TextFieldAskAIFixSpellingMutation, TextFieldAskAIFixSpellingMutation$data } from '@components/common/form/__generated__/TextFieldAskAIFixSpellingMutation.graphql';
 import { TextFieldAskAIMakeLongerMutation, TextFieldAskAIMakeLongerMutation$data } from '@components/common/form/__generated__/TextFieldAskAIMakeLongerMutation.graphql';
 import { TextFieldAskAIMakeShorterMutation, TextFieldAskAIMakeShorterMutation$data } from '@components/common/form/__generated__/TextFieldAskAIMakeShorterMutation.graphql';
 import { TextFieldAskAISummarizeMutation, TextFieldAskAISummarizeMutation$data } from '@components/common/form/__generated__/TextFieldAskAISummarizeMutation.graphql';
 import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
+import TextField from '@mui/material/TextField';
 import Menu from '@mui/material/Menu';
 import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@filigran/design-system';
 import MenuItem from '@mui/material/MenuItem';
@@ -31,7 +34,7 @@ import useEnterpriseEdition from '../../../../utils/hooks/useEnterpriseEdition';
 import { useChatbot } from '../../chatbox/ChatbotContext';
 
 // region types
-export type AgentAction = 'spelling' | 'shorter' | 'longer' | 'tone' | 'summarize' | 'explain';
+export type AgentAction = 'spelling' | 'shorter' | 'longer' | 'tone' | 'summarize' | 'explain' | 'translate' | 'improve_writing';
 
 export interface AgentMode {
   intent: string;
@@ -86,6 +89,18 @@ const textFieldAskAIExplainMutation = graphql`
   }
 `;
 
+const textFieldAskAITranslateMutation = graphql`
+  mutation TextFieldAskAITranslateMutation($id: ID!, $content: String!, $format: Format, $language: String!) {
+    aiTranslate(id: $id, content: $content, format: $format, language: $language)
+  }
+`;
+
+const textFieldAskAIImproveWritingMutation = graphql`
+  mutation TextFieldAskAIImproveWritingMutation($id: ID!, $content: String!, $format: Format) {
+    aiImproveWriting(id: $id, content: $content, format: $format)
+  }
+`;
+
 const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
   currentValue,
   setFieldValue,
@@ -133,6 +148,8 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
   const [commitMutationChangeTone] = useApiMutation<TextFieldAskAIChangeToneMutation>(textFieldAskAIChangeToneMutation);
   const [commitMutationSummarize] = useApiMutation<TextFieldAskAISummarizeMutation>(textFieldAskAISummarizeMutation);
   const [commitMutationExplain] = useApiMutation<TextFieldAskAIExplainMutation>(textFieldAskAIExplainMutation);
+  const [commitMutationTranslate] = useApiMutation<TextFieldAskAITranslateMutation>(textFieldAskAITranslateMutation);
+  const [commitMutationImproveWriting] = useApiMutation<TextFieldAskAIImproveWritingMutation>(textFieldAskAIImproveWritingMutation);
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
     event.preventDefault();
@@ -161,6 +178,8 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
     tone: 'global.change_tone',
     summarize: 'global.summarize',
     explain: 'global.explain',
+    translate: 'global.translate',
+    improve_writing: 'global.improve_writing',
   };
 
   const handleAgentAction = (action: AgentAction) => {
@@ -179,6 +198,12 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
 
   // ── Legacy GraphQL path ───────────────────────────────────────────────
 
+  const [translateDialogOpen, setTranslateDialogOpen] = useState(false);
+  const [translateLanguage, setTranslateLanguage] = useState('');
+  const handleOpenTranslateOptions = () => {
+    setTranslateLanguage('');
+    setTranslateDialogOpen(true);
+  };
   const handleOpenToneOptions = () => {
     handleCloseMenu();
     setOpenToneOptions(true);
@@ -271,6 +296,32 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
           },
         });
         break;
+      case 'translate':
+        commitMutationTranslate({
+          variables: { id, content: currentValue, format, language: translateLanguage },
+          onCompleted: (response: TextFieldAskAITranslateMutation$data) => {
+            setContent(response?.aiTranslate ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'improve_writing':
+        commitMutationImproveWriting({
+          variables: { id, content: currentValue, format },
+          onCompleted: (response: TextFieldAskAIImproveWritingMutation$data) => {
+            setContent(response?.aiImproveWriting ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
       default:
         break;
     }
@@ -329,6 +380,12 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
           <MenuItem onClick={() => (useXtmOne ? handleAgentAction('explain') : handleLegacyAskAi('explain', false))}>
             {t_i18n('Explain')}
           </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('improve_writing') : handleLegacyAskAi('improve_writing'))}>
+            {t_i18n('Improve writing')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('translate') : handleOpenTranslateOptions())}>
+            {t_i18n('Translate')}
+          </MenuItem>
         </Menu>
         {busId && (
           <ResponseDialog
@@ -378,6 +435,35 @@ const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
                 onClick={() => {
                   handleCloseToneOptions();
                   handleLegacyAskAi('tone');
+                }}
+              >
+                {t_i18n('Generate')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+        {/* Legacy translate language dialog (only used when XTM One is NOT configured) */}
+        {!useXtmOne && (
+          <Dialog
+            open={translateDialogOpen}
+            onClose={() => setTranslateDialogOpen(false)}
+            title={t_i18n('Select options')}
+          >
+            <TextField
+              label={t_i18n('Target language')}
+              value={translateLanguage}
+              onChange={(e) => setTranslateLanguage(e.target.value)}
+              fullWidth
+            />
+            <DialogActions>
+              <Button variant="secondary" onClick={() => setTranslateDialogOpen(false)}>
+                {t_i18n('Cancel')}
+              </Button>
+              <Button
+                disabled={translateLanguage.trim().length < 2}
+                onClick={() => {
+                  setTranslateDialogOpen(false);
+                  handleLegacyAskAi('translate');
                 }}
               >
                 {t_i18n('Generate')}
