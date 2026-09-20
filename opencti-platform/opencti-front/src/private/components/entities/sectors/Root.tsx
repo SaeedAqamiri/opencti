@@ -7,6 +7,7 @@ import { RootSectorSubscription } from '@components/entities/sectors/__generated
 import useQueryLoading from 'src/utils/hooks/useQueryLoading';
 import useForceUpdate from '@components/common/bulk/useForceUpdate';
 import AIInsights from '@components/common/ai/AIInsights';
+import EntityAiReportButton from '@components/common/ai/EntityAiReportButton';
 import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
 import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
 import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
@@ -219,7 +220,12 @@ const RootSector = ({ sectorId, queryRef }: RootSectorProps) => {
                   />
                 ),
               }}
-              extraActions={isOverview && <AIInsights id={sector.id} />}
+              extraActions={isOverview && (
+                <>
+                  <AIInsights id={sector.id} />
+                  <EntityAiReportButton entityId={sector.id} mode="victim" />
+                </>
+              )}
             />
           </div>
         </>

@@ -7,6 +7,7 @@ import { GraphQLSubscriptionConfig } from 'relay-runtime';
 import { RootThreatActorsGroupSubscription } from '@components/threats/threat_actors_group/__generated__/RootThreatActorsGroupSubscription.graphql';
 import useForceUpdate from '@components/common/bulk/useForceUpdate';
 import AIInsights from '@components/common/ai/AIInsights';
+import EntityAiReportButton from '@components/common/ai/EntityAiReportButton';
 import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
 import ThreatActorGroup from './ThreatActorGroup';
 import ThreatActorGroupKnowledge from './ThreatActorGroupKnowledge';
@@ -203,7 +204,12 @@ const RootThreatActorGroup = ({ queryRef, threatActorGroupId }: RootThreatActorG
                 history:
                   <StixCoreObjectHistory stixCoreObjectId={threatActorGroupId} />,
               }}
-              extraActions={isOverview && <AIInsights id={threatActorGroup.id} />}
+              extraActions={isOverview && (
+                <>
+                  <AIInsights id={threatActorGroup.id} />
+                  <EntityAiReportButton entityId={threatActorGroup.id} mode="threat" />
+                </>
+              )}
             />
           </div>
         </>

@@ -1,5 +1,5 @@
 version: 1
-updated: '2026-09-19T03:25:09.834Z'
+updated: '2026-09-20T14:44:41.123Z'
 entries:
   agent:
     summary: >-
@@ -22,3 +22,15 @@ relations:
     based_on:
       - >-
         opencti-platform/opencti-front/src/private/components/profile/ProfileOverviewXtmOneMcp.tsx@5200-1789785536698
+  - from: threats/threat_actors_individual/Root.tsx
+    to: common/ai/EntityAiReportButton.tsx
+    description: >-
+      Root.tsx renders EntityAiReportButton mode='threat' in StixDomainObjectMain extraActions
+      (overview only) next to AIInsights; same wiring in threat_actors_group/Root.tsx,
+      countries/Root.tsx and sectors/Root.tsx (mode='victim' for the latter two).
+    confidence: verified
+    based_on:
+      - >-
+        opencti-platform/opencti-front/src/private/components/threats/threat_actors_individual/Root.tsx@10523-1789915048052
+      - >-
+        opencti-platform/opencti-front/src/private/components/common/ai/EntityAiReportButton.tsx@6622-1789915031156

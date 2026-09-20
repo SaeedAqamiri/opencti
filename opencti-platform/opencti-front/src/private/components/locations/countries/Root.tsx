@@ -5,6 +5,7 @@ import { GraphQLSubscriptionConfig } from 'relay-runtime';
 import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
 import useForceUpdate from '@components/common/bulk/useForceUpdate';
 import AIInsights from '@components/common/ai/AIInsights';
+import EntityAiReportButton from '@components/common/ai/EntityAiReportButton';
 import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
 import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
 import Country from './Country';
@@ -205,7 +206,12 @@ const RootCountryComponent = ({ queryRef, countryId }: RootCountryComponentProps
                 history:
                   <StixCoreObjectHistory stixCoreObjectId={countryId} />,
               }}
-              extraActions={isOverview && <AIInsights id={country.id} />}
+              extraActions={isOverview && (
+                <>
+                  <AIInsights id={country.id} />
+                  <EntityAiReportButton entityId={country.id} mode="victim" />
+                </>
+              )}
             />
           </div>
         </>

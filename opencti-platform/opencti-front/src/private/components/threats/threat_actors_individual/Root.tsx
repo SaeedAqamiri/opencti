@@ -5,6 +5,7 @@ import { GraphQLSubscriptionConfig } from 'relay-runtime';
 import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
 import useForceUpdate from '@components/common/bulk/useForceUpdate';
 import AIInsights from '@components/common/ai/AIInsights';
+import EntityAiReportButton from '@components/common/ai/EntityAiReportButton';
 import ErrorNotFound from '../../../../components/ErrorNotFound';
 import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
 import Loader, { LoaderVariant } from '../../../../components/Loader';
@@ -217,7 +218,12 @@ const RootThreatActorIndividualComponent = ({
                 history:
                   <StixCoreObjectHistory stixCoreObjectId={threatActorIndividualId} />,
               }}
-              extraActions={isOverview && <AIInsights id={threatActorIndividual.id} />}
+              extraActions={isOverview && (
+                <>
+                  <AIInsights id={threatActorIndividual.id} />
+                  <EntityAiReportButton entityId={threatActorIndividual.id} mode="threat" />
+                </>
+              )}
             />
           </div>
         </>
