@@ -17,8 +17,11 @@ import { logApp } from '../../config/conf';
 import { FunctionalError, UnknownError } from '../../config/errors';
 import { queryAi, queryNLQAi } from '../../database/ai-llm';
 import { elSearchFiles } from '../../database/file-search';
-import { storeLoadById, fullEntitiesThroughRelationsToList } from '../../database/middleware-loader';
+import { storeLoadById, fullEntitiesThroughRelationsToList, fullRelationsList } from '../../database/middleware-loader';
+import { elFindByIds } from '../../database/engine';
 import { ENTITY_TYPE_IDENTITY, ABSTRACT_STIX_OBJECT } from '../../schema/general';
+import { STIX_CORE_RELATIONSHIPS } from '../../schema/stixCoreRelationship';
+import { extractEntityRepresentativeName } from '../../database/entity-representative';
 import { RELATION_CREATED_BY } from '../../schema/stixRefRelationship';
 import { isEmptyField } from '../../database/utils';
 import { generateFilterKeysSchema } from '../../domain/filterKeysSchema';
@@ -262,11 +265,40 @@ export const generateContainerReport = async (context: AuthContext, user: AuthUs
 
 const ENTITY_REPORT_SYSTEM_PROMPT = 'You are an assistant aimed to generate complete report about entities from a cyber threat intelligence knowledge graph based on the STIX 2.1 model.';
 
+const ENTITY_KNOWLEDGE_MAX_RELATIONS = 150;
+
+// Ground the report on every stix-core-relationship touching the entity (both
+// directions). We fetch relations with the concrete relationship types ('*' is
+// not expanded by the elastic layer) and resolve both endpoints' names.
 const buildEntityKnowledge = async (context: AuthContext, user: AuthUser, entityId: string) => {
-  const relations = await fullEntitiesThroughRelationsToList(context, user, entityId, '*', [ABSTRACT_STIX_OBJECT]);
-  const sentences = relations
-    .map((r: any) => `${r.from?.name ?? '?'} ${r.relationship_type ?? 'related-to'} ${r.to?.name ?? '?'}${r.description ? ` (${String(r.description).slice(0, 200)})` : ''}`)
-    .join('\n');
+  const relations = await fullRelationsList<any>(context, user, STIX_CORE_RELATIONSHIPS as unknown as string, {
+    noFiltersChecking: true,
+    filters: {
+      mode: 'and' as any,
+      filters: [
+        {
+          key: ['connections'],
+          values: [],
+          nested: [{ key: 'internal_id', values: [entityId] }],
+        },
+      ],
+      filterGroups: [],
+    } as any,
+  });
+  const endpointIds = Array.from(new Set(relations.flatMap((r: any) => [r.fromId, r.toId]).filter(Boolean)));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const nodes = (await elFindByIds(context, user, endpointIds)) as any[];
+  const nodeById = new Map<string, any>((nodes ?? []).map((n: any) => [n.id, n]));
+  const label = (n: any) => (n ? `${n.entity_type} ${extractEntityRepresentativeName(n)}` : 'unknown entity');
+  const truncated = relations.length > ENTITY_KNOWLEDGE_MAX_RELATIONS;
+  const sentences = relations.slice(0, ENTITY_KNOWLEDGE_MAX_RELATIONS).map((r: any) => {
+    const from = nodeById.get(r.fromId);
+    const to = nodeById.get(r.toId);
+    return `- The ${label(from)} ${r.relationship_type} the ${label(to)}.`;
+  });
+  if (truncated) {
+    sentences.push(`- (... ${relations.length - ENTITY_KNOWLEDGE_MAX_RELATIONS} more relationships omitted)`);
+  }
   return sentences;
 };
 
@@ -278,7 +310,7 @@ export const generateEntityReport = async (
   const entity = await storeLoadById(context, user, entityId, ABSTRACT_STIX_OBJECT) as any & { entity_type: string; name: string; description?: string };
   if (!entity) throw FunctionalError('Entity not found', { entityId });
   const knowledge = await buildEntityKnowledge(context, user, entity.id);
-  if (isEmptyField(knowledge) || knowledge.length === 0) {
+  if (knowledge.length === 0 && isEmptyField(entity.description)) {
     return 'Not enough data to generate a report for this entity.';
   }
   const author = await fullEntitiesThroughRelationsToList(context, user, entity.id, RELATION_CREATED_BY, [ENTITY_TYPE_IDENTITY]);
@@ -299,7 +331,7 @@ export const generateEntityReport = async (
   - Author: ${authorName}
 
   # Knowledge
-  ${knowledge}
+  ${knowledge.length > 0 ? knowledge.join('\n') : '(No relationships recorded for this entity; base the report on the description above.)'}
   `;
   const response = await queryAi(id, ENTITY_REPORT_SYSTEM_PROMPT, prompt, user);
   return response.replace('```html', '').replace('```markdown', '').replace('```', '').trim();
