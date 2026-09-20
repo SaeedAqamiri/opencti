@@ -225,11 +225,23 @@ export const chatbotSessionLocalProxy = async (req: Express.Request, res: Expres
   try {
     const httpClient = agentHttpClient(res);
     const sid = String(req.params?.conversationId ?? '');
-    const path = sid ? `/sessions/${encodeURIComponent(sid)}` : '/sessions';
     const method = req.method as 'GET' | 'POST' | 'DELETE';
-    const response = method === 'POST'
+    // Widget restore: POST {conversation_id, agent_slug} must return the
+    // EXISTING conversation's messages. Without this branch the POST would
+    // reach the agent's create-session route and mint an empty session,
+    // re-pointing the widget at a blank conversation.
+    const restoreId = method === 'POST'
+      ? String(req.body?.conversation_id ?? req.body?.conversationId ?? '').trim()
+      : '';
+    const path = sid
+      ? `/sessions/${encodeURIComponent(sid)}`
+      : restoreId
+        ? `/sessions/${encodeURIComponent(restoreId)}`
+        : '/sessions';
+    const requestMethod = method === 'POST' && restoreId ? 'GET' : method;
+    const response = requestMethod === 'POST'
       ? await httpClient.post(path, req.body ?? {}, { timeout: 30_000 })
-      : method === 'DELETE'
+      : requestMethod === 'DELETE'
         ? await httpClient.delete(path, { timeout: 30_000 })
         : await httpClient.get(path, { timeout: 30_000 });
     if (response.status === 204) {
@@ -238,27 +250,29 @@ export const chatbotSessionLocalProxy = async (req: Express.Request, res: Expres
     }
     const data = response.data ?? {};
     if (Array.isArray(data)) {
-      // list → widget ChatConversationSummary[]
+      // list → widget history menu. The widget runtime normalizer reads
+      // snake_case (conversation_id ?? id, updated_at, message_count,
+      // agent_name) and silently DROPS entries whose conversation_id/id is
+      // not a non-empty string — camelCase keys empty the history.
       res.json(data.map((s: Record<string, unknown>) => ({
-        conversationId: s.id,
+        conversation_id: s.id,
         title: s.title ?? '(session)',
-        updatedAt: s.updatedAt,
-        messageCount: s.messageCount,
-        agentName: LOCAL_AGENT.agent_name,
+        updated_at: s.updatedAt,
+        message_count: s.messageCount,
+        agent_name: LOCAL_AGENT.agent_name,
       })));
       return;
     }
-    // single session → widget history shape
+    // single session → widget restore shape
     const messages = Array.isArray(data.messages) ? data.messages : [];
     res.json({
-      conversationId: data.id ?? sid,
-      agentName: LOCAL_AGENT.agent_name,
+      conversation_id: data.id ?? sid ?? restoreId,
+      agent_name: LOCAL_AGENT.agent_name,
       messages: messages.map((m: Record<string, unknown>) => ({
-        id: `${data.id}-${m.ts ?? ''}`,
         role: m.role,
         content: m.content,
-        timestamp: m.ts ?? null,
-        toolNames: m.toolNames ?? [],
+        ...(Array.isArray(m.toolNames) ? { tool_names: m.toolNames } : {}),
+        ...(Array.isArray(m.toolCallTrace) ? { tool_call_trace: m.toolCallTrace } : {}),
       })),
     });
   } catch (e: unknown) {
