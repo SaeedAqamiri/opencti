@@ -352,6 +352,10 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
     response.data.on('end', () => {
       const toolCalls = Array.isArray(meta.tool_calls) ? meta.tool_calls : [];
       const incomplete = Boolean(meta.incomplete);
+      // Full per-call trace (name/input/output/success) from the agent —
+      // rendered by the widget's Reasoning-details dialog once the answer is
+      // complete. Names remain as the lightweight fallback.
+      const toolTrace = Array.isArray(meta.tool_call_trace) ? meta.tool_call_trace : undefined;
       emit({
         type: 'done',
         conversation_id: conversationId ?? undefined,
@@ -359,6 +363,7 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
         tool_names: [...new Set(toolCalls)],
         tool_call_count: toolCalls.length,
         iterations: toolCalls.length,
+        ...(toolTrace ? { tool_call_trace: toolTrace } : {}),
         is_truncated: incomplete,
       });
       res.end();
