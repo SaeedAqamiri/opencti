@@ -24,6 +24,7 @@ import { XTM_HUB_AUTO_REGISTER_QUERY_PARAM, XTM_HUB_PERMISSION_REQUIRED_DIALOG_S
 
 const Security = lazy(() => import('../../../utils/Security'));
 const Settings = lazy(() => import('./Settings'));
+const AiModels = lazy(() => import('./AiModels'));
 const FileIndexing = lazy(() => import('./file_indexing/FileIndexing'));
 const Experience = lazy(() => import('./Experience'));
 const RootAccesses = lazy(() => import('./accesses/Root'));
@@ -63,6 +64,14 @@ const Root = () => {
                 placeholder={<Navigate to={fallbackUrl} />}
               >
                 <Settings />
+              </Security>
+            )}
+          />
+          <Route
+            path="/ai"
+            element={(
+              <Security needs={[SETTINGS_SETPARAMETERS]} placeholder={<Navigate to={fallbackUrl} />}>
+                <AiModels />
               </Security>
             )}
           />

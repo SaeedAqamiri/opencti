@@ -1413,6 +1413,8 @@ type Settings implements InternalObject & BasicObject & ThemeSettings & IntlSett
   platform_ai_type: String
   platform_ai_model: String
   platform_ai_has_token: Boolean!
+  platform_ai_providers: [AiProvider!]!
+  platform_ai_active_provider: String!
   # XTM1 AI
   filigran_chatbot_ai_url: String
   filigran_chatbot_ai_cgu_status: CGUStatus!
@@ -1423,6 +1425,21 @@ type Settings implements InternalObject & BasicObject & ThemeSettings & IntlSett
 type MapCustomFile {
   name: String!
   size: Float!
+}
+
+type AiProvider {
+  id: ID!
+  name: String!
+  endpoint: String!
+  model: String!
+  api_key_set: Boolean!
+}
+
+input AiProviderInput {
+  name: String!
+  endpoint: String!
+  model: String!
+  api_key: String
 }
 
 ############## Groups
@@ -15749,6 +15766,10 @@ type SettingsEditMutations {
   updateHeaderAuth(input: HeadersAuthConfigInput!): Settings @auth(for: [SETTINGS_SETACCESSES])
   uploadMapCustomFile(file: Upload!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
   deleteMapCustomFile: Settings @auth(for: [SETTINGS_SETPARAMETERS])
+  aiProviderAdd(input: AiProviderInput!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
+  aiProviderEdit(id: ID!, input: AiProviderInput!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
+  aiProviderDelete(id: ID!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
+  aiProviderSetActive(id: ID!): Settings @auth(for: [SETTINGS_SETPARAMETERS])
 }
 type SubTypeEditMutations {
   statusAdd(input: StatusAddInput!): SubType

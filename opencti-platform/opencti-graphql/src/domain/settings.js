@@ -24,7 +24,7 @@ import { publishUserAction } from '../listener/UserActionListener';
 import { getEntitiesListFromCache, getEntityFromCache } from '../database/cache';
 import { now } from '../utils/format';
 import { generateInternalId, generateStandardId } from '../schema/identifier';
-import { ForbiddenAccess, UnsupportedError } from '../config/errors';
+import { ForbiddenAccess, FunctionalError, UnsupportedError } from '../config/errors';
 import { isEmptyField, isNotEmptyField } from '../database/utils';
 import { ENTITY_TYPE_MARKING_DEFINITION } from '../schema/stixMetaObject';
 import { decodeLicensePem, getEnterpriseEditionInfo } from '../modules/settings/licensing';
@@ -35,6 +35,16 @@ import { findById as findThemeById } from '../modules/theme/theme-domain';
 import { buildAvailableProviders } from './setting-auth';
 import { CguStatus } from '../generated/graphql';
 import { getXtmOneRegistrationVersion } from '../modules/xtm/one/xtm-one';
+import {
+  AI_ENV_PROVIDER_ID,
+  buildStoredAiProvider,
+  envPublicAiProvider,
+  readStoredAiProviders,
+  resetAiRuntimeConfigCache,
+  resolveAiRuntimeFromSettings,
+  toPublicAiProvider,
+  validateAiProviderInput,
+} from '../modules/ai/ai-config';
 
 export const getMemoryStatistics = () => {
   return { ...process.memoryUsage(), ...getHeapStatistics() };
@@ -127,6 +137,8 @@ export const getSettings = async (context) => {
   const clusterInfo = await getClusterInformation();
   const eeInfo = getEnterpriseEditionInfo(platformSettings);
   const platformTheme = await findThemeById(context, SYSTEM_USER, platformSettings.platform_theme);
+  const aiRuntime = resolveAiRuntimeFromSettings(platformSettings);
+  const storedAiProviders = await readStoredAiProviders();
 
   return {
     ...platformSettings,
@@ -145,9 +157,11 @@ export const getSettings = async (context) => {
     platform_openaev_url: nconf.get('xtm:openaev_url'),
     platform_opengrc_url: nconf.get('xtm:opengrc_url'),
     platform_xtmhub_url: nconf.get('xtm:xtmhub_url'),
-    platform_ai_type: `${getAIEndpointType()} ${nconf.get('ai:type')}`,
-    platform_ai_model: nconf.get('ai:model'),
-    platform_ai_has_token: !!isNotEmptyField(nconf.get('ai:token')),
+    platform_ai_type: `${getAIEndpointType()} ${aiRuntime.type}`,
+    platform_ai_model: aiRuntime.model,
+    platform_ai_has_token: isNotEmptyField(aiRuntime.token),
+    platform_ai_providers: [envPublicAiProvider(), ...storedAiProviders.map(toPublicAiProvider)],
+    platform_ai_active_provider: aiRuntime.id,
     platform_theme: platformTheme,
     platform_trash_enabled: nconf.get('app:trash:enabled') ?? true,
     platform_translations: nconf.get('app:translations') ?? '{}',
@@ -361,6 +375,98 @@ export const settingsEditField = async (context, user, settingsId, input) => {
 
 export const setupEnterpriseLicense = (context, user, { settingId, license }) => {
   return settingsEditField(context, user, settingId, [{ key: 'enterprise_license', value: [license] }]);
+};
+
+const loadSettingsEntity = async (context, user, settingsId) => {
+  const settings = await storeLoadById(context, user, settingsId, ENTITY_TYPE_SETTINGS);
+  if (!settings) {
+    throw FunctionalError('Cannot find platform settings', { id: settingsId });
+  }
+  return settings;
+};
+
+const persistAiProviders = async (context, user, settingsId, providers, activeProvider) => {
+  const data = [{ key: 'platform_ai_providers', value: providers }];
+  if (activeProvider !== undefined) {
+    data.push({ key: 'platform_ai_active_provider', value: [activeProvider] });
+  }
+  await updateAttribute(context, user, settingsId, ENTITY_TYPE_SETTINGS, data);
+  resetAiRuntimeConfigCache();
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: 'updates `platform_ai_providers` for `platform settings`',
+    context_data: { id: settingsId, entity_type: ENTITY_TYPE_SETTINGS, input: data },
+  });
+  const updatedSettings = await getSettings(context);
+  return notify(BUS_TOPICS.Settings.EDIT_TOPIC, updatedSettings, user);
+};
+
+export const settingsAiProviderAdd = async (context, user, settingsId, input) => {
+  await loadSettingsEntity(context, user, settingsId);
+  const providers = await readStoredAiProviders();
+  const provider = buildStoredAiProvider(input);
+  if (providers.some((p) => p.name === provider.name)) {
+    throw FunctionalError('An AI provider with this name already exists', { name: provider.name });
+  }
+  return persistAiProviders(context, user, settingsId, [...providers, provider]);
+};
+
+export const settingsAiProviderEdit = async (context, user, settingsId, providerId, input) => {
+  const settings = await loadSettingsEntity(context, user, settingsId);
+  const providers = (Array.isArray(settings.platform_ai_providers) ? settings.platform_ai_providers : [])
+    .map((p) => ({ ...p }));
+  const provider = providers.find((p) => p.id === providerId);
+  if (!provider) {
+    throw FunctionalError('AI provider not found', { id: providerId });
+  }
+  const validated = validateAiProviderInput(input);
+  provider.name = validated.name;
+  provider.endpoint = validated.endpoint;
+  provider.model = validated.model;
+  if (isNotEmptyField(validated.api_key)) {
+    provider.api_key = validated.api_key; // empty api_key keeps the stored one
+  }
+  return persistAiProviders(context, user, settingsId, providers);
+};
+
+export const settingsAiProviderDelete = async (context, user, settingsId, providerId) => {
+  if (providerId === AI_ENV_PROVIDER_ID) {
+    throw FunctionalError('The environment configuration provider cannot be deleted');
+  }
+  const settings = await loadSettingsEntity(context, user, settingsId);
+  const providers = (Array.isArray(settings.platform_ai_providers) ? settings.platform_ai_providers : [])
+    .filter((p) => p.id !== providerId);
+  if (providers.length === (settings.platform_ai_providers ?? []).length) {
+    throw FunctionalError('AI provider not found', { id: providerId });
+  }
+  const activeProvider = settings.platform_ai_active_provider === providerId ? AI_ENV_PROVIDER_ID : undefined;
+  return persistAiProviders(context, user, settingsId, providers, activeProvider);
+};
+
+export const settingsAiProviderSetActive = async (context, user, settingsId, providerId) => {
+  if (providerId !== AI_ENV_PROVIDER_ID) {
+    const settings = await loadSettingsEntity(context, user, settingsId);
+    const providers = Array.isArray(settings.platform_ai_providers) ? settings.platform_ai_providers : [];
+    if (!providers.some((p) => p.id === providerId)) {
+      throw FunctionalError('AI provider not found', { id: providerId });
+    }
+  }
+  const data = [{ key: 'platform_ai_active_provider', value: [providerId] }];
+  await updateAttribute(context, user, settingsId, ENTITY_TYPE_SETTINGS, data);
+  resetAiRuntimeConfigCache();
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `sets \`${providerId}\` as active AI provider for \`platform settings\``,
+    context_data: { id: settingsId, entity_type: ENTITY_TYPE_SETTINGS, input: data },
+  });
+  const updatedSettings = await getSettings(context);
+  return notify(BUS_TOPICS.Settings.EDIT_TOPIC, updatedSettings, user);
 };
 
 export const getMessagesFilteredByRecipients = (user, settings) => {

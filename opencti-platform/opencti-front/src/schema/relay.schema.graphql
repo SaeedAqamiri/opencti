@@ -1480,6 +1480,8 @@ type Settings implements InternalObject & BasicObject & ThemeSettings & IntlSett
   platform_ai_type: String
   platform_ai_model: String
   platform_ai_has_token: Boolean!
+  platform_ai_providers: [AiProvider!]!
+  platform_ai_active_provider: String!
   filigran_chatbot_ai_url: String
   filigran_chatbot_ai_cgu_status: CGUStatus!
   platform_map_custom_file: MapCustomFile
@@ -1488,6 +1490,21 @@ type Settings implements InternalObject & BasicObject & ThemeSettings & IntlSett
 type MapCustomFile {
   name: String!
   size: Float!
+}
+
+type AiProvider {
+  id: ID!
+  name: String!
+  endpoint: String!
+  model: String!
+  api_key_set: Boolean!
+}
+
+input AiProviderInput {
+  name: String!
+  endpoint: String!
+  model: String!
+  api_key: String
 }
 
 enum GroupsOrdering {
@@ -9721,6 +9738,10 @@ type SettingsEditMutations {
   updateHeaderAuth(input: HeadersAuthConfigInput!): Settings
   uploadMapCustomFile(file: Upload!): Settings
   deleteMapCustomFile: Settings
+  aiProviderAdd(input: AiProviderInput!): Settings
+  aiProviderEdit(id: ID!, input: AiProviderInput!): Settings
+  aiProviderDelete(id: ID!): Settings
+  aiProviderSetActive(id: ID!): Settings
 }
 
 type SubTypeEditMutations {

@@ -5,12 +5,13 @@ import { Mistral } from '@mistralai/mistralai';
 import type { ChatCompletionStreamRequest } from '@mistralai/mistralai/models/components';
 import { AuthenticationError, AzureOpenAI, OpenAI } from 'openai';
 import dns from 'node:dns';
-import { z } from 'zod';
-import conf, { BUS_TOPICS, logApp } from '../config/conf';
+import conf, { booleanConf, BUS_TOPICS, logApp } from '../config/conf';
 import { UnknownError, UnsupportedError } from '../config/errors';
 import { OutputSchema } from '../modules/ai/ai-nlq-schema';
 import type { Output } from '../modules/ai/ai-nlq-schema';
 import { AI_BUS } from '../modules/ai/ai-types';
+import { resolveAiRuntimeConfig } from '../modules/ai/ai-config';
+import type { AiRuntimeConfig } from '../modules/ai/ai-config';
 import type { AuthUser } from '../types/user';
 import { truncate } from '../utils/format';
 import { notify } from './redis';
@@ -20,57 +21,52 @@ import { isEmptyField } from './utils';
 // have no IPv6 route; undici/fetch then hangs instead of falling back.
 dns.setDefaultResultOrder('ipv4first');
 
-const AI_ENABLED = conf.get('ai:enabled');
-const AI_TYPE = conf.get('ai:type');
-const AI_ENDPOINT = conf.get('ai:endpoint');
-const AI_TOKEN = conf.get('ai:token');
-const AI_MODEL = conf.get('ai:model');
-const AI_MAX_TOKENS = conf.get('ai:max_tokens');
-const AI_VERSION = conf.get('ai:version');
-const AI_AZURE_INSTANCE = conf.get('ai:ai_azure_instance');
-const AI_AZURE_DEPLOYMENT = conf.get('ai:ai_azure_deployment');
+interface AiClients {
+  cfg: AiRuntimeConfig;
+  client: Mistral | OpenAI | AzureOpenAI | null;
+  nlqChat: ChatOpenAI | ChatMistralAI | AzureChatOpenAI | null;
+}
 
-let client: Mistral | OpenAI | AzureOpenAI | null = null;
-let nlqChat: ChatOpenAI | ChatMistralAI | AzureChatOpenAI | null = null;
-if (AI_ENABLED && AI_TOKEN) {
-  switch (AI_TYPE) {
-    case 'mistralai':
-      client = new Mistral({
-        serverURL: isEmptyField(AI_ENDPOINT) ? undefined : AI_ENDPOINT,
-        apiKey: AI_TOKEN,
-        /* uncomment if you need low level debug on AI
-        debugLogger: {
-          log: (message, args) => logApp.info(`[AI] log ${message}`, { message }),
-          group: (label) => logApp.info(`[AI] group ${label} start.`),
-          groupEnd: () => logApp.info('[AI] group end.'),
-        } */
+// Clients are (re)built from the resolved runtime configuration (registry
+// active provider, or the ai:* environment configuration) and cached until
+// that configuration changes.
+const buildClients = (cfg: AiRuntimeConfig): { client: AiClients['client']; nlqChat: AiClients['nlqChat'] } => {
+  if (!booleanConf('ai:enabled', false) || isEmptyField(cfg.token)) {
+    return { client: null, nlqChat: null };
+  }
+  switch (cfg.type) {
+    case 'mistralai': {
+      const client = new Mistral({
+        serverURL: isEmptyField(cfg.endpoint) ? undefined : cfg.endpoint,
+        apiKey: cfg.token ?? undefined,
       });
 
-      if (AI_ENDPOINT.includes('https://api.mistral.ai')) {
+      let nlqChat: ChatOpenAI | ChatMistralAI;
+      if ((cfg.endpoint ?? '').includes('https://api.mistral.ai')) {
         // Official MistralAI API
         nlqChat = new ChatMistralAI({
-          model: AI_MODEL,
-          apiKey: AI_TOKEN,
+          model: cfg.model ?? undefined,
+          apiKey: cfg.token ?? undefined,
           temperature: 0,
         });
       } else {
         // Mistral model deployed via vLLM (OpenAI-compatible)
         nlqChat = new ChatOpenAI({
-          model: AI_MODEL,
-          apiKey: AI_TOKEN,
+          model: cfg.model ?? undefined,
+          apiKey: cfg.token ?? undefined,
           temperature: 0,
           configuration: {
-            baseURL: `${AI_ENDPOINT}/v1`,
+            baseURL: `${cfg.endpoint}/v1`,
           },
         });
       }
+      return { client, nlqChat };
+    }
 
-      break;
-
-    case 'openai':
-      client = new OpenAI({
-        apiKey: AI_TOKEN,
-        ...(isEmptyField(AI_ENDPOINT) ? {} : { baseURL: AI_ENDPOINT }),
+    case 'openai': {
+      const client = new OpenAI({
+        apiKey: cfg.token ?? undefined,
+        ...(isEmptyField(cfg.endpoint) ? {} : { baseURL: cfg.endpoint }),
         // Pin the global fetch implementation: esbuild-bundled SDK may otherwise
         // pick its undici-based transport, which is flaky in some environments
         // (e.g. IPv6-only DNS answers on hosts without an IPv6 route).
@@ -79,52 +75,82 @@ if (AI_ENABLED && AI_TOKEN) {
         timeout: 180000,
       });
 
-      nlqChat = new ChatOpenAI({
-        model: AI_MODEL,
-        apiKey: AI_TOKEN,
+      const nlqChat = new ChatOpenAI({
+        model: cfg.model ?? undefined,
+        apiKey: cfg.token ?? undefined,
         temperature: 0,
         configuration: {
-          baseURL: AI_ENDPOINT || undefined,
+          baseURL: cfg.endpoint || undefined,
         },
       });
+      return { client, nlqChat };
+    }
 
-      break;
-
-    case 'azureopenai':
-      client = new AzureOpenAI({
-        apiKey: AI_TOKEN,
-        ...(isEmptyField(AI_ENDPOINT) ? {} : { baseURL: AI_ENDPOINT }),
-        ...(isEmptyField(AI_VERSION) ? {} : { apiVersion: AI_VERSION }),
+    case 'azureopenai': {
+      const client = new AzureOpenAI({
+        apiKey: cfg.token ?? undefined,
+        ...(isEmptyField(cfg.endpoint) ? {} : { baseURL: cfg.endpoint }),
+        ...(isEmptyField(conf.get('ai:version')) ? {} : { apiVersion: conf.get('ai:version') }),
       });
 
-      nlqChat = new AzureChatOpenAI({
-        azureOpenAIApiKey: AI_TOKEN,
-        azureOpenAIApiVersion: AI_VERSION,
-        azureOpenAIApiInstanceName: AI_AZURE_INSTANCE,
-        azureOpenAIApiDeploymentName: AI_AZURE_DEPLOYMENT,
+      const nlqChat = new AzureChatOpenAI({
+        azureOpenAIApiKey: cfg.token ?? undefined,
+        azureOpenAIApiVersion: conf.get('ai:version'),
+        azureOpenAIApiInstanceName: conf.get('ai:ai_azure_instance'),
+        azureOpenAIApiDeploymentName: conf.get('ai:ai_azure_deployment'),
         temperature: 0,
       });
-
-      break;
+      return { client, nlqChat };
+    }
 
     default:
-      throw UnsupportedError('Not supported AI type (currently support: mistralai, openai, azureopenai)', { type: AI_TYPE });
+      throw UnsupportedError('Not supported AI type (currently support: mistralai, openai, azureopenai)', { type: cfg.type });
   }
-}
+};
+
+let clientsCache: { key: string; clients: AiClients } | null = null;
+
+const getAiClients = async (): Promise<AiClients> => {
+  const cfg = await resolveAiRuntimeConfig();
+  const key = JSON.stringify({
+    enabled: booleanConf('ai:enabled', false),
+    id: cfg.id,
+    type: cfg.type,
+    endpoint: cfg.endpoint,
+    token: cfg.token,
+    model: cfg.model,
+    maxTokens: cfg.maxTokens,
+    version: conf.get('ai:version'),
+    azure_instance: conf.get('ai:ai_azure_instance'),
+    azure_deployment: conf.get('ai:ai_azure_deployment'),
+  });
+  if (!clientsCache || clientsCache.key !== key) {
+    clientsCache = { key, clients: { cfg, ...buildClients(cfg) } };
+  }
+  return clientsCache.clients;
+};
+
+const badAiConfigError = (cfg: AiRuntimeConfig, forNlq = false) => UnsupportedError(forNlq ? 'Incorrect AI configuration for NLQ' : 'Incorrect AI configuration', {
+  enabled: booleanConf('ai:enabled', false),
+  type: cfg.type,
+  endpoint: cfg.endpoint,
+  model: cfg.model,
+});
 
 // Query MistralAI (Streaming)
 export const queryMistralAi = async (busId: string | null, systemMessage: string, userMessage: string, user: AuthUser) => {
+  const { cfg, client } = await getAiClients();
   if (!client) {
-    throw UnsupportedError('Incorrect AI configuration', { enabled: AI_ENABLED, type: AI_TYPE, endpoint: AI_ENDPOINT, model: AI_MODEL });
+    throw badAiConfigError(cfg);
   }
   try {
     logApp.debug('[AI] Querying MistralAI with prompt', { questionStart: userMessage.substring(0, 100) });
     const request: ChatCompletionStreamRequest = {
-      model: AI_MODEL,
+      model: cfg.model ?? '',
       temperature: 0,
       messages: [
         { role: 'system', content: systemMessage },
-        { role: 'user', content: truncate(userMessage, AI_MAX_TOKENS, false) },
+        { role: 'user', content: truncate(userMessage, cfg.maxTokens ?? undefined, false) },
       ],
     };
     const response = await (client as Mistral)?.chat.stream(request);
@@ -154,16 +180,17 @@ export const queryMistralAi = async (busId: string | null, systemMessage: string
 
 // Query OpenAI (Streaming)
 export const queryChatGpt = async (busId: string | null, developerMessage: string, userMessage: string, user: AuthUser) => {
+  const { cfg, client } = await getAiClients();
   if (!client) {
-    throw UnsupportedError('Incorrect AI configuration', { enabled: AI_ENABLED, type: AI_TYPE, endpoint: AI_ENDPOINT, model: AI_MODEL });
+    throw badAiConfigError(cfg);
   }
   try {
-    logApp.info('[AI] Querying OpenAI with prompt', { type: AI_TYPE });
+    logApp.info('[AI] Querying OpenAI with prompt', { type: cfg.type, provider: cfg.id, model: cfg.model });
     const response = await (client as OpenAI)?.chat.completions.create({
-      model: AI_MODEL,
+      model: cfg.model ?? '',
       messages: [
         { role: 'system', content: developerMessage },
-        { role: 'user', content: truncate(userMessage, AI_MAX_TOKENS, false) },
+        { role: 'user', content: truncate(userMessage, cfg.maxTokens ?? undefined, false) },
       ],
       stream: true,
     });
@@ -204,14 +231,15 @@ export const queryChatGpt = async (busId: string | null, developerMessage: strin
 // Generic AI Query Handler
 export const queryAi = async (busId: string | null, developerMessage: string | null, userMessage: string, user: AuthUser) => {
   const finalDeveloperMessage = developerMessage || 'You are an assistant helping a cyber threat intelligence analyst to better understand cyber threat intelligence data.';
-  switch (AI_TYPE) {
+  const { cfg } = await getAiClients();
+  switch (cfg.type) {
     case 'mistralai':
       return queryMistralAi(busId, finalDeveloperMessage, userMessage, user);
     case 'azureopenai':
     case 'openai':
       return queryChatGpt(busId, finalDeveloperMessage, userMessage, user);
     default:
-      throw UnsupportedError('Not supported AI type', { type: AI_TYPE });
+      throw UnsupportedError('Not supported AI type', { type: cfg.type });
   }
 };
 
@@ -220,24 +248,22 @@ export const queryAi = async (busId: string | null, developerMessage: string | n
 // e.g. z.ai; the raw SDK tool-call path is reliable and returns the same
 // zod-validated Output).
 export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
-  const badAiConfigError = UnsupportedError('Incorrect AI configuration for NLQ', {
-    enabled: AI_ENABLED,
-    type: AI_TYPE,
-    endpoint: AI_ENDPOINT,
-    model: AI_MODEL,
-  });
+  const { cfg, client, nlqChat } = await getAiClients();
+  const nlqBadAiConfigError = badAiConfigError(cfg, true);
   if (!nlqChat || !client) {
-    throw badAiConfigError;
+    throw nlqBadAiConfigError;
   }
 
   // NLQ usage telemetry is counted at the feature entry point
   // (generateNLQresponse in ai-domain) so it stays backend-agnostic.
 
-  logApp.info('[NLQ] Querying AI model for structured output');
+  logApp.info('[NLQ] Querying AI model for structured output', { provider: cfg.id, model: cfg.model });
   try {
-    if (AI_TYPE === 'openai') {
-      const roleMap: Record<string, string> = { human: 'user', ai: 'assistant', system: 'system', tool: 'tool', function: 'function' };
-      const messages = promptValue.messages.map((m) => ({
+    if (cfg.type === 'openai') {
+      // The NLQ prompt only carries plain text roles (human/ai/system); anything
+      // else falls back to 'user' so the payload matches ChatCompletionMessageParam.
+      const roleMap: Record<string, 'user' | 'assistant' | 'system'> = { human: 'user', ai: 'assistant', system: 'system' };
+      const messages: OpenAI.Chat.ChatCompletionMessageParam[] = promptValue.messages.map((m) => ({
         role: roleMap[m._getType() as string] ?? 'user',
         content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
       }));
@@ -245,8 +271,8 @@ export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
       // exact output JSON shape; json_object mode is far more reliable on
       // OpenAI-compatible gateways than a complex anyOf tool schema.
       const response = await (client as OpenAI).chat.completions.create({
-        model: AI_MODEL,
-        messages: messages as { role: string; content: string }[],
+        model: cfg.model ?? '',
+        messages,
         response_format: { type: 'json_object' },
         temperature: 0,
         max_tokens: 16000,
@@ -272,11 +298,10 @@ export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
         return parseWithSalvage(candidate);
       } catch (e) {
         // one self-repair round: show the model its invalid JSON + the validation errors
-        if (AI_TYPE !== 'openai') throw e;
         const repair = await (client as OpenAI).chat.completions.create({
-          model: AI_MODEL,
+          model: cfg.model ?? '',
           messages: [
-            ...(messages as { role: string; content: string }[]),
+            ...messages,
             { role: 'assistant', content: String(content) },
             { role: 'user', content: `Your previous JSON was invalid: ${String(e).slice(0, 500)}. Return the corrected JSON only, same required shape.` },
           ],
@@ -294,7 +319,7 @@ export const queryNLQAi = async (promptValue: ChatPromptValueInterface) => {
     return await nlqChat.withStructuredOutput<Output>(OutputSchema).invoke(promptValue);
   } catch (err) {
     if (err instanceof AuthenticationError) {
-      throw badAiConfigError;
+      throw nlqBadAiConfigError;
     }
     throw UnknownError('Error when calling the NLQ model', { cause: err, error_message: String(err).slice(0, 500), promptValue });
   }

@@ -613,6 +613,22 @@ export type AiHistory = {
   updated_at?: Maybe<Scalars['DateTime']['output']>;
 };
 
+export type AiProvider = {
+  __typename?: 'AiProvider';
+  api_key_set: Scalars['Boolean']['output'];
+  endpoint: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  model: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type AiProviderInput = {
+  api_key?: InputMaybe<Scalars['String']['input']>;
+  endpoint: Scalars['String']['input'];
+  model: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+};
+
 export type AiSummary = {
   __typename?: 'AiSummary';
   refreshed_at?: Maybe<Scalars['DateTime']['output']>;
@@ -30713,9 +30729,11 @@ export type Settings = BasicObject & InternalObject & IntlSettings & ThemeSettin
   password_policy_min_uppercase?: Maybe<Scalars['Int']['output']>;
   password_policy_min_words?: Maybe<Scalars['Int']['output']>;
   password_policy_validity_days?: Maybe<Scalars['Int']['output']>;
+  platform_ai_active_provider: Scalars['String']['output'];
   platform_ai_enabled: Scalars['Boolean']['output'];
   platform_ai_has_token: Scalars['Boolean']['output'];
   platform_ai_model?: Maybe<Scalars['String']['output']>;
+  platform_ai_providers: Array<AiProvider>;
   platform_ai_type?: Maybe<Scalars['String']['output']>;
   platform_banner_level?: Maybe<Scalars['String']['output']>;
   platform_banner_text?: Maybe<Scalars['String']['output']>;
@@ -30781,6 +30799,10 @@ export type Settings = BasicObject & InternalObject & IntlSettings & ThemeSettin
 
 export type SettingsEditMutations = {
   __typename?: 'SettingsEditMutations';
+  aiProviderAdd?: Maybe<Settings>;
+  aiProviderDelete?: Maybe<Settings>;
+  aiProviderEdit?: Maybe<Settings>;
+  aiProviderSetActive?: Maybe<Settings>;
   contextClean?: Maybe<Settings>;
   contextPatch?: Maybe<Settings>;
   deleteMapCustomFile?: Maybe<Settings>;
@@ -30791,6 +30813,27 @@ export type SettingsEditMutations = {
   updateHeaderAuth?: Maybe<Settings>;
   updateLocalAuth?: Maybe<Settings>;
   uploadMapCustomFile?: Maybe<Settings>;
+};
+
+
+export type SettingsEditMutationsAiProviderAddArgs = {
+  input: AiProviderInput;
+};
+
+
+export type SettingsEditMutationsAiProviderDeleteArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type SettingsEditMutationsAiProviderEditArgs = {
+  id: Scalars['ID']['input'];
+  input: AiProviderInput;
+};
+
+
+export type SettingsEditMutationsAiProviderSetActiveArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -39965,6 +40008,8 @@ export type ResolversTypes = ResolversObject<{
   AiActivity: ResolverTypeWrapper<AiActivity>;
   AiForecast: ResolverTypeWrapper<AiForecast>;
   AiHistory: ResolverTypeWrapper<AiHistory>;
+  AiProvider: ResolverTypeWrapper<AiProvider>;
+  AiProviderInput: AiProviderInput;
   AiSummary: ResolverTypeWrapper<AiSummary>;
   Analysis: ResolverTypeWrapper<ResolversUnionTypes<ResolversTypes>['Analysis']>;
   AnalysisContentType: AnalysisContentType;
@@ -40833,7 +40878,7 @@ export type ResolversTypes = ResolversObject<{
   SendUserMailInput: SendUserMailInput;
   SessionDetail: ResolverTypeWrapper<SessionDetail>;
   Settings: ResolverTypeWrapper<Omit<Settings, 'activity_listeners' | 'editContext' | 'messages_administration' | 'platform_critical_alerts' | 'platform_ip_whitelist_exclusions' | 'platform_messages' | 'platform_organization' | 'platform_theme'> & { activity_listeners?: Maybe<Array<ResolversTypes['Member']>>, editContext?: Maybe<Array<ResolversTypes['EditUserContext']>>, messages_administration?: Maybe<Array<ResolversTypes['SettingsMessage']>>, platform_critical_alerts: Array<ResolversTypes['PlatformCriticalAlert']>, platform_ip_whitelist_exclusions?: Maybe<Array<ResolversTypes['Member']>>, platform_messages?: Maybe<Array<ResolversTypes['SettingsMessage']>>, platform_organization?: Maybe<ResolversTypes['Organization']>, platform_theme?: Maybe<ResolversTypes['Theme']> }>;
-  SettingsEditMutations: ResolverTypeWrapper<Omit<SettingsEditMutations, 'contextClean' | 'contextPatch' | 'deleteMapCustomFile' | 'deleteMessage' | 'editMessage' | 'fieldPatch' | 'updateCertAuth' | 'updateHeaderAuth' | 'updateLocalAuth' | 'uploadMapCustomFile'> & { contextClean?: Maybe<ResolversTypes['Settings']>, contextPatch?: Maybe<ResolversTypes['Settings']>, deleteMapCustomFile?: Maybe<ResolversTypes['Settings']>, deleteMessage?: Maybe<ResolversTypes['Settings']>, editMessage?: Maybe<ResolversTypes['Settings']>, fieldPatch?: Maybe<ResolversTypes['Settings']>, updateCertAuth?: Maybe<ResolversTypes['Settings']>, updateHeaderAuth?: Maybe<ResolversTypes['Settings']>, updateLocalAuth?: Maybe<ResolversTypes['Settings']>, uploadMapCustomFile?: Maybe<ResolversTypes['Settings']> }>;
+  SettingsEditMutations: ResolverTypeWrapper<Omit<SettingsEditMutations, 'aiProviderAdd' | 'aiProviderDelete' | 'aiProviderEdit' | 'aiProviderSetActive' | 'contextClean' | 'contextPatch' | 'deleteMapCustomFile' | 'deleteMessage' | 'editMessage' | 'fieldPatch' | 'updateCertAuth' | 'updateHeaderAuth' | 'updateLocalAuth' | 'uploadMapCustomFile'> & { aiProviderAdd?: Maybe<ResolversTypes['Settings']>, aiProviderDelete?: Maybe<ResolversTypes['Settings']>, aiProviderEdit?: Maybe<ResolversTypes['Settings']>, aiProviderSetActive?: Maybe<ResolversTypes['Settings']>, contextClean?: Maybe<ResolversTypes['Settings']>, contextPatch?: Maybe<ResolversTypes['Settings']>, deleteMapCustomFile?: Maybe<ResolversTypes['Settings']>, deleteMessage?: Maybe<ResolversTypes['Settings']>, editMessage?: Maybe<ResolversTypes['Settings']>, fieldPatch?: Maybe<ResolversTypes['Settings']>, updateCertAuth?: Maybe<ResolversTypes['Settings']>, updateHeaderAuth?: Maybe<ResolversTypes['Settings']>, updateLocalAuth?: Maybe<ResolversTypes['Settings']>, uploadMapCustomFile?: Maybe<ResolversTypes['Settings']> }>;
   SettingsMessage: ResolverTypeWrapper<Omit<SettingsMessage, 'recipients'> & { recipients?: Maybe<Array<ResolversTypes['Member']>> }>;
   SettingsMessageInput: SettingsMessageInput;
   SmtpAuthType: SmtpAuthType;
@@ -41136,6 +41181,8 @@ export type ResolversParentTypes = ResolversObject<{
   AiActivity: AiActivity;
   AiForecast: AiForecast;
   AiHistory: AiHistory;
+  AiProvider: AiProvider;
+  AiProviderInput: AiProviderInput;
   AiSummary: AiSummary;
   Analysis: ResolversUnionTypes<ResolversParentTypes>['Analysis'];
   Any: Scalars['Any']['output'];
@@ -41880,7 +41927,7 @@ export type ResolversParentTypes = ResolversObject<{
   SendUserMailInput: SendUserMailInput;
   SessionDetail: SessionDetail;
   Settings: Omit<Settings, 'activity_listeners' | 'editContext' | 'messages_administration' | 'platform_critical_alerts' | 'platform_ip_whitelist_exclusions' | 'platform_messages' | 'platform_organization' | 'platform_theme'> & { activity_listeners?: Maybe<Array<ResolversParentTypes['Member']>>, editContext?: Maybe<Array<ResolversParentTypes['EditUserContext']>>, messages_administration?: Maybe<Array<ResolversParentTypes['SettingsMessage']>>, platform_critical_alerts: Array<ResolversParentTypes['PlatformCriticalAlert']>, platform_ip_whitelist_exclusions?: Maybe<Array<ResolversParentTypes['Member']>>, platform_messages?: Maybe<Array<ResolversParentTypes['SettingsMessage']>>, platform_organization?: Maybe<ResolversParentTypes['Organization']>, platform_theme?: Maybe<ResolversParentTypes['Theme']> };
-  SettingsEditMutations: Omit<SettingsEditMutations, 'contextClean' | 'contextPatch' | 'deleteMapCustomFile' | 'deleteMessage' | 'editMessage' | 'fieldPatch' | 'updateCertAuth' | 'updateHeaderAuth' | 'updateLocalAuth' | 'uploadMapCustomFile'> & { contextClean?: Maybe<ResolversParentTypes['Settings']>, contextPatch?: Maybe<ResolversParentTypes['Settings']>, deleteMapCustomFile?: Maybe<ResolversParentTypes['Settings']>, deleteMessage?: Maybe<ResolversParentTypes['Settings']>, editMessage?: Maybe<ResolversParentTypes['Settings']>, fieldPatch?: Maybe<ResolversParentTypes['Settings']>, updateCertAuth?: Maybe<ResolversParentTypes['Settings']>, updateHeaderAuth?: Maybe<ResolversParentTypes['Settings']>, updateLocalAuth?: Maybe<ResolversParentTypes['Settings']>, uploadMapCustomFile?: Maybe<ResolversParentTypes['Settings']> };
+  SettingsEditMutations: Omit<SettingsEditMutations, 'aiProviderAdd' | 'aiProviderDelete' | 'aiProviderEdit' | 'aiProviderSetActive' | 'contextClean' | 'contextPatch' | 'deleteMapCustomFile' | 'deleteMessage' | 'editMessage' | 'fieldPatch' | 'updateCertAuth' | 'updateHeaderAuth' | 'updateLocalAuth' | 'uploadMapCustomFile'> & { aiProviderAdd?: Maybe<ResolversParentTypes['Settings']>, aiProviderDelete?: Maybe<ResolversParentTypes['Settings']>, aiProviderEdit?: Maybe<ResolversParentTypes['Settings']>, aiProviderSetActive?: Maybe<ResolversParentTypes['Settings']>, contextClean?: Maybe<ResolversParentTypes['Settings']>, contextPatch?: Maybe<ResolversParentTypes['Settings']>, deleteMapCustomFile?: Maybe<ResolversParentTypes['Settings']>, deleteMessage?: Maybe<ResolversParentTypes['Settings']>, editMessage?: Maybe<ResolversParentTypes['Settings']>, fieldPatch?: Maybe<ResolversParentTypes['Settings']>, updateCertAuth?: Maybe<ResolversParentTypes['Settings']>, updateHeaderAuth?: Maybe<ResolversParentTypes['Settings']>, updateLocalAuth?: Maybe<ResolversParentTypes['Settings']>, uploadMapCustomFile?: Maybe<ResolversParentTypes['Settings']> };
   SettingsMessage: Omit<SettingsMessage, 'recipients'> & { recipients?: Maybe<Array<ResolversParentTypes['Member']>> };
   SettingsMessageInput: SettingsMessageInput;
   SmtpConfiguration: SmtpConfiguration;
@@ -42321,6 +42368,14 @@ export type AiHistoryResolvers<ContextType = any, ParentType extends ResolversPa
   refreshed_at?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
   result?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   updated_at?: Resolver<Maybe<ResolversTypes['DateTime']>, ParentType, ContextType>;
+}>;
+
+export type AiProviderResolvers<ContextType = any, ParentType extends ResolversParentTypes['AiProvider'] = ResolversParentTypes['AiProvider']> = ResolversObject<{
+  api_key_set?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
+  endpoint?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  id?: Resolver<ResolversTypes['ID'], ParentType, ContextType>;
+  model?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
+  name?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
 }>;
 
 export type AiSummaryResolvers<ContextType = any, ParentType extends ResolversParentTypes['AiSummary'] = ResolversParentTypes['AiSummary']> = ResolversObject<{
@@ -51240,9 +51295,11 @@ export type SettingsResolvers<ContextType = any, ParentType extends ResolversPar
   password_policy_min_uppercase?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   password_policy_min_words?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
   password_policy_validity_days?: Resolver<Maybe<ResolversTypes['Int']>, ParentType, ContextType>;
+  platform_ai_active_provider?: Resolver<ResolversTypes['String'], ParentType, ContextType>;
   platform_ai_enabled?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   platform_ai_has_token?: Resolver<ResolversTypes['Boolean'], ParentType, ContextType>;
   platform_ai_model?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
+  platform_ai_providers?: Resolver<Array<ResolversTypes['AiProvider']>, ParentType, ContextType>;
   platform_ai_type?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   platform_banner_level?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
   platform_banner_text?: Resolver<Maybe<ResolversTypes['String']>, ParentType, ContextType>;
@@ -51306,6 +51363,10 @@ export type SettingsResolvers<ContextType = any, ParentType extends ResolversPar
 }>;
 
 export type SettingsEditMutationsResolvers<ContextType = any, ParentType extends ResolversParentTypes['SettingsEditMutations'] = ResolversParentTypes['SettingsEditMutations']> = ResolversObject<{
+  aiProviderAdd?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType, RequireFields<SettingsEditMutationsAiProviderAddArgs, 'input'>>;
+  aiProviderDelete?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType, RequireFields<SettingsEditMutationsAiProviderDeleteArgs, 'id'>>;
+  aiProviderEdit?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType, RequireFields<SettingsEditMutationsAiProviderEditArgs, 'id' | 'input'>>;
+  aiProviderSetActive?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType, RequireFields<SettingsEditMutationsAiProviderSetActiveArgs, 'id'>>;
   contextClean?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType>;
   contextPatch?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType, Partial<SettingsEditMutationsContextPatchArgs>>;
   deleteMapCustomFile?: Resolver<Maybe<ResolversTypes['Settings']>, ParentType, ContextType>;
@@ -54056,6 +54117,7 @@ export type Resolvers<ContextType = any> = ResolversObject<{
   AiActivity?: AiActivityResolvers<ContextType>;
   AiForecast?: AiForecastResolvers<ContextType>;
   AiHistory?: AiHistoryResolvers<ContextType>;
+  AiProvider?: AiProviderResolvers<ContextType>;
   AiSummary?: AiSummaryResolvers<ContextType>;
   Analysis?: AnalysisResolvers<ContextType>;
   Any?: GraphQLScalarType;

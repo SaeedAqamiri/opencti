@@ -387,6 +387,7 @@ const useNavMenu = (): NavGroup[] => {
           link: '/dashboard/settings',
           subItems: [
             { granted: isGrantedToParameters, link: '/dashboard/settings', label: t_i18n('Parameters'), exact: true },
+            { granted: isGrantedToParameters, link: '/dashboard/settings/ai', label: t_i18n('AI Models') },
             { granted: isGrantedToSecurity || isOrganizationAdmin, link: '/dashboard/settings/accesses', label: t_i18n('Security') },
             { granted: isGrantedToCustomization, link: '/dashboard/settings/customization', label: t_i18n('Customization') },
             { granted: isGrantedToTaxonomies, link: '/dashboard/settings/vocabularies', label: t_i18n('Taxonomies') },
