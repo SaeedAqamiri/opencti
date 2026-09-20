@@ -272,6 +272,10 @@ export const chatbotSessionLocalProxy = async (req: Express.Request, res: Expres
 export const postChatbotMessageLocal = async (req: Express.Request, res: Express.Response) => {
   const context = await createAuthenticatedContext(req, res, 'chatbot');
   if (!context?.user) return;
+  // Defense in depth: if a previous handler already answered this response
+  // (e.g. an auth rejection), writing SSE headers would throw
+  // ERR_HTTP_HEADERS_SENT and kill the request.
+  if (res.headersSent) return;
   addChatbotMessageCount();
   try {
     const content = String(req.body?.content ?? req.body?.message ?? '').trim();
@@ -627,10 +631,10 @@ export const getChatbotPendingApprovals = async (req: Express.Request, res: Expr
 export const postChatbotMessage = async (req: Express.Request, res: Express.Response) => {
   try {
     const context = await authenticateAndVerify(req, res);
+    if (!context?.user) return;
     if (!xtmOneClient.isConfigured()) {
       return postChatbotMessageLocal(req, res);
     }
-    if (!context?.user) return;
 
     if (!req.body) {
       res.status(400).json({ error: 'Request body is missing' });
