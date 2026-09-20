@@ -18,7 +18,7 @@ import type { JSONSchemaType } from 'ajv';
 import type { PlaybookComponent } from '../playbook-types';
 import type { StixBundle, StixObject } from '../../../types/stix-2-1-common';
 import { logApp } from '../../../config/conf';
-import { buildAgentMessageContent, buildAgentSlugOneOf, callXtmAgent, isAgentBoundToIntent, isXtmOneConfigured, resolveAgentJwtUser, resolveRunAsUserId } from './ai-agent-shared';
+import { buildAgentMessageContent, buildAgentSlugOneOfWithLocal as buildAgentSlugOneOf, callLocalAgent, callXtmAgent, isAgentBoundToIntent, isLocalAgentConfigured, isXtmOneConfigured, resolveAgentJwtUser, resolveRunAsUserId } from './ai-agent-shared';
 
 // Canonical STIX 2.1 ID shape: `<type>--<uuid>` where the UUID is the
 // 8-4-4-4-12 hex layout. Stricter than the loose `[\w-]{36}` pattern in
@@ -171,6 +171,28 @@ export const PLAYBOOK_AI_AGENT_TRANSFORM_COMPONENT: PlaybookComponent<AiAgentTra
     if (!agent_slug) {
       logApp.warn('[PLAYBOOK AI AGENT] No agent configured, returning bundle unmodified');
       return { output_port: 'unmodified', bundle };
+    }
+    // Local opencti-agent mode: run against the on-prem agent (no XTM One
+    // identity, no intent catalog) and keep the same safe terminal port.
+    if (isLocalAgentConfigured()) {
+      const content = buildAgentMessageContent(bundle, prompt);
+      const rawResponse = await callLocalAgent(agent_slug, content);
+      if (rawResponse === null) {
+        return { output_port: 'unmodified', bundle };
+      }
+      const transformedBundle = parseStixBundle(rawResponse);
+      if (!transformedBundle) {
+        logApp.warn('[PLAYBOOK AI AGENT] Could not parse local agent response as a STIX bundle', {
+          agentSlug: agent_slug,
+          responsePreview: rawResponse.slice(0, 200),
+        });
+        return { output_port: 'unmodified', bundle };
+      }
+      const nextBundle: StixBundle = {
+        ...bundle,
+        objects: (transformedBundle.objects ?? []) as StixObject[],
+      };
+      return { output_port: 'out', bundle: nextBundle };
     }
     // Without an XTM One configuration the step can never run: skip it
     // before resolving the JWT identity so no user lookup is performed

@@ -17,7 +17,7 @@ import * as R from 'ramda';
 import type { JSONSchemaType } from 'ajv';
 import type { PlaybookComponent } from '../playbook-types';
 import { logApp } from '../../../config/conf';
-import { buildAgentMessageContent, buildAgentSlugOneOf, callXtmAgent, isAgentBoundToIntent, isXtmOneConfigured, resolveAgentJwtUser, resolveRunAsUserId } from './ai-agent-shared';
+import { buildAgentMessageContent, buildAgentSlugOneOfWithLocal as buildAgentSlugOneOf, callLocalAgent, callXtmAgent, isAgentBoundToIntent, isLocalAgentConfigured, isXtmOneConfigured, resolveAgentJwtUser, resolveRunAsUserId } from './ai-agent-shared';
 
 interface AiAgentSendConfiguration {
   agent_slug: string;
@@ -96,6 +96,17 @@ export const PLAYBOOK_AI_AGENT_SEND_COMPONENT: PlaybookComponent<AiAgentSendConf
     const { agent_slug, prompt, run_as } = playbookNode.configuration;
     if (!agent_slug) {
       logApp.warn('[PLAYBOOK AI AGENT SEND] No agent configured, dropping playbook step', { playbookId });
+      return { output_port: undefined, bundle, forceBundleTracking: true };
+    }
+    // Local opencti-agent mode: fire-and-wait against the on-prem agent.
+    if (isLocalAgentConfigured()) {
+      const content = buildAgentMessageContent(bundle, prompt);
+      const rawResponse = await callLocalAgent(agent_slug, content);
+      logApp.info('[PLAYBOOK AI AGENT SEND] Local agent analysis', {
+        agentSlug: agent_slug,
+        answered: rawResponse !== null,
+        responsePreview: (rawResponse ?? '').slice(0, 500),
+      });
       return { output_port: undefined, bundle, forceBundleTracking: true };
     }
     // Without an XTM One configuration the step can never run: skip it

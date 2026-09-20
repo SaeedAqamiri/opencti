@@ -1,0 +1,19 @@
+version: 1
+updated: '2026-09-18T17:29:29.561Z'
+entries:
+  ai-agent-shared.ts:
+    summary: >-
+      Shared plumbing for the two XTM One AI-agent playbook components (ai-agent-component.ts
+      'Transform with AI agent' = transformer intent, rewrites the STIX bundle via the agent;
+      ai-agent-send-component.ts 'Send to AI agent' = consumer intent, forwards bundle).
+      EE-licensed; agent pickers are dynamic oneOf lists from xtmOneClient.listAgentsForIntent,
+      intent binding re-validated at execution; AUTOMATION_MANAGER_USER identity, 5-minute agent
+      timeout, telemetry run counter. Excluded from the chatbot/insights picker in
+      playbook-domain.ts:134.
+    based_on:
+      - >-
+        opencti-platform/opencti-graphql/src/modules/playbook/components/ai-agent-shared.ts@18574-1789313543042
+      - >-
+        opencti-platform/opencti-graphql/src/modules/playbook/components/ai-agent-component.ts@10334-1789313543042
+      - >-
+        opencti-platform/opencti-graphql/src/modules/playbook/components/ai-agent-send-component.ts@6867-1789313543042

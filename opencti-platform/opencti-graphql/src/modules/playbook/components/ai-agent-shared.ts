@@ -165,6 +165,74 @@ export const resolveAgentJwtUser = async (
  */
 export const isXtmOneConfigured = (): boolean => !!nconf.get('xtm:xtm_one_url') && xtmOneClient.isConfigured();
 
+// ── local opencti-agent mode (M-playbook wiring) ─────────────────────────
+// When XTM One is NOT configured but the local opencti-agent is, the two
+// AI-agent playbook blocks run against the on-prem agent instead of the XTM
+// One catalog: a single 'opencti-agent' entry replaces the dynamic picker
+// and the call goes to the agent's plain /ask endpoint.
+
+export const LOCAL_AGENT_SLUG = 'opencti-agent';
+
+export const isLocalAgentConfigured = (): boolean =>
+  !xtmOneClient.isConfigured() && !!nconf.get('ai:agent_api_url');
+
+const AGENT_API_URL = nconf.get('ai:agent_api_url') || 'http://127.0.0.1:8100';
+
+/**
+ * Local variant of {@link buildAgentSlugOneOf}: when the local agent is
+ * wired, the catalog is the single local agent; otherwise the XTM One
+ * intent catalog (unchanged upstream behavior).
+ */
+export const buildAgentSlugOneOfWithLocal = async (
+  intent: string,
+): Promise<Array<{ const: string; title: string }>> => {
+  if (isLocalAgentConfigured()) {
+    return [{ const: LOCAL_AGENT_SLUG, title: 'Local Agent' }];
+  }
+  return buildAgentSlugOneOf(intent);
+};
+
+/**
+ * Local variant of {@link callXtmAgent}: posts the same ``content`` payload
+ * to the local agent's blocking /ask endpoint and returns the assistant
+ * answer (null on any failure — same never-throw contract as upstream so
+ * executors keep routing to their safe terminal port).
+ */
+export const callLocalAgent = async (
+  agentSlug: string,
+  content: string,
+): Promise<string | null> => {
+  if (!isLocalAgentConfigured()) {
+    return null;
+  }
+  addPlaybookAiAgentRunCount();
+  try {
+    const httpClient = getHttpClient({
+      baseURL: AGENT_API_URL,
+      responseType: 'json',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const response = await httpClient.post(
+      '/ask',
+      { question: content, mode: 'chat', task_id: `playbook-${agentSlug}` },
+      { timeout: AGENT_CALL_TIMEOUT_MS },
+    );
+    const answer = response.data?.answer ?? null;
+    if (response.data?.incomplete) {
+      logApp.warn('[PLAYBOOK AI AGENT] Local agent returned an incomplete answer', {
+        agentSlug,
+        incomplete: response.data.incomplete,
+      });
+    }
+    return answer;
+  } catch (e: unknown) {
+    const httpErr = getResponseError(e);
+    const detail = httpErr?.data?.detail ?? httpErr?.data?.error ?? (e as Error)?.message;
+    logApp.error('[PLAYBOOK AI AGENT] Local agent call failed', { agentSlug, detail });
+    return null;
+  }
+};
+
 /**
  * Runtime defense in depth: re-check that ``slug`` is currently bound to
  * the expected ``intent`` in the XTM One catalog before the executor

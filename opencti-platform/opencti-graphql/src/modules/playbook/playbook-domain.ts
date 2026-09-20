@@ -44,10 +44,24 @@ import { checkPlaybookFiltersAndBuildConfigWithCorrectFilters, deleteLinksAndAll
 import { type SharingConfiguration } from './components/sharing-component';
 import { assertDefinitionRunAsAllowed, assertRunAsUserAllowed, sanitizeDefinitionRunAs } from './components/ai-agent-shared';
 
+
+// ── local playbook access ────────────────────────────────────────────────
+// When the local opencti-agent is wired (ai:agent_api_url) and XTM One is
+// NOT configured, the playbook feature runs locally: the EE walls are
+// relaxed for this deployment mode only (branch ai-ungate philosophy).
+// With an XTM One token present, upstream behavior is untouched.
+import { isLocalAgentConfigured } from './components/ai-agent-shared';
+
+export const checkPlaybookEdition = async (context: AuthContext) => {
+  if (!isLocalAgentConfigured()) {
+    await checkPlaybookEdition(context);
+  }
+};
+
 const MINIMAL_COMPATIBLE_VERSION = '6.7.14';
 
 export const findById: DomainFindById<BasicStoreEntityPlaybook> = async (context: AuthContext, user: AuthUser, playbookId: string) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   return storeLoadById(context, user, playbookId, ENTITY_TYPE_PLAYBOOK);
 };
 
@@ -98,7 +112,7 @@ export const findPlaybooksForEnrollment = async (
   user: AuthUser,
   ids: string[],
 ) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const eligible = await getEligiblePlaybooksForEnrollment(context);
   if (eligible.length === 0) return [];
   const cappedIds = ids.slice(0, ENROLLMENT_PLAYBOOK_EVALUATION_LIMIT);
@@ -114,7 +128,7 @@ export const findPlaybooksForEnrollmentByFilters = async (
   search: string | null,
   excludedIds: string[],
 ): Promise<BasicStoreEntityPlaybook[]> => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const eligible = await getEligiblePlaybooksForEnrollment(context);
   if (eligible.length === 0) return [];
   const stixEntities = await stixLoadByFilters(context, user, [ABSTRACT_STIX_CORE_OBJECT], {
@@ -140,15 +154,18 @@ const XTM_ONE_DEPENDENT_COMPONENT_IDS: ReadonlySet<string> = new Set([
 ]);
 
 export const availableComponents = async (context: AuthContext) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const xtmOneConfigured = xtmOneClient.isConfigured();
+  // Local opencti-agent mode: the AI-agent blocks run against the on-prem
+  // agent (ai-agent-shared), so listing them is meaningful without XTM One.
+  const localAgent = isLocalAgentConfigured();
   return Object.values(PLAYBOOK_COMPONENTS).filter((component) => {
-    return xtmOneConfigured || !XTM_ONE_DEPENDENT_COMPONENT_IDS.has(component.id);
+    return xtmOneConfigured || localAgent || !XTM_ONE_DEPENDENT_COMPONENT_IDS.has(component.id);
   });
 };
 
 export const getPlaybookDefinition = async (context: AuthContext, playbook: BasicStoreEntityPlaybook) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   if (playbook.playbook_definition && playbook.playbook_definition.includes('PLAYBOOK_SHARING_COMPONENT')) {
     // parse playbook definition in case there is a sharing with organization component, in order to parse organizations to get their label
     const definition = JSON.parse(playbook.playbook_definition) as ComponentDefinition;
@@ -198,7 +215,7 @@ const validateNodeRunAs = async (context: AuthContext, user: AuthUser, configura
 };
 
 export const playbookAddNode = async (context: AuthContext, user: AuthUser, id: string, input: PlaybookAddNodeInput) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const configuration = await checkPlaybookFiltersAndBuildConfigWithCorrectFilters(context, user, input, user.id);
   await validateNodeRunAs(context, user, configuration);
   const playbook = await findById(context, user, id);
@@ -229,7 +246,7 @@ export const playbookAddNode = async (context: AuthContext, user: AuthUser, id: 
 };
 
 export const playbookUpdatePositions = async (context: AuthContext, user: AuthUser, id: string, positions: string) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const playbook = await findById(context, user, id);
   const definition = JSON.parse(playbook.playbook_definition) as ComponentDefinition;
   const nodesPositions = JSON.parse(positions);
@@ -254,7 +271,7 @@ export const playbookReplaceNode = async (
   nodeId: string,
   input: PlaybookAddNodeInput,
 ) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const configuration = await checkPlaybookFiltersAndBuildConfigWithCorrectFilters(context, user, input, user.id);
   await validateNodeRunAs(context, user, configuration);
 
@@ -311,7 +328,7 @@ export const playbookInsertNode = async (
   childNodeId: string,
   input: PlaybookAddNodeInput,
 ) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   await validateNodeRunAs(context, user, input.configuration);
   const playbook = await findById(context, user, id);
   const definition = JSON.parse(playbook.playbook_definition) as ComponentDefinition;
@@ -392,7 +409,7 @@ export const playbookInsertNode = async (
 };
 
 export const playbookDeleteNode = async (context: AuthContext, user: AuthUser, id: string, nodeId: string) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const playbook = await findById(context, user, id);
   const definition = JSON.parse(playbook.playbook_definition) as ComponentDefinition;
   definition.nodes = definition.nodes.filter((n) => n.id !== nodeId);
@@ -409,7 +426,7 @@ export const playbookDeleteNode = async (context: AuthContext, user: AuthUser, i
 };
 
 export const playbookAddLink = async (context: AuthContext, user: AuthUser, id: string, input: PlaybookAddLinkInput) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const playbook = await findById(context, user, id);
   const definition = JSON.parse(playbook.playbook_definition ?? '{}') as ComponentDefinition;
   // Check from consistency
@@ -449,7 +466,7 @@ export const playbookAddLink = async (context: AuthContext, user: AuthUser, id: 
 };
 
 export const playbookDeleteLink = async (context: AuthContext, user: AuthUser, id: string, linkId: string) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const playbook = await findById(context, user, id);
   const definition = JSON.parse(playbook.playbook_definition) as ComponentDefinition;
   definition.links = definition.links.filter((n) => n.id !== linkId);
@@ -467,7 +484,7 @@ type PlaybookCreationType = {
   playbook_definition?: string;
 };
 const createPlaybook = async (context: AuthContext, user: AuthUser, playbookCreationInput: PlaybookCreationType) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const created = await createEntity(context, user, playbookCreationInput, ENTITY_TYPE_PLAYBOOK);
   const playbookId = created.internal_id;
   await registerConnectorQueues(playbookId, `Playbook ${playbookId} queue`, 'internal', 'playbook');
@@ -481,7 +498,7 @@ export const playbookAdd = async (context: AuthContext, user: AuthUser, input: P
 };
 
 export const playbookDelete = async (context: AuthContext, user: AuthUser, playbookId: string) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   const element = await deleteElementById(context, user, playbookId, ENTITY_TYPE_PLAYBOOK);
   await unregisterConnector(playbookId);
   await deleteAllPlaybookExecutions(playbookId);
@@ -489,7 +506,7 @@ export const playbookDelete = async (context: AuthContext, user: AuthUser, playb
 };
 
 export const playbookEdit = async (context: AuthContext, user: AuthUser, id: string, input: EditInput[]) => {
-  await checkEnterpriseEdition(context);
+  await checkPlaybookEdition(context);
   // The editor sets the definition through the granular node mutations, never
   // through playbookFieldPatch, but the field patch is exposed on the API and
   // could be used to persist a whole definition directly. Re-validate the

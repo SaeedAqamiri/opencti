@@ -754,7 +754,7 @@ IOC_RX = [
     (re.compile(r'\b[a-f0-9]{32}\b', re.I), "file:hashes.'MD5'"),
     (re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}/\S+'), 'url'),
     (re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b'), 'ipv4-addr'),
-    (re.compile(r'\b[\w-]{2,}(?:\.[\w-]{2,})+\.(?:com|net|org|io|xyz|info|ru|cf|biz|top|online|site|icu|club|us|uk)\b', re.I), 'domain-name'),
+    (re.compile(r'\b[\w-]{2,}(?:\.[\w-]{2,})*\.(?:com|net|org|io|xyz|info|ru|cf|biz|top|online|site|icu|club|us|uk)\b', re.I), 'domain-name'),
     (re.compile(r'\bhttps?://\S+'), 'url'),
 ]
 
@@ -773,7 +773,7 @@ def ioc_kind(value: str) -> str | None:
         return 'url'
     if re.fullmatch(r'(?:\d{1,3}\.){3}\d{1,3}', v):
         return 'ipv4-addr'
-    if re.fullmatch(r'[\w-]{2,}(?:\.[\w-]{2,})+', v, re.I):
+    if re.fullmatch(r'[\w-]{2,}(?:\.[\w-]{2,})*', v, re.I):
         return 'domain-name'
     return None
 
