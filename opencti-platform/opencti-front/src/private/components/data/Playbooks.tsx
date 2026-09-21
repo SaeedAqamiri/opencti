@@ -26,6 +26,7 @@ import useQueryLoading from '../../../utils/hooks/useQueryLoading';
 import PlaybookCreation from './playbooks/PlaybookCreation';
 import { PlaybooksLinesPaginationQuery, PlaybooksLinesPaginationQuery$variables } from './__generated__/PlaybooksLinesPaginationQuery.graphql';
 import useEnterpriseEdition from '../../../utils/hooks/useEnterpriseEdition';
+import { useChatbot } from '../chatbox/ChatbotContext';
 import { useFormatter } from '../../../components/i18n';
 import Breadcrumbs from '../../../components/Breadcrumbs';
 import DataTable from '../../../components/dataGrid/DataTable';
@@ -114,6 +115,12 @@ const playbooksLinesFragment = graphql`
 
 const Playbooks: FunctionComponent = () => {
   const isEnterpriseEdition = useEnterpriseEdition();
+  // Local opencti-agent mode mirrors the backend relaxation in
+  // playbook-domain: the Automation (playbooks) surface is served without EE
+  // when XTM One is absent and the local agent is wired, so its two AI-agent
+  // blocks stay usable on-prem.
+  const { localAgentMode } = useChatbot();
+  const canUsePlaybooks = isEnterpriseEdition || localAgentMode === true;
   const { t_i18n, n } = useFormatter();
   const { setTitle } = useConnectedDocumentModifier();
   setTitle(t_i18n('Automation | Processing | Data'));
@@ -206,7 +213,7 @@ const Playbooks: FunctionComponent = () => {
           }]}
       />
       <ProcessingMenu />
-      {isEnterpriseEdition ? (
+      {canUsePlaybooks ? (
         <>
           {queryRef && (
             <DataTable
