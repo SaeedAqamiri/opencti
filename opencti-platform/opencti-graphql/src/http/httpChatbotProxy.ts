@@ -381,6 +381,10 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
     if (!res.headersSent) {
       res.status(503).send({ status: 'error', error: 'opencti-agent API is unreachable' });
     } else {
+      // SSE headers are already flushed (the thinking status went out), so an
+      // HTTP status is impossible — surface the failure as a widget error
+      // event instead of silently ending (the widget would hang on "…").
+      emit({ type: 'error', content: 'The local agent rejected or failed this message.' });
       res.end();
     }
   }
