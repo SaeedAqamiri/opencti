@@ -182,6 +182,8 @@ type ImportFilesContextProps = InitialValues & {
   guessMimeType: (fileId: string) => Promise<string | null>;
   queryRef: PreloadedQuery<ImportFilesContextQuery>;
   isForcedImportToDraft: boolean;
+  aiExtractMode: boolean;
+  setAiExtractMode: (enabled: boolean) => void;
 };
 
 const ImportFilesContext = createContext<ImportFilesContextProps | undefined>(undefined);
@@ -203,6 +205,7 @@ export const ImportFilesProvider = ({ children, initialValue }: {
   const [uploadStatus, setUploadStatus] = useState<undefined | UploadStatus>();
   const [draftId, setDraftId] = useState<string | undefined>(draftContext?.id);
   const [selectedFormId, setSelectedFormId] = useState<string | undefined>();
+  const [aiExtractMode, setAiExtractMode] = useState(false);
   const queryRef = useQueryLoading<ImportFilesContextQuery>(importFilesQuery, {
     id: initialValue.entityId || '',
   });
@@ -242,6 +245,8 @@ export const ImportFilesProvider = ({ children, initialValue }: {
           isForcedImportToDraft,
           guessMimeType,
           queryRef,
+          aiExtractMode,
+          setAiExtractMode,
         }}
       >
         {children}

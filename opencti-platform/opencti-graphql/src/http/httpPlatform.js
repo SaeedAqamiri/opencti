@@ -48,7 +48,7 @@ import {
   getChatbotPendingApprovals,
   getChatbotChatStubLocal,
 } from './httpChatbotProxy';
-import { postAiAgentAsk, postAiAgentSession, getAiAgentSessions, getAiAgentSession, deleteAiAgentSession } from './httpAgentProxy';
+import { postAiAgentAsk, postAiAgentExtractFile, postAiAgentSession, getAiAgentSessions, getAiAgentSession, deleteAiAgentSession } from './httpAgentProxy';
 import { PROVIDERS } from '../modules/authenticationProvider/providers-configuration';
 import { CERT_PROVIDER } from '../modules/authenticationProvider/provider-cert';
 import { HEADERS_PROVIDER } from '../modules/authenticationProvider/provider-headers';
@@ -636,6 +636,8 @@ const createApp = async (app, schema) => {
 
   // -- opencti-agent proxy (local read-only threat-intel agent, v3)
   app.post(`${basePath}/ai-agent/ask`, postAiAgentAsk);
+  // Raw-bytes route (NOT JSON): the file body must reach the proxy untouched.
+  app.post(`${basePath}/ai-agent/extract-file`, express.raw({ type: '*/*', limit: '20mb' }), postAiAgentExtractFile);
   app.post(`${basePath}/ai-agent/sessions`, postAiAgentSession);
   app.get(`${basePath}/ai-agent/sessions`, getAiAgentSessions);
   app.get(`${basePath}/ai-agent/sessions/:sid`, getAiAgentSession);

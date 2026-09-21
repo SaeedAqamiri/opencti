@@ -40,6 +40,8 @@ import useDefaultValues from '../../../../../utils/hooks/useDefaultValues';
 import useSwitchDraft from '../../../drafts/useSwitchDraft';
 import useCreateDraft from './useCreateDraft';
 import { useChatbot } from '@components/chatbox/ChatbotContext';
+import { extractFileToStix } from '../../../../../utils/ai/agentApi';
+import { FileWithConnectors } from '@components/common/files/import_files/ImportFilesUploader';
 
 export const CSV_MAPPER_NAME = '[FILE] CSV Mapper import';
 
@@ -139,6 +141,7 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
     inDraftContext,
     queryRef,
     selectedFormId,
+    aiExtractMode,
   } = useImportFilesContext();
   const { xtmOneConfigured } = useChatbot();
 
@@ -210,37 +213,42 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
       newDraftId?: string;
     },
     setErrors: (errors: FormikErrors<OptionsFormValues>) => void,
+    filesToImport: FileWithConnectors[] = files,
+    fromAiExtract = false,
   ) => {
-    const variables = files.map(({ file, connectors, configuration }) => (selectedEntityId
+    // AI-extracted files are self-contained STIX bundles: they always go
+    // through the native auto-import path (the bundle IS the import), while
+    // validation mode/markings from the options step are still honored.
+    const variables = filesToImport.map(({ file, connectors, configuration }) => (selectedEntityId
       ? (
           {
             id: selectedEntityId,
             file,
-            connectors: importMode === 'auto' ? undefined : connectors?.map(({ id: connectorId }) => ({
+            connectors: importMode === 'auto' || fromAiExtract ? undefined : connectors?.map(({ id: connectorId }) => ({
               connectorId,
               configuration,
             })),
             fileMarkings: fileMarkingIds,
             validationMode,
             draftId: newDraftId,
-            noTriggerImport: importMode === 'manual',
+            noTriggerImport: importMode === 'manual' && !fromAiExtract,
           } as ImportFilesDialogEntityMutation$variables
         ) : (
           {
             file,
-            connectors: importMode === 'auto' ? undefined : connectors?.map(({ id: connectorId }) => ({
+            connectors: importMode === 'auto' || fromAiExtract ? undefined : connectors?.map(({ id: connectorId }) => ({
               connectorId,
               configuration,
             })),
             fileMarkings: fileMarkingIds,
             validationMode,
             draftId: newDraftId,
-            noTriggerImport: importMode === 'manual',
+            noTriggerImport: importMode === 'manual' && !fromAiExtract,
           } as ImportFilesDialogGlobalMutation$variables
         )
     ));
 
-    setUploadedFiles(files.map(({ file: { name } }) => ({ name })));
+    setUploadedFiles(filesToImport.map(({ file: { name } }) => ({ name })));
 
     bulkCommit({
       commit: (args) => (
@@ -271,14 +279,57 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
     });
   };
 
+  // Local stix_harvester branch: send every selected file to the AI agent,
+  // and replace it by the STIX bundle the agent built from it. The derived
+  // .json files then flow through the standard import path below.
+  const extractFilesToStixBundles = async (): Promise<FileWithConnectors[]> => {
+    setUploadStatus('uploading');
+    setUploadedFiles(files.map(({ file: { name } }) => ({ name })));
+    const derivedFiles: FileWithConnectors[] = [];
+    const failedFiles: { name: string; reason: string }[] = [];
+    for (const { file } of files) {
+      try {
+        const result = await extractFileToStix(file);
+        if (!result.bundle?.objects?.length) {
+          throw new Error(t_i18n('No threat intelligence could be extracted from this file'));
+        }
+        const bundleName = `${file.name.replace(/\.[^.]+$/, '')}-ai-extract.json`;
+        derivedFiles.push({
+          file: new File([JSON.stringify(result.bundle, null, 2)], bundleName, { type: 'application/json' }),
+        });
+        setUploadedFiles((prevUploadedFiles) => prevUploadedFiles.map(
+          (prevFile) => (prevFile.name === file.name ? { name: file.name, status: 'success' as const } : prevFile),
+        ));
+      } catch (e) {
+        failedFiles.push({ name: file.name, reason: e instanceof Error ? e.message : String(e) });
+        setUploadedFiles((prevUploadedFiles) => prevUploadedFiles.map(
+          (prevFile) => (prevFile.name === file.name ? { name: file.name, status: 'error' as const } : prevFile),
+        ));
+      }
+    }
+    if (failedFiles.length > 0) {
+      MESSAGING$.notifyError(`${t_i18n('AI extraction failed for')}: ${failedFiles.map((f) => `${f.name} (${f.reason})`).join(', ')}`);
+      setUploadStatus(undefined);
+      return [];
+    }
+    return derivedFiles;
+  };
+
   const onSubmit: FormikConfig<OptionsFormValues>['onSubmit'] = async (values, { setErrors }) => {
     const selectedEntityId = entityId ?? (values.associatedEntity?.value || undefined);
     const fileMarkingIds = values.fileMarkings.map(({ value }) => value);
 
     const { validationMode } = values;
+    let filesToImport = files;
+    if (aiExtractMode && files.length > 0) {
+      filesToImport = await extractFilesToStixBundles();
+      if (filesToImport.length === 0) {
+        return;
+      }
+    }
     if (validationMode === 'workbench') {
       setUploadStatus('uploading');
-      importFiles({ selectedEntityId, fileMarkingIds, validationMode }, setErrors);
+      importFiles({ selectedEntityId, fileMarkingIds, validationMode }, setErrors, filesToImport, aiExtractMode);
     } else if (validationMode === 'draft') {
       const newDraftId = !draftId ? await createDraft(values, selectedEntityId) : draftId;
       if (!newDraftId) {
@@ -287,10 +338,10 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
         throw new Error(t_i18n('Failed to create draft workspace.'));
       }
       setUploadStatus('uploading');
-      importFiles({ selectedEntityId, fileMarkingIds, validationMode, newDraftId }, setErrors);
+      importFiles({ selectedEntityId, fileMarkingIds, validationMode, newDraftId }, setErrors, filesToImport, aiExtractMode);
     } else {
       setUploadStatus('uploading');
-      importFiles({ selectedEntityId, fileMarkingIds }, setErrors);
+      importFiles({ selectedEntityId, fileMarkingIds }, setErrors, filesToImport, aiExtractMode);
     }
   };
 
@@ -321,6 +372,10 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
       return !!selectedFormId;
     }
     // For file modes, check if files are selected
+    // AI extraction produces the bundle itself: connector configuration never applies.
+    if (aiExtractMode) {
+      return files.length > 0;
+    }
     return files.length > 0 && (importMode === 'auto' || files.every((file) => {
       const hasCsvMapperConnector = file.connectors?.some((connector) => connector.name === CSV_MAPPER_NAME);
       if (hasCsvMapperConnector) return !!file.configuration;
@@ -332,7 +387,7 @@ const ImportFiles = ({ open, handleClose }: ImportFilesDialogProps) => {
       if (hasXtmOneConnector && xtmOneConfigured) return !!file.configuration;
       return true;
     }));
-  }, [files, importMode, selectedFormId, connectorsForImport, xtmOneConfigured]);
+  }, [files, importMode, selectedFormId, connectorsForImport, xtmOneConfigured, aiExtractMode]);
 
   const isValidImport = useMemo(() => {
     const { values } = optionsContext;

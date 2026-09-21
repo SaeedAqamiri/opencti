@@ -180,3 +180,51 @@ export const callAgentStream = async (
   }
   return { content: accumulated, status: 'success', generatedAt, fromCache };
 };
+
+// ── Local stix_harvester: file → agent extract → STIX 2.1 bundle ─────────
+
+export interface StixExtractIndicator {
+  value: string;
+  stix_type: string;
+}
+
+export interface StixExtractEntity {
+  name: string;
+  type: string | null;
+}
+
+export interface StixExtractBundle {
+  type: 'bundle';
+  id: string;
+  objects: Record<string, unknown>[];
+}
+
+export interface StixExtractResult {
+  task_id: string;
+  answer: string;
+  indicators: StixExtractIndicator[];
+  techniques: string[];
+  entities: StixExtractEntity[];
+  relations: string[][];
+  bundle: StixExtractBundle;
+  source?: { filename: string; format: string; text_chars: number };
+}
+
+/**
+ * Upload a file to the local AI agent (through the authenticated platform
+ * proxy) for IOC/entity extraction and receive a ready-to-import STIX 2.1
+ * bundle. Raw bytes on the wire — the platform route parses nothing.
+ */
+export const extractFileToStix = async (file: File): Promise<StixExtractResult> => {
+  const buffer = await file.arrayBuffer();
+  const response = await fetch(`/ai-agent/extract-file?filename=${encodeURIComponent(file.name)}`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: buffer,
+  });
+  if (!response.ok) {
+    throw new Error(await readAgentErrorBody(response));
+  }
+  return response.json();
+};
