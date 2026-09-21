@@ -338,5 +338,34 @@
    "Kali365"
   ],
   "max_calls": 7
+ },
+ {
+  "id": "td1-apt28-connection-breakdown",
+  "type": "retrieve",
+  "question": "On its outgoing side, which entity types does APT28 connect to, and how many edges per type? Use the distribution tool (scope=connected) and give each type with its count.",
+  "gold_entity_names": [],
+  "soft_checks": {
+   "answer_contains": [
+    "Attack-Pattern",
+    "Malware",
+    "Tool",
+    "93",
+    "19",
+    "10"
+   ]
+  },
+  "max_calls": 6
+ },
+ {
+  "id": "td2-malware-created-at-filter",
+  "type": "retrieve",
+  "question": "How many malware objects does this platform hold that were added on or after 2020-01-01? Use aggregate with the created_at filter (do not count lists yourself).",
+  "gold_entity_names": [],
+  "soft_checks": {
+   "answer_contains": [
+    "732"
+   ]
+  },
+  "max_calls": 5
  }
 ]

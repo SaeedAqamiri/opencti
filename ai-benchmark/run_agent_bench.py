@@ -29,7 +29,7 @@ ALLOWED_TOOLS = {
     'search_entities', 'get_entity', 'get_neighbors', 'get_indicators',
     'get_observables', 'aggregate', 'create_relationship', 'add_to_container',
     'get_entities_batch', 'find_paths', 'set_operations', 'get_evidence',
-    'graph_stats', 'find_containers', 'get_container_objects',
+    'graph_stats', 'find_containers', 'get_container_objects', 'distribution',
 }
 
 LIMITS = {'max_calls': 20, 'max_wall_ms': 120_000, 'max_tokens': 60_000}
@@ -73,6 +73,11 @@ def grade(task: dict, art: dict) -> dict:
             nums = [int(n) for n in re.findall(r'\b(\d{2,3})\b', answer)]
             ok = any(v[0] <= n <= v[1] for n in nums)
             checks.append((f'soft:{k}', ok, f'nums={nums[:5]} vs {v}'))
+        # v1 extension (2026-09-21, P1b): numeric/statistical tools cannot be graded
+        # via entity recall — require every expected substring to appear in the answer.
+        if k == 'answer_contains':
+            missing = [s for s in v if s not in answer]
+            checks.append((f'soft:{k}', not missing, f'missing={missing[:3]}'))
 
     # 2) graph_accuracy
     if gold_triples:
