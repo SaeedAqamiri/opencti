@@ -367,5 +367,28 @@
    ]
   },
   "max_calls": 5
+ },
+ {
+  "id": "ts1-sightings-of-ioc",
+  "type": "retrieve",
+  "question": "Where has the indicator for the domain appleupdate.com been sighted? List every sighting location with its count.",
+  "gold_entity_names": [
+   "Afghanistan",
+   "Åland Islands"
+  ],
+  "max_calls": 6
+ },
+ {
+  "id": "tt1-malware-ingestion-trend",
+  "type": "retrieve",
+  "question": "Using the time_series tool: in which year were the most malware objects added to this platform, and how many were added that year? (bucket by year, full history)",
+  "gold_entity_names": [],
+  "soft_checks": {
+   "answer_contains": [
+    "2025",
+    "732"
+   ]
+  },
+  "max_calls": 4
  }
 ]

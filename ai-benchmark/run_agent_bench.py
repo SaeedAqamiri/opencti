@@ -25,11 +25,17 @@ HERE = Path(__file__).parent
 # add_to_container) are KNOWN but NOT allowed in read-only runs.
 # v1 extension (2026-09-21, P1a): graph_stats (server-side counts) and the container
 # tools find_containers / get_container_objects (object_refs membership, read-only).
+# v1 extension (2026-09-21, P2): get_sightings (stixSightingRelationships — a separate
+# root invisible to stixCoreRelationships; permanent fixture: 2 synthetic sightings
+# on the appleupdate.com indicator), time_series (server-side histograms; fixture
+# truth: all 732 malwares in the 2025 bucket), search_files (EE file indexing —
+# returns an explicit FEATURE_UNAVAILABLE/EMPTY-with-hint on this build).
 ALLOWED_TOOLS = {
     'search_entities', 'get_entity', 'get_neighbors', 'get_indicators',
     'get_observables', 'aggregate', 'create_relationship', 'add_to_container',
     'get_entities_batch', 'find_paths', 'set_operations', 'get_evidence',
     'graph_stats', 'find_containers', 'get_container_objects', 'distribution',
+    'get_sightings', 'time_series', 'search_files',
 }
 
 LIMITS = {'max_calls': 20, 'max_wall_ms': 120_000, 'max_tokens': 60_000}
