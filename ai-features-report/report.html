@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 16mm 13mm 18mm 13mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Vazirmatn', 'Vazirmatn FD', sans-serif;
+    font-size: 10.5pt; line-height: 1.9; color: #1c2733; margin: 0;
+  }
+  h1 {
+    font-size: 21pt; color: #0f3f77; margin: 0 0 6px; line-height: 1.5;
+  }
+  h1 + blockquote {
+    background: linear-gradient(135deg,#eef4fb,#f7fafd); border: 1px solid #d7e4f4;
+  }
+  h2 {
+    font-size: 15pt; color: #0f3f77; border-bottom: 2.5px solid #2d7dd2;
+    padding-bottom: 6px; margin: 26px 0 12px; break-after: avoid;
+  }
+  h2:not(:first-of-type) { break-before: page; }
+  h3 { font-size: 12pt; color: #2d7dd2; margin: 16px 0 8px; break-after: avoid; }
+  p { margin: 7px 0; text-align: justify; }
+  blockquote {
+    margin: 12px 0; padding: 10px 14px; background: #f4f8fc;
+    border-right: 4px solid #2d7dd2; border-radius: 6px; color: #345;
+  }
+  blockquote p { margin: 4px 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 9pt; break-inside: avoid;
+  }
+  th {
+    background: #0f3f77; color: #fff; padding: 7px 9px; text-align: right;
+    font-weight: 700;
+  }
+  td { border: 1px solid #d9e2ec; padding: 6px 9px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f8fb; }
+  img {
+    max-width: 100%; display: block; margin: 14px auto 4px;
+    border: 1px solid #cfd8e3; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(15,63,119,.12); break-inside: avoid;
+  }
+  p > em:only-child, p em:first-child {
+    /* caption lines */
+  }
+  li { margin: 3px 0; }
+  code {
+    font-family: 'Vazirmatn FD', 'Consolas', monospace; font-size: 8.5pt;
+    background: #eef2f7; border: 1px solid #dde5ee; border-radius: 4px;
+    padding: 1px 5px; color: #0b4a8f; direction: ltr; unicode-bidi: embed;
+  }
+  pre {
+    background: #0f1c2b; color: #dbe7f5; padding: 12px 14px; border-radius: 8px;
+    direction: ltr; text-align: left; font-size: 8.5pt; overflow: hidden;
+    break-inside: avoid;
+  }
+  pre code { background: none; border: none; color: inherit; padding: 0; }
+  hr { border: none; border-top: 1px solid #d9e2ec; margin: 18px 0; }
+  ol > li, ul > li { text-align: justify; }
+  /* caption = italic-only paragraph right after image */
+  p:has(> img) + p > em {
+    display: block; text-align: center; color: #5a6b7d; font-size: 8.5pt;
+    margin: -2px auto 12px;
+  }
+</style>
+</head>
+<body>
+<h1>گزارش مستند قابلیت‌های هوش مصنوعی OpenCTI</h1>
+<blockquote>
+<p><strong>مخزن:</strong> OpenCTI (شاخهٔ <code>ai-ungate</code>) · <strong>تاریخ تست:</strong> سپتامبر ۲۰۲۶
+<strong>روش:</strong> همهٔ قابلیت‌ها به‌صورت <strong>زنده و واقعی</strong> روی سرور در حال اجرا (<code>localhost:3001</code>) با مرورگر خودکار Playwright تست شدند و هر اسکرین‌شات، خروجی واقعی همان لحظه است — نه تصویر تبلیغاتی.
+<strong>تنظیمات لحظهٔ تست:</strong> XTM One متصل نیست (<code>xtm_one_configured=false</code>) · لایسنس EE منقضی (trial) · CGU در حالت <code>pending</code> · مدل AI داخلی فعال (<code>platform_ai_enabled=true</code>، مدل متصل به endpoint سازگار با OpenAI در <code>config/development.json</code>)</p>
+</blockquote>
+<hr />
+<h2>فهرست</h2>
+<ol>
+<li>نقشهٔ کلی قابلیت‌های AI</li>
+<li>Ask AI روی فیلدهای متنی (۶ عمل)</li>
+<li>AI Insights — تحلیل هوشمند موجودیت‌ها</li>
+<li>تولید ریپورت هوشمند برای کانتینرها</li>
+<li>جست‌وجوی زبان طبیعی (NLQ)</li>
+<li>پنل ایجنت محلی <code>/dashboard/agent</code></li>
+<li>Ask Ariane و CTEM Command Center</li>
+<li>تنظیمات AI</li>
+<li>معماری مسیریابی: سه مقصد AI</li>
+<li>قابلیت‌های XTM One-محور بدون جایگزین محلی</li>
+<li>APIهای هوش مصنوعی بدون دکمه در UI</li>
+<li>پیوست: روش تست و راهنمای بازتولید</li>
+</ol>
+<hr />
+<h2>۱. نقشهٔ کلی</h2>
+<p>OpenCTI سه «مقصد» برای پردازش هوش مصنوعی دارد و هر دکمهٔ AI در UI به یکی از این سه وصل می‌شود:</p>
+<table>
+<thead>
+<tr>
+<th>مسیر</th>
+<th>توضیح</th>
+<th>وضعیت در این checkout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>مدل LLM داخلی (legacy)</strong></td>
+<td>mutationهای GraphQL ماژول <code>ai</code> (<code>aiFixSpelling</code>, <code>aiExplain</code>, <code>aiNLQ</code>, <code>aiContainerGenerateReport</code> و…) که متن را به مدل کانفیگ‌شدهٔ پلتفرم می‌فرستند و پاسخ را با subscription ‏<code>aiBus</code> استریم می‌کنند</td>
+<td>✅ فعال و تست‌شده</td>
+</tr>
+<tr>
+<td><strong>XTM One (Agentic AI / Ariane)</strong></td>
+<td>ایجنت‌های ابری فیلیگران؛ فقط با رجیستر شدن XTM One فعال می‌شود</td>
+<td>❌ متصل نیست → UI خودکار به مسیر legacy برمی‌گردد یا قابلیت مخفی می‌شود</td>
+</tr>
+<tr>
+<td><strong>opencti-agent محلی</strong></td>
+<td>ایجنت اختصاصی خودمان (pydantic-ai، فقط‌خواندنی، ۱۰ ابزار GraphQL) پشت مسیر <code>/ai-agent/ask</code></td>
+<td>✅ فعال — فقط از صفحهٔ <code>/dashboard/agent</code></td>
+</tr>
+</tbody>
+</table>
+<p><img alt="داشبورد پس از ورود" src="images/00-dashboard.png" />
+<em>تصویر ۱ — داشبورد اصلی پس از ورود؛ دکمهٔ بنفش ✦ کنار جست‌وجو (NLQ) و دکمهٔ «Ask Ariane» با برچسب EE در نوار بالا دیده می‌شوند.</em></p>
+<hr />
+<h2>۲. Ask AI روی فیلدهای متنی</h2>
+<p><strong>کجاست؟</strong> کنار <strong>هر فیلد متنی، Markdown و HTML</strong> در سراسر پلتفرم (توضیحات موجودیت‌ها، نام‌ها، محتوا و…) یک آیکون کوچک ✳ (لوگوی XTM One) نمایش داده می‌شود — در انتهای فیلدهای متنی ساده و در گوشهٔ بالای ویرایشگرهای Markdown/HTML.</p>
+<p><strong>چه می‌کند؟</strong> منویی با ۶ عمل متنی باز می‌کند:</p>
+<table>
+<thead>
+<tr>
+<th>عمل</th>
+<th>mutation پشت‌صحنه</th>
+<th>کاربرد</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fix spelling &amp; grammar</td>
+<td><code>aiFixSpelling</code></td>
+<td>اصلاح املای گزارش‌ها پیش از انتشار</td>
+</tr>
+<tr>
+<td>Make it shorter</td>
+<td><code>aiMakeShorter</code></td>
+<td>خلاصه‌سازی خوانا برای تیترها</td>
+</tr>
+<tr>
+<td>Make it longer</td>
+<td><code>aiMakeLonger</code></td>
+<td>بسط توضیح کوتاه یک اندیکاتور</td>
+</tr>
+<tr>
+<td>Change tone</td>
+<td><code>aiChangeTone</code></td>
+<td>تبدیل لحن به Tactical / Operational / Strategic</td>
+</tr>
+<tr>
+<td>Summarize</td>
+<td><code>aiSummarize</code></td>
+<td>خلاصهٔ یک متن طولانی</td>
+</tr>
+<tr>
+<td>Explain</td>
+<td><code>aiExplain</code></td>
+<td>توضیح سادهٔ یک متن تخصصی برای تحلیلگر تازه‌کار</td>
+</tr>
+</tbody>
+</table>
+<p>پاسخ در دیالوگ «Ask AI» استریم می‌شود؛ با دکمهٔ <strong>Accept</strong> متن فیلد جایگزین می‌شود و <strong>Retry</strong> دوباره تولید می‌کند. حداقل ۱۰ کاراکتر متن لازم است.</p>
+<h3>مثال کاربردی (تست زنده)</h3>
+<p>فرم ساخت Report را باز کردیم، در توضیحات نوشتیم: <em>«APT28 is a Russian state-sponsored cyber espionage group active since 2004…»</em> و روی ✳ توضیحات → <strong>Explain</strong> زدیم:</p>
+<p><img alt="دکمهٔ Ask AI روی فرم" src="images/01-askai-field-button.png" />
+<em>تصویر ۲ — آیکون ✳ Ask AI روی فیلد Name (سمت راست فیلد) و روی ویرایشگر Description (بالای ویرایشگر).</em></p>
+<p><img alt="منوی Ask AI" src="images/02-askai-menu.png" />
+<em>تصویر ۳ — منوی ۶ عمله پس از کلیک روی آیکون.</em></p>
+<p><img alt="پاسخ Explain" src="images/03-askai-explain-response.png" />
+<em>تصویر ۴ — خروجی واقعی عمل «Explain»: مدل مفهوم «AI UI Smoke Test Report» را در سه پاراگراف ساده توضیح داده؛ بنر زرد هشدار Beta و دکمه‌های پذیرش پایین دیالوگ دیده می‌شود.</em></p>
+<p><strong>پشت‌صحنه:</strong> درخواست GraphQL <code>aiExplain</code> با کد ۲۰۰ روی شبکه ثبت شد. متن اصلی و عمل انتخابی به سرور می‌رود، سرور آن را به مدل کانفیگ‌شده می‌دهد و پاسخ از طریق <code>aiBus</code> به دیالوگ استریم می‌شود.</p>
+<hr />
+<h2>۳. AI Insights</h2>
+<p><strong>کجاست؟</strong> دکمهٔ <strong>«AI Insights»</strong> (با آیکون ✳) در هدر صفحهٔ Overview این موجودیت‌ها: Intrusion Set، Campaign، Threat Actor (گروه/فرد)، Malware، Event Incident، Sector، Country، Region — و روی Report/Grouping/Case‌ها با تب محدودتر «Containers».</p>
+<p><strong>چه می‌کند؟</strong> یک Drawer سمت راست با تا ۴ تب تحلیلی باز می‌کند:</p>
+<table>
+<thead>
+<tr>
+<th>تب</th>
+<th>محتوا</th>
+<th>منبع داده</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Activity</strong></td>
+<td>خلاصهٔ روند فعالیت اخیر موجودیت (اندیکاتورها، قربانیان، روابط)</td>
+<td>آمار پلتفرم + LLM</td>
+</tr>
+<tr>
+<td><strong>Containers digest</strong></td>
+<td>خلاصهٔ ریپورت‌ها/کیس‌های مرتبط (با فیلتر)</td>
+<td>کانتینرهای مرتبط + LLM</td>
+</tr>
+<tr>
+<td><strong>Forecast</strong></td>
+<td>پیش‌بینی روند آینده</td>
+<td>روند تاریخی + LLM</td>
+</tr>
+<tr>
+<td><strong>Internal history</strong></td>
+<td>تاریخچهٔ داخلی پلتفرم (workbenches, notes…)</td>
+<td>history داخلی + LLM</td>
+</tr>
+</tbody>
+</table>
+<p>هر تب به‌صورت خودکار کوئری می‌زند و پاسخ استریم‌شدهٔ مدل را با بنر «این خلاصه توسط AI تولید شده» نمایش می‌دهد. وقتی XTM One متصل باشد، یک Combobox «Select agent» بالای کشو اضافه می‌شود (اینجا چون XTM One نیست، مخفی است).</p>
+<h3>مثال کاربردی (تست زنده)</h3>
+<p>صفحهٔ موجودیت <strong>APT28</strong> را باز کردیم → دکمهٔ AI Insights → تب Activity به‌طور خودکار خلاصهٔ زیر را تولید کرد:</p>
+<blockquote>
+<p><em>«APT28 Activity Summary Based on OpenCTI Statistics — APT28, also tracked under aliases including IRON TWILIGHT, SNAKEMACKEREL, Swallowtail, Group 74, Sednit, Sofacy… The indicators of compromise series covers 25 monthly observation points…»</em></p>
+</blockquote>
+<p><img alt="دکمهٔ AI Insights در هدر APT28" src="images/04-insights-button.png" />
+<em>تصویر ۵ — صفحهٔ Overview ی APT28؛ دکمهٔ AI Insights در ردیف بالای تب‌ها سمت چپ «Add Security coverage».</em></p>
+<p><img alt="تب Activity" src="images/05-insights-activity.png" />
+<em>تصویر ۶ — خروجی زندهٔ تب Activity: خلاصهٔ چندپاراگرافی مبتنی بر آمار واقعی پلتفرم (aliases های APT28، بازهٔ زمانی داده‌ها، تحلیل روند IOC). نوار «Computing activity evaluation…» بالای متن نشان‌دهندهٔ استریم است.</em></p>
+<p><img alt="تب Containers digest" src="images/06-insights-containers.png" />
+<em>تصویر ۷ — تب Containers digest: خلاصهٔ هوشمند ریپورت‌های مرتبط با موجودیت.</em></p>
+<p><strong>کاربرد عملی:</strong> تحلیلگری که وارد صفحهٔ یک Threat Actor ناشناخته می‌شود، بدون خواندن ده‌ها ریپورت، در چند ثانیه تصویر کلی فعالیت اخیر، کانتینرهای مرتبط و روند آینده را می‌گیرد.</p>
+<hr />
+<h2>۴. ریپورت هوشمند کانتینرها</h2>
+<p><strong>کجاست؟</strong> داخل صفحهٔ کانتینرها (Report، Case-Incident، Case-RFI، Grouping) → تب <strong>Content</strong> → ردیف «Description &amp; Main content» → دکمهٔ ⋮ → گزینهٔ <strong>Generate a PDF export</strong>. دیالوگ باز می‌شود؛ از نوار مرحله‌ها (Stepper) روی <strong>Format</strong> کلیک کنید تا کارت <strong>Ask AI</strong> دیده شود.</p>
+<blockquote>
+<p>⚠️ نکتهٔ مهم کشف‌شده در تست: دیالوگ Export موجود در تب <strong>Data</strong> (کارت Exported files) گزینهٔ AI <strong>ندارد</strong> — فهرست Format آن فقط فرمت‌های کانکتورهای export فعال است. مسیر رسمی AI از تب <strong>Content</strong> است: دو دیالوگ مجزا در کد وجود دارد و فقط دیالوگِ تب Content کارت Ask AI را رندر می‌کند.</p>
+</blockquote>
+<p><strong>چه می‌کند؟</strong> کل «گراف دانش» کانتینر (موجودیت‌ها + روابط داخل Report/Case) را به مدل می‌دهد و یک <strong>ریپورت متنی کامل</strong> می‌سازد. قبل از تولید، پارامترها را می‌پرسد:</p>
+<ul>
+<li><strong>Format:</strong> HTML / Markdown / Plain text / JSON</li>
+<li><strong>Tone:</strong> Tactical / Operational / Strategic</li>
+<li><strong>Number of paragraphs</strong></li>
+<li><strong>Language:</strong> ده‌ها زبان</li>
+</ul>
+<p>پس از تولید، دیالوگ <strong>Select destination</strong> مقصد را می‌پرسد: درج در <strong>محتوای اصلی موجودیت</strong> یا ساخت <strong>فایل جدید</strong> با نام دلخواه.</p>
+<h3>مثال کاربردی (تست زنده)</h3>
+<p>یک Report آزمایشی ساختیم → تب Content → ⋮ → Generate a PDF export:</p>
+<p><img alt="تب Content و منوی ⋮" src="images/11-content-tab.png" />
+<em>تصویر ۸ — تب Content کانتینر؛ ردیف «Description &amp; Main content» با دکمهٔ ⋮ (راهنمای «Generate a PDF export» نمایان است).</em></p>
+<p><img alt="دیالوگ Generate an export" src="images/12-export-dialog.png" />
+<em>تصویر ۹ — دیالوگ Export در مرحلهٔ Form (کانکتور PDF، فایل خروجی و گزینه‌های صفحه). با کلیک روی مرحلهٔ «1 Format» به شبکهٔ کارت‌ها شامل کارت Ask AI می‌رسیم.</em></p>
+<p><img alt="دیاالگ Select options" src="images/13-askai-report-options.png" />
+<em>تصویر ۱۰ — پس از انتخاب کارت Ask AI: پیام «Generate a text report based on the knowledge graph (entities and relationships) of this container» با انتخاب Format=HTML، Tone=Tactical، 10 پاراگراف، زبان English و دکمهٔ Generate.</em></p>
+<p><img alt="ریپورت تولیدشده" src="images/14-report-generated.png" />
+<em>تصویر ۱۱ — خروجی واقعی: ریپورت AI با بندهای تحلیلی و جدول «Indicators of Compromise and Observables». دکمه‌های Close/Accept پایین دیالوگ.</em></p>
+<p><img alt="انتخاب مقصد" src="images/15-select-destination.png" />
+<em>تصویر ۱۲ — پس از Accept: انتخاب مقصد — درج در «Main content» یا ساخت «New file». با Submit محتوا ثبت می‌شود.</em></p>
+<p><strong>کاربرد عملی:</strong> تحلیلگر یک Report با ۵۰ موجودیت و ۸۰ رابطه می‌سازد (یا از import می‌گیرد) و به‌جای نوشتن دستی خلاصهٔ اجرایی، با دو کلیک ریپورت اولیهٔ آمادهٔ ویرایش می‌گیرد.</p>
+<hr />
+<h2>۵. جست‌وجوی زبان طبیعی (NLQ)</h2>
+<p><strong>کجاست؟</strong> دکمهٔ ✦ بنفش کنار فیلد جست‌وجوی نوار بالا. با کلیک، حالت جست‌وجو به NLQ می‌رود و placeholder به «Ask your question…» تغییر می‌کند.</p>
+<p><strong>قرار است چه کند؟</strong> سؤال فارسی/انگلیسی کاربر (مثلاً «all malware used by APT28») به <strong>گروه فیلتر استاندارد OpenCTI</strong> تبدیل می‌شود (mutation ‏<code>aiNLQ</code> با few-shot و تشخیص نام موجودیت‌ها) و مستقیم صفحهٔ نتایج فیلترشده باز می‌شود. اگر موجودیتی که کاربر نام برده پیدا نشود، toast هشدار می‌دهد.</p>
+<h3>مثال کاربردی (تست زنده) و یک یافتهٔ مهم</h3>
+<p><img alt="حالت NLQ فعال" src="images/07-nlq-toggle.png" />
+<em>تصویر ۱۳ — حالت NLQ فعال: placeholder به «Ask your question…» تغییر کرده و دکمهٔ ✦ بنفش/فعال است (tooltip: Ask ai).</em></p>
+<p>سؤال «malware used by APT28» را فرستادیم؛ صفحهٔ نتایج باز شد، اما بررسی شبکه (wire) نشان داد <strong>mutation ‏<code>aiNLQ</code> اصلاً ارسال نشده</strong> و جست‌وجو به‌صورت کلیدواژه‌ای انجام شده است:</p>
+<p><img alt="نتایج پس از NLQ" src="images/08-nlq-fallback.png" />
+<em>تصویر ۱۴ — صفحهٔ نتایج؛ چیپ «Entity type=» خالی، فیلتر پیش‌فرض خود صفحهٔ جست‌وجوست (در آزمون کنترل‌شده، جست‌وجوی معمولی هم دقیقاً همین URL را ساخت).</em></p>
+<p><strong>علت (کشف فنی):</strong> شرط <code>askAI &amp;&amp; isEnterpriseEdition</code> در <code>TopBar.tsx:194</code>. لایسنس EE در این استقرار منقضی است، پس درخواست NLQ بی‌صدا به جست‌وجوی کلیدواژه‌ای می‌افتد. خودِ بک‌اند (<code>aiNLQ</code>) قفل EE ندارد و در بنچمارک، فیلترهای درست تولید می‌کند؛ <strong>رفع آن فقط حذف همین یک شرط در TopBar است.</strong> این دقیقاً نمونه‌ای از دستهٔ «دکمه هست، عملاً کاری نمی‌کند» است.</p>
+<hr />
+<h2>۶. پنل ایجنت محلی</h2>
+<p><strong>کجاست؟</strong> مسیر <strong><code>/dashboard/agent</code></strong> (در منوی کنار صفحه). این قابلیتِ افزوده‌شدهٔ همین checkout است و به ایجنت اختصاصی ما وصل می‌شود — نه به XTM One و نه به مدل legacy.</p>
+<p><strong>معماری:</strong> مرورگر → <code>POST /ai-agent/ask</code> (همان‌origin) → پروکسی بک‌اند (<code>httpAgentProxy.ts</code>؛ احراز هویت کاربر + تایم‌اوت ۳ دقیقه) → opencti-agent روی <code>:8100</code> (FastAPI، pydantic-ai) → ایجنت با ۱۰ ابزار <strong>فقط‌خواندنی</strong> GraphQL (جست‌وجو، دریافت موجودیت، batch، find_paths، عملیات مجموعه‌ای و…) به خود پلتفرم کوئری می‌زند → پاسخ Markdown + لیست <strong>Cited entities</strong>.</p>
+<h3>مثال کاربردی (تست زنده)</h3>
+<p><img alt="پنل ایجنت" src="images/09-agent-panel.png" />
+<em>تصویر ۱۵ — صفحهٔ ایجنت: ورودی «Ask the threat-intel agent (read-only)» و دکمهٔ Ask.</em></p>
+<p>سؤال: <strong>«Which malware is shared between APT28 and APT29?»</strong></p>
+<p><img alt="پاسخ ایجنت" src="images/10-agent-answer.png" />
+<em>تصویر ۱۶ — پاسخ واقعی ایجنت: «The malware shared between APT28 and APT29 (represented in this graph as UNC2452) is </em><em>reGeorg</em><em>» به‌همراه </em><em>شواهد</em><em> (هر دو یال uses با شناسهٔ رابطه و منبع/citation) و لیست کامل «Cited entities». HTTP 200 از <code>/ai-agent/ask</code> ثبت شد.</em></p>
+<p><strong>کاربرد عملی:</strong> پرسش‌های تحلیلی چندمرحله‌ای (اشتراک malware بین دو گروه، مسیر ارتباطی بین دو موجودیت، مجموعه‌ها) که با جست‌وجوی ساده نمی‌شود — ایجنت خودش چند ابزار را زنجیر می‌زند و جواب مستند با citation می‌دهد.</p>
+<hr />
+<h2>۷. Ask Ariane و CTEM Command Center</h2>
+<p><strong>کجاست؟</strong> هر دو در نوار بالا، سمت راست: دکمهٔ «Ask Ariane» (با برچسب EE) و آیکون رادار CTEM.</p>
+<p><strong>این‌ها مقصدشان XTM One است</strong> (چت‌بات agentic ابری فیلیگران با تاریخچهٔ مکالمه، آپلود فایل و تأیید انسانی فراخوانی ابزار) و <strong>به ایجنت محلی ما وصل نیستند.</strong></p>
+<p><img alt="دکمهٔ Ask Ariane" src="images/16-askariane-button.png" />
+<em>تصویر ۱۷ — دکمهٔ Ask Ariane در نوار بالا با برچسب سبز EE (نشان می‌دهد فعال نیست).</em></p>
+<p><img alt="کلیک روی Ask Ariane" src="images/17-askariane-ee-dialog.png" />
+<em>تصویر ۱۸ — نتیجهٔ واقعی کلیک با اکانت ادمین در وضعیت فعلی: فقط دیالوگ «Enterprice Edition license agreement» باز می‌شود؛ چت هرگز باز نمی‌شود.</em></p>
+<p><strong>شرط لازم برای فعال شدن هر سه مورد:</strong> ① لایسنس EE معتبر، ② پذیرش Filigran AI Terms (CGU=enabled در Settings→Experience)، ③ اتصال XTM One (<code>xtm_one_configured=true</code>). بدون این سه، این دکمه «هست ولی کار نمی‌کند» — و آیکون CTEM اصلاً رندر نمی‌شود.</p>
+<hr />
+<h2>۸. تنظیمات AI</h2>
+<p><strong>کجاست؟</strong> <strong>Settings → Filigran Experience</strong>. این صفحه سه بخش مرتبط دارد:</p>
+<p><img alt="صفحهٔ Experience" src="images/18-settings-experience.png" />
+<em>تصویر ۱۹ — Settings → Filigran Experience در حالت Community: کارت Enterprise Edition (با قید «Agentic AI capabilities»)، کارت XTM Hub (Not connected) و بخش Support Packages.</em></p>
+<ul>
+<li>وقتی EE فعال باشد، در کارت Enterprise ردیف <strong>«XTM One (Agentic AI)»</strong> ظاهر می‌شود: اگر CGU در حالت pending باشد دکمهٔ <strong>Validate the Filigran AI Terms</strong> و در غیر این صورت یک <strong>سوییچ</strong> خاموش/روشن.</li>
+<li>وقتی XTM One متصل نباشد ردیف <strong>«Generative AI (AI Insight, NLQ)»</strong> نمایش داده می‌شود: سوییچ <code>platform_ai_enabled</code> که همهٔ دکمه‌های ✳ Ask AI و AI Insights را خاموش/روشن می‌کند.</li>
+<li>دیالوگ <strong>ValidateTermsOfUseDialog</strong> (پذیرش/رد قوانین Filigran AI) هم از همین‌جا و هم از دکمه‌های Ask AI/AI Insights در حالت pending باز می‌شود.</li>
+<li>مدل legacy در فایل <code>opencti-graphql/config/development.json</code> تنظیم می‌شود (endpoint سازگار OpenAI + token + model + max_tokens).</li>
+</ul>
+<hr />
+<h2>۹. معماری مسیریابی</h2>
+<p>تصمیم «این دکمه به کجا می‌رود؟» در فرانت با دو قلاب گرفته می‌شود:</p>
+<pre><code>useAI()                 → { enabled, configured, fullyActive }
+useChatbot().xtmOneConfigured → از GET /chatbot/config
+</code></pre>
+<ul>
+<li>اگر <code>xtmOneConfigured === true</code> باشد → مسیر <strong>XTM One agent</strong> (intentهای cti.*، انتخابگر ایجنت، چت Ariane).</li>
+<li>در غیر این صورت → مسیر <strong>legacy</strong> (mutationهای GraphQL داخلی + استریم <code>aiBus</code> با مدل کانفیگ‌شده).</li>
+<li>استثنا: صفحهٔ <code>/dashboard/agent</code> که همیشه و فقط به <strong>opencti-agent</strong> (<code>/ai-agent/ask</code>) می‌رود.</li>
+</ul>
+<p>نتیجهٔ عملی در این checkout (بدون XTM One): Ask AI، AI Insights و ریپورت کانتینر <strong>همه با موفقیت روی مدل legacy کار می‌کنند</strong> (تست شد)، در حالی که چت‌بات/CTEM/بلوک‌های Playbook و انتخابگرهای ایجنت به‌دلیل وابستگی به XTM One غیرفعال‌اند.</p>
+<hr />
+<h2>۱۰. قابلیت‌های بدون جایگزین</h2>
+<p>این‌ها فقط با XTM One کار می‌کنند و در این استقرار «دکمه/قابلیت سر جایش نیست یا عملاً کاری نمی‌کند»:</p>
+<table>
+<thead>
+<tr>
+<th>قابلیت</th>
+<th>وضعیت اینجا</th>
+<th>شرط فعال شدن</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>چت Ask Ariane</td>
+<td>دکمه نمایان، کلیک → فقط دیالوگ لایسنس EE</td>
+<td>EE + CGU + XTM One</td>
+</tr>
+<tr>
+<td>آیکون CTEM Command Center</td>
+<td>رندر نمی‌شود</td>
+<td>XTM One</td>
+</tr>
+<tr>
+<td>بلوک‌های Playbook: «Transform with AI agent» / «Send to AI agent»</td>
+<td>از فهرست بلوک‌ها حذف می‌شوند (<code>availableComponents</code> + گیت EE)</td>
+<td>EE + XTM One token</td>
+</tr>
+<tr>
+<td>انتخابگر ایجنت در Import (کانکتورهای دارای <code>xtm_one_intent</code>)</td>
+<td>غیب — چنین کانکتوری تعریف نشده</td>
+<td>XTM One + ایجنت bind شده</td>
+</tr>
+<tr>
+<td>Combobox «Select agent» در AI Insights و فلش ایجنت NLQ</td>
+<td>مخفی/خالی</td>
+<td>XTM One</td>
+</tr>
+<tr>
+<td>کارت XTM One MCP در Profile</td>
+<td>حالت «متصل نیست»</td>
+<td>XTM One</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>۱۱. APIهای بدون UI</h2>
+<p>در اسکیمای GraphQL (<code>ai.graphql</code>) این mutationها وجود دارند ولی در این نسخه دکمه‌ای در UI ندارند (قابل استفاده از API/automation):</p>
+<table>
+<thead>
+<tr>
+<th>mutation</th>
+<th>کار</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>aiThreatGenerateReport</code> / <code>aiVictimGenerateReport</code></td>
+<td>ریپورت‌سازی برای Threat Actor ها و قربانیان (مثل ریپورت کانتینر)</td>
+</tr>
+<tr>
+<td><code>aiConvertIndicator</code></td>
+<td>تبدیل اندیکاتور بین STIX / Sigma / YARA</td>
+</tr>
+<tr>
+<td><code>aiImproveWriting</code></td>
+<td>بهبود نگارش متن</td>
+</tr>
+<tr>
+<td><code>aiSummarizeFiles</code> / <code>aiConvertFilesToStix</code></td>
+<td>خلاصه‌سازی فایل‌ها و تبدیل فایل به STIX (<strong>منسوخ</strong>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>۱۲. پیوست</h2>
+<p><strong>محیط تست:</strong> OpenCTI روی <code>:4000</code> (backend)، vite dev روی <code>:3001</code>، opencti-agent روی <code>:8100</code>؛ کاربر ادمین؛ شاخهٔ <code>ai-ungate</code>.</p>
+<p><strong>روش:</strong> اسکریپت‌های Playwright (<code>/tmp/opencode/ai-ui/</code>) لاگین، پیمایش و کلیک‌ها را انجام دادند؛ درخواست‌های GraphQL/HTTP رهگیری شدند تا «کار کردن» فقط با ظاهر اثبات نشود — هر قابلیت با کد وضعیت شبکه هم تأیید شد (مثلاً <code>aiExplain: 200</code>، <code>aiContainerGenerateReport: 200</code>، <code>/ai-agent/ask: 200</code>).</p>
+<p><strong>بازتولید:</strong> <code>cd /tmp/opencode/ai-ui &amp;&amp; node flow4.mjs</code> (ریپورت کانتینر) — سایر اسکریپت‌ها: <code>shoot.mjs</code> تا <code>shoot8b.mjs</code>.</p>
+<p><strong>دو اصلاح پیشنهادی ناشی از این تست:</strong>
+1. <code>TopBar.tsx:194</code> — حذف <code>isEnterpriseEdition</code> از شرط NLQ تا مثل بقیهٔ قابلیت‌ها روی این شاخه ungated شود (یکی‌خطی).
+2. در صورت تمایل، مسیر legacy چت‌بات (Ask Ariane) به opencti-agent محلی (<code>:8100</code>) سیم‌کشی شود تا چت هم بدون XTM One کار کند.</p>
+</body>
+</html>
