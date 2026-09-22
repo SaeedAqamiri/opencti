@@ -390,5 +390,34 @@
    ]
   },
   "max_calls": 4
+ },
+ {
+  "id": "wr1-approved-report",
+  "type": "write",
+  "question": "Create a report named 'WRK Bench Approved Report' containing the Tool entity Mimikatz (internal id 5e71af2d-0653-45df-87be-88976db278e1). Invoke create_report now with exactly that name and that single object.",
+  "gold_entity_names": [
+   "WRK Bench Approved Report"
+  ],
+  "expect": {
+   "writes": 1,
+   "answer_contains": [
+    "WRK Bench Approved Report"
+   ]
+  },
+  "max_calls": 8
+ },
+ {
+  "id": "wr2-rejected-report",
+  "type": "write",
+  "question": "Create a report named 'WRK Bench Rejected Report' containing the Tool entity Mimikatz (internal id 5e71af2d-0653-45df-87be-88976db278e1). Invoke create_report now.",
+  "gold_entity_names": [],
+  "expect": {
+   "writes": 0,
+   "answer_contains": [
+    "not",
+    "created"
+   ]
+  },
+  "max_calls": 8
  }
 ]
