@@ -343,6 +343,10 @@ export const postChatbotMessageLocal = async (req: Express.Request, res: Express
           if (typeof evt.delta === 'string') {
             full += evt.delta;
             emit({ type: 'stream', content: evt.delta });
+          } else if (evt.type === 'approval_required') {
+            // v2-B HITL: forward the pause verbatim — the widget normalizer maps
+            // {type, proposals, conversation_id} onto its awaiting_approval state.
+            emit(evt);
           } else if (evt.task_id) {
             meta = evt;
           }
@@ -581,6 +585,24 @@ export const postChatbotMessageApprove = async (req: Express.Request, res: Expre
       res.status(400).json({ error: 'Request body is missing' });
       return;
     }
+    // v2-B local mode: the paused turn lives in the on-prem opencti-agent.
+    // The browser-session gate above is PRESERVED — an API identity must never
+    // approve a tool call, least of all one the agent proposed itself.
+    if (!xtmOneClient.isConfigured()) {
+      const conversationId = String(req.body?.conversation_id ?? req.body?.conversationId ?? '');
+      if (!UUID_RE.test(conversationId)) {
+        res.status(400).json({ error: 'Invalid conversation id' });
+        return;
+      }
+      const localClient = agentHttpClient(res);
+      const response = await localClient.post(
+        `/sessions/${encodeURIComponent(conversationId)}/approve`,
+        { decisions: req.body?.decisions ?? [], approver: context.user.email },
+        { timeout: DEFAULT_XTM_TIMEOUT },
+      );
+      res.status(response.status).json(response.data);
+      return;
+    }
     const jwt = await issueXtmJwt(context.user, XTM_ONE_URL);
     const httpClient = getXtmClient('json', {
       Authorization: `Bearer ${jwt}`,
@@ -625,7 +647,7 @@ export const getChatbotPendingApprovals = async (req: Express.Request, res: Expr
     // Same gate as the decision route. The proposals payload spells out the tool
     // name, its arguments and its input schema, and merely reaching this route
     // tells XTM One a client is still watching — which is what keeps a displayed
-    // prompt from being discarded as abandoned. Neither belongs to an API token.
+    // prompt from being discarded as abandoned.
     if (!isBrowserSessionRequest(req, context)) {
       res.status(403).json({ status: 'error', error: 'Tool approval requires a user session' });
       return;
@@ -633,6 +655,16 @@ export const getChatbotPendingApprovals = async (req: Express.Request, res: Expr
     const conversationId = String(req.params.conversationId ?? '');
     if (!conversationId || !UUID_RE.test(conversationId)) {
       res.status(400).json({ error: 'Invalid conversation id' });
+      return;
+    }
+    // v2-B local mode: the agent owns the paused-turn state.
+    if (!xtmOneClient.isConfigured()) {
+      const localClient = agentHttpClient(res);
+      const response = await localClient.get(
+        `/sessions/${encodeURIComponent(conversationId)}/pending-approvals`,
+        { timeout: 30_000 },
+      );
+      res.status(response.status).json(response.data);
       return;
     }
     const jwt = await issueXtmJwt(context.user, XTM_ONE_URL);

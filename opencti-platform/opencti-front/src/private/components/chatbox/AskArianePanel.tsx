@@ -150,9 +150,13 @@ const AskArianePanel: React.FC<AskArianePanelProps> = ({
         agents: '/agents',
         messages: '/messages',
         sessions: '/sessions',
-        // XTM One-only extras — omitted in local mode so the widget never
-        // advertises HITL approval / steering / uploads the agent can't serve.
-        ...(localOnly ? {} : {
+        // XTM One-only extras — steering/uploads stay local-omitted (the agent
+        // doesn't serve them), but HITL approval is served by the local
+        // opencti-agent (v2-B): the same proxy routes branch to the agent.
+        ...(localOnly ? {
+          approve: '/messages/approve',
+          pendingApprovals: '/conversations',
+        } : {
           // Mid-run steering — must be set explicitly because the chatbot
           // default ('/chat/messages/steer') assumes XTM One-style paths,
           // while the OpenCTI proxy exposes '/messages/steer'.
