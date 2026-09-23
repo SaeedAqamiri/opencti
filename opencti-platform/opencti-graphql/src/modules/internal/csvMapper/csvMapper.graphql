@@ -1,0 +1,209 @@
+# Type
+type AttributeColumnConfiguration {
+  separator: String
+  pattern_date: String
+  timezone: String
+}
+type AttributeColumn {
+  column_name: String
+  configuration: AttributeColumnConfiguration
+}
+type AttributeBasedOn {
+  identifier: String
+  representations: [String]
+}
+type AttributeRef {
+  multiple: Boolean
+  id: String
+  ids: [String]
+}
+
+type CsvMapperRepresentationAttribute {
+  key: String!
+  column: AttributeColumn
+  based_on: AttributeBasedOn
+  ref: AttributeRef
+  default_values: [DefaultValue!]
+}
+
+enum CsvMapperOperator {
+  eq
+  not_eq
+}
+type CsvMapperRepresentationTargetColumn {
+  column_reference: String
+  operator: CsvMapperOperator
+  value: String
+}
+type CsvMapperRepresentationTarget {
+  entity_type: String!
+  column_based: CsvMapperRepresentationTargetColumn
+}
+
+enum CsvMapperRepresentationType {
+  entity
+  relationship
+}
+type CsvMapperRepresentation {
+  id: ID!
+  type: CsvMapperRepresentationType!
+  target: CsvMapperRepresentationTarget!
+  attributes: [CsvMapperRepresentationAttribute!]!
+  from: String
+  to: String
+}
+
+type CsvMapperAddInputFromImport {
+  name: String!
+  has_header: Boolean!
+  separator: String!
+  representations: [CsvMapperRepresentation!]!
+  skipLineChar: String
+}
+
+type CsvMapper implements InternalObject & BasicObject {
+  id: ID!
+  entity_type: String! @auth
+  representative: Representative!
+  standard_id: String! @auth
+  parent_types: [String!]! @auth
+  metrics:[Metric] @auth
+  # CsvMapper
+  name: String! @auth
+  has_header: Boolean! @auth
+  separator: String! @auth
+  skipLineChar: String @auth
+  representations: [CsvMapperRepresentation!]! @auth
+  errors: String
+  toConfigurationExport: String!
+}
+
+# Ordering
+enum CsvMapperOrdering {
+  name
+  _score
+}
+
+# Relay connections
+type CsvMapperConnection {
+  pageInfo: PageInfo!
+  edges: [CsvMapperEdge!]!
+}
+type CsvMapperEdge {
+  cursor: String!
+  node: CsvMapper!
+}
+
+type CsvMapperTestResult {
+  objects: String!
+  nbRelationships: Int!
+  nbEntities: Int!
+}
+
+type CsvMapperSchemaAttribute {
+  name: String!
+  type: String!
+  mandatory: Boolean!
+  mandatoryType: String!
+  editDefault: Boolean!
+  multiple: Boolean!
+  defaultValues: [DefaultValue!]
+  label: String!
+  mappings: [CsvMapperSchemaAttribute!]
+}
+type CsvMapperSchemaAttributes {
+  name: String!
+  attributes: [CsvMapperSchemaAttribute!]!
+}
+
+# Ordering
+enum JsonMapperOrdering {
+  name
+  _score
+}
+
+# Relay connections
+type JsonMapperConnection {
+  pageInfo: PageInfo!
+  edges: [JsonMapperEdge!]!
+}
+type JsonMapperEdge {
+  cursor: String!
+  node: JsonMapper!
+}
+
+# Queries
+type Query {
+  csvMapper(id: ID!): CsvMapper @auth(for: [CSVMAPPERS, INGESTION_SETINGESTIONS])
+  csvMappers(
+    first: Int
+    after: ID
+    orderBy: CsvMapperOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+  ): CsvMapperConnection @auth(for: [CSVMAPPERS, INGESTION_SETINGESTIONS])
+  csvMapperSchemaAttributes: [CsvMapperSchemaAttributes!]! @auth(for: [KNOWLEDGE, CSVMAPPERS])
+  csvMapperAddInputFromImport(
+    file: Upload!
+  ): CsvMapperAddInputFromImport! @auth(for: [CSVMAPPERS])
+}
+
+# Mutations
+input AttributeColumnConfigurationInput {
+  separator: String
+  pattern_date: String
+  timezone: String
+}
+input AttributeColumnInput {
+  column_name: String
+  configuration: AttributeColumnConfigurationInput
+}
+input AttributeBasedOnInput {
+  representations: [String]
+}
+input AttributeRefInput {
+  multiple: Boolean
+  id: String
+  ids: [String]
+}
+
+input CsvMapperRepresentationAttributeInput {
+  key: String
+  column: AttributeColumnInput
+  based_on: AttributeBasedOnInput
+  ref: AttributeRefInput
+}
+
+input CsvMapperRepresentationTargetColumnInput {
+  column_reference: String
+  operator: CsvMapperOperator
+  value: String
+}
+input CsvMapperRepresentationTargetInput {
+  entity_type: String!
+  column_based: CsvMapperRepresentationTargetColumnInput
+}
+
+input CsvMapperRepresentationInput {
+  id: ID!
+  type: CsvMapperRepresentationType!
+  target: CsvMapperRepresentationTargetInput!
+  attributes: [CsvMapperRepresentationAttributeInput]!
+  from: String
+  to: String
+}
+input CsvMapperAddInput {
+  name: String! @constraint(minLength: 2, format: "not-blank")
+  has_header: Boolean!
+  separator: String!
+  representations: String!
+  skipLineChar: String
+}
+
+type Mutation {
+  csvMapperAdd(input: CsvMapperAddInput!): CsvMapper @auth(for: [CSVMAPPERS])
+  csvMapperTest(configuration: String!, file: Upload!): CsvMapperTestResult @auth(for: [CSVMAPPERS])
+  csvMapperDelete(id: ID!): ID @auth(for: [CSVMAPPERS])
+  csvMapperFieldPatch(id: ID!, input: [EditInput!]!): CsvMapper @auth(for: [CSVMAPPERS])
+}

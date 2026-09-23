@@ -1,0 +1,235 @@
+import React, { useMemo } from 'react';
+import { Route, Routes, useParams, useLocation } from 'react-router';
+import { graphql, PreloadedQuery, usePreloadedQuery, useSubscription } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import AIInsights from '@components/common/ai/AIInsights';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import Country from './Country';
+import CountryKnowledge from './CountryKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import FileManager from '../../common/files/FileManager';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import { RootCountriesSubscription } from './__generated__/RootCountriesSubscription.graphql';
+import { RootCountryQuery } from './__generated__/RootCountryQuery.graphql';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import { isPathOverview } from '../../../../utils/tabUtils';
+import CountryEdition from './CountryEdition';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import CountryDeletion from './CountryDeletion';
+import { PATH_COUNTRIES, PATH_COUNTRY } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootCountriesSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on Country {
+        ...Country_country
+        ...CountryEditionOverview_country
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const countryQuery = graphql`
+  query RootCountryQuery($id: String!) {
+    country(id: $id) {
+      id
+      entity_type
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      name
+      x_opencti_aliases
+      x_opencti_graph_data
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...Country_country
+      ...CountryKnowledge_country
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+interface RootCountryComponentProps {
+  queryRef: PreloadedQuery<RootCountryQuery>;
+  countryId: string;
+}
+
+const RootCountryComponent = ({ queryRef, countryId }: RootCountryComponentProps) => {
+  const subConfig = useMemo<
+    GraphQLSubscriptionConfig<RootCountriesSubscription>
+  >(
+    () => ({
+      subscription,
+      variables: { id: countryId },
+    }),
+    [countryId],
+  );
+  useSubscription(subConfig);
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  const data = usePreloadedQuery(countryQuery, queryRef);
+  const { forceUpdate } = useForceUpdate();
+  const { country, connectorsForImport, connectorsForExport } = data;
+  const basePath = PATH_COUNTRY(countryId);
+  const link = `${basePath}/knowledge`;
+  const isOverview = isPathOverview(location.pathname, basePath);
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  return (
+    <CreateRelationshipContextProvider>
+      {country ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={(
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'regions',
+                    'areas',
+                    'cities',
+                    'organizations',
+                    'threats',
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'malwares',
+                    'attack_patterns',
+                    'tools',
+                    'observables',
+                  ]}
+                  data={country}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Locations') },
+              { label: t_i18n('Countries'), link: PATH_COUNTRIES },
+              { label: country.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Country"
+              disableSharing={true}
+              stixDomainObject={country}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <CountryEdition countryId={country.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={country}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <CountryDeletion id={country.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              enableQuickSubscription={true}
+              isOpenctiAlias={true}
+              redirectToContent={true}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={country}
+              basePath={basePath}
+              pages={{
+                overview: <Country countryData={country} />,
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <CountryKnowledge countryData={country} />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={country}
+                  />
+                ),
+                analyses: (
+                  <StixCoreObjectOrStixCoreRelationshipContainers
+                    stixDomainObjectOrStixCoreRelationship={country}
+                  />
+                ),
+                sightings: (
+                  <EntityStixSightingRelationships
+                    entityId={country.id}
+                    entityLink={link}
+                    noPadding={true}
+                    isTo={true}
+                  />
+                ),
+                files: (
+                  <FileManager
+                    id={countryId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={country}
+                  />
+                ),
+                history:
+                  <StixCoreObjectHistory stixCoreObjectId={countryId} />,
+              }}
+              extraActions={isOverview && <AIInsights id={country.id} />}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+
+const RootCountry = () => {
+  const { countryId } = useParams() as { countryId: string };
+  const queryRef = useQueryLoading<RootCountryQuery>(countryQuery, {
+    id: countryId,
+  });
+  return (
+    <>
+      {queryRef && (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootCountryComponent queryRef={queryRef} countryId={countryId} />
+        </React.Suspense>
+      )}
+    </>
+  );
+};
+
+export default RootCountry;

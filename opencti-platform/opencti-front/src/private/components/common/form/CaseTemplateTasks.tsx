@@ -1,0 +1,204 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import makeStyles from '@mui/styles/makeStyles';
+import { Form, Formik } from 'formik';
+import { FormikConfig } from 'formik/dist/types';
+import * as R from 'ramda';
+import { FunctionComponent, useState } from 'react';
+import { graphql } from 'react-relay';
+import type { ComboboxChangeMeta } from '@filigran/design-system';
+import ComboboxField, { asMultiValue, ComboboxFieldProps } from '../../../../components/ComboboxField';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import { useFormatter } from '../../../../components/i18n';
+import ItemIcon from '../../../../components/ItemIcon';
+import TextField from '../../../../components/TextField';
+import { fetchQuery, handleErrorInForm } from '../../../../relay/environment';
+import Field, { FieldOption, fieldSpacingContainerStyle } from '../../../../utils/field';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import { CaseTemplateTasksCreationMutation, TaskTemplateAddInput } from './__generated__/CaseTemplateTasksCreationMutation.graphql';
+import { CaseTemplateTasksSearchQuery$data } from './__generated__/CaseTemplateTasksSearchQuery.graphql';
+
+// Deprecated - https://mui.com/system/styles/basics/
+// Do not use it for new code.
+const useStyles = makeStyles(() => ({
+  icon: {
+    paddingTop: 4,
+    display: 'inline-block',
+  },
+  text: {
+    display: 'inline-block',
+    flexGrow: 1,
+    marginLeft: 10,
+  },
+
+}));
+
+interface TaskTemplateFieldProps {
+  caseTemplateId?: string;
+  onChange: (name: string, values: FieldOption[]) => void;
+  values?: readonly FieldOption[];
+}
+
+const CaseTemplateTasksQuery = graphql`
+  query CaseTemplateTasksSearchQuery($search: String) {
+    taskTemplates(search: $search) {
+      edges {
+        node {
+          id
+          name
+          description
+        }
+      }
+    }
+  }
+`;
+
+const CaseTemplateTasksCreation = graphql`
+  mutation CaseTemplateTasksCreationMutation($input: TaskTemplateAddInput!) {
+    taskTemplateAdd(input: $input) {
+      id
+      standard_id
+      name
+      description
+    }
+  }
+`;
+
+const CaseTemplateTasks: FunctionComponent<TaskTemplateFieldProps> = ({
+  onChange,
+  values,
+}) => {
+  const classes = useStyles();
+  const { t_i18n } = useFormatter();
+  const [tasks, setTasks] = useState<FieldOption[]>([...(values ?? [])]);
+  const [openCreation, setOpenCreation] = useState(false);
+  const [commitTaskCreation] = useApiMutation<CaseTemplateTasksCreationMutation>(
+    CaseTemplateTasksCreation,
+  );
+
+  const searchTasks = (search: string) => {
+    {
+      fetchQuery(CaseTemplateTasksQuery, { search })
+        .toPromise()
+        .then((data) => {
+          const newTasks = (
+            data as CaseTemplateTasksSearchQuery$data
+          )?.taskTemplates?.edges?.map(({ node }) => ({
+            value: node.id,
+            label: node.name,
+          })) ?? [];
+          setTasks(R.uniq([...tasks, ...newTasks]));
+        });
+    }
+  };
+
+  const submitTaskCreation: FormikConfig<TaskTemplateAddInput>['onSubmit'] = (
+    submitValues,
+    { setSubmitting, setErrors, resetForm },
+  ) => {
+    const { name, description } = submitValues;
+    setSubmitting(true);
+    commitTaskCreation({
+      variables: { input: { name, description } },
+      onError: (error: Error) => {
+        handleErrorInForm(error, setErrors);
+        setSubmitting(false);
+      },
+      onCompleted: (data) => {
+        setSubmitting(false);
+        setOpenCreation(false);
+        onChange('tasks', [
+          ...(values ?? []),
+          ...(data.taskTemplateAdd
+            ? [
+                {
+                  value: data.taskTemplateAdd.id,
+                  label: data.taskTemplateAdd.name,
+                },
+              ]
+            : []),
+        ]);
+        resetForm();
+      },
+    });
+  };
+
+  return (
+    <>
+      <Field<ComboboxFieldProps>
+        component={ComboboxField}
+        // MUI hid its clear indicator here with display:none; the library defaults
+        // clearable to true, so the affordance must be declined explicitly.
+        clearable={false}
+        style={fieldSpacingContainerStyle}
+        name="tasks"
+        multiple={true}
+        label={t_i18n('Tasks')}
+        noOptionsText={t_i18n('No available options')}
+        options={tasks}
+        onInputChange={(search: string, meta: ComboboxChangeMeta) => {
+          if (meta.cause === 'type') searchTasks(search);
+        }}
+        onFocusInput={() => searchTasks('')}
+        onChange={asMultiValue(onChange)}
+        openCreate={() => setOpenCreation(true)}
+        renderOption={(option) => (
+          <>
+            <div className={classes.icon} style={{ color: option.color }}>
+              <ItemIcon type="Task" />
+            </div>
+            <div className={classes.text}>{option.label}</div>
+          </>
+        )}
+      />
+      <Dialog
+        open={openCreation}
+        title={t_i18n('Create a task template')}
+      >
+        <Formik<TaskTemplateAddInput>
+          initialValues={{ name: '', description: '' }}
+          onSubmit={submitTaskCreation}
+        >
+          {({ submitForm, handleReset, isSubmitting }) => (
+            <Form>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="name"
+                label={t_i18n('Name')}
+                fullWidth={true}
+              />
+              <Field
+                component={MarkdownField}
+                name="description"
+                label={t_i18n('Description')}
+                style={{ marginTop: 20, marginBottom: 20 }}
+              />
+              <DialogActions>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    handleReset();
+                    setOpenCreation(false);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Cancel')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Create')}
+                </Button>
+              </DialogActions>
+            </Form>
+          )}
+        </Formik>
+      </Dialog>
+    </>
+  );
+};
+
+export default CaseTemplateTasks;

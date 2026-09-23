@@ -1,0 +1,40 @@
+import { Locator, Page } from '@playwright/test';
+
+export default class SelectFieldPageModel {
+  private readonly inputLocator: Locator;
+  private readonly parentLocator: Locator;
+
+  constructor(
+    private readonly page: Page,
+    private readonly label: string,
+    private readonly multiple: boolean,
+    readonly rootLocator?: Locator,
+    // `getByRole` matches the accessible name by SUBSTRING, so a field named
+    // "Attribute" also resolves the one named "Date attribute" sitting beside
+    // it. Opt in where two fields in the same container share a word; left off
+    // by default so no existing call site changes behaviour.
+    private readonly exact: boolean = false,
+  ) {
+    this.inputLocator = (rootLocator ?? page).getByRole('combobox', { name: label, exact });
+    this.parentLocator = this.inputLocator.locator('../..');
+  }
+
+  async selectOption(option: string) {
+    await this.inputLocator.click();
+    const list = this.page.getByRole('listbox', { name: this.label });
+    return list.getByText(option, { exact: true }).click();
+  }
+
+  getOption(option: string) {
+    return this.parentLocator.getByText(option).first();
+  }
+
+  // `.first()` because the library field nests its helper text inside the same
+  // subtree the trigger hangs from, so `getByText` matches the <p> AND its
+  // wrapper — two descriptions of one string, which strict mode rejects. The
+  // adapter renders exactly one `SelectHelperText`, so there is no duplicate
+  // error message to hide here.
+  getByText(input: string) {
+    return this.parentLocator.getByText(input).first();
+  }
+}

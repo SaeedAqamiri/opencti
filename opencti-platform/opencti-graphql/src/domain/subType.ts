@@ -1,0 +1,85 @@
+import * as R from 'ramda';
+import { ATTR_DB_NAMESPACE, ATTR_DB_OPERATION_NAME, SEMATTRS_DB_NAME, SEMATTRS_DB_OPERATION } from '@opentelemetry/semantic-conventions';
+import { telemetry } from '../config/tracing';
+import { buildPagination } from '../database/utils';
+import { ENTITY_TYPE_DRAFT_WORKSPACE } from '../modules/draftWorkspace/draftWorkspace-types';
+import { ABSTRACT_STIX_CORE_RELATIONSHIP, ABSTRACT_STIX_CYBER_OBSERVABLE, ABSTRACT_STIX_DOMAIN_OBJECT } from '../schema/general';
+import { schemaAttributesDefinition } from '../schema/schema-attributes';
+import { schemaRelationsRefDefinition } from '../schema/schema-relationsRef';
+import { schemaTypesDefinition } from '../schema/schema-types';
+import { ENTITY_HASHED_OBSERVABLE_ARTIFACT } from '../schema/stixCyberObservable';
+import { ENTITY_TYPE_EXTERNAL_REFERENCE } from '../schema/stixMetaObject';
+import { ABSTRACT_STIX_NESTED_REF_RELATIONSHIP } from '../schema/stixRefRelationship';
+import { STIX_SIGHTING_RELATIONSHIP } from '../schema/stixSightingRelationship';
+import type { AuthContext, AuthUser } from '../types/user';
+
+// -- ENTITY TYPES --
+
+export const queryDefaultSubTypesPaginated = async (context: AuthContext, user: AuthUser, search: string | null = null) => {
+  const queryDefaultSubTypesFn = async () => {
+    const domainObjectTypes = schemaTypesDefinition
+      .get(ABSTRACT_STIX_DOMAIN_OBJECT)
+      .filter((n) => n.includes(search ?? ''))
+      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+    const customTypes = [
+      ABSTRACT_STIX_CORE_RELATIONSHIP,
+      STIX_SIGHTING_RELATIONSHIP,
+      ABSTRACT_STIX_CYBER_OBSERVABLE,
+      ENTITY_TYPE_EXTERNAL_REFERENCE,
+      ENTITY_HASHED_OBSERVABLE_ARTIFACT,
+      ENTITY_TYPE_DRAFT_WORKSPACE,
+    ];
+
+    const allTypes = [...domainObjectTypes, ...customTypes].map((id) => ({ node: { id, label: id } }));
+
+    // Remove duplicates types
+    const finalResult = [
+      ...new Map(allTypes.map((item) => [item.node.id, item])).values(),
+    ];
+
+    return buildPagination(0, null, finalResult, finalResult.length);
+  };
+
+  return telemetry(context, user, 'QUERY default subtypes', {
+    [ATTR_DB_NAMESPACE]: 'subtypes_domain',
+    // Deprecated attribute to be removed when transition done
+    [SEMATTRS_DB_NAME]: 'subtypes_domain',
+    [ATTR_DB_OPERATION_NAME]: 'read',
+    // Deprecated attribute to be removed when transition done
+    [SEMATTRS_DB_OPERATION]: 'read',
+  }, queryDefaultSubTypesFn);
+};
+
+const querySubType = async (subTypeId: string) => {
+  const attributes = schemaAttributesDefinition.getAttributeNames(subTypeId);
+  if (attributes.length > 0) {
+    return { id: subTypeId, label: subTypeId };
+  }
+  return null;
+};
+const querySubTypesPaginated = async (context: AuthContext, user: AuthUser, { type = null, search = null }: { type: string | null; search?: string | null }) => {
+  if (type === null) {
+    return queryDefaultSubTypesPaginated(context, user, search);
+  }
+  const sortByLabel = R.sortBy(R.toLower);
+
+  let types;
+  if (type === ABSTRACT_STIX_NESTED_REF_RELATIONSHIP) {
+    types = schemaRelationsRefDefinition.getDatables();
+  } else {
+    types = schemaTypesDefinition.get(type).filter((n) => n.includes(search ?? ''));
+  }
+  const finalResult = R.pipe(
+    sortByLabel,
+    R.map((n) => ({ node: { id: n, label: n } })),
+    R.uniqBy(R.path(['node', 'id'])),
+  )(types);
+  return buildPagination(0, null, finalResult, finalResult.length);
+};
+
+export const findById = (subTypeId: string) => querySubType(subTypeId);
+
+export const findSubTypePaginated = (context: AuthContext, user: AuthUser, args: { type: string | null; search?: string | null }) => {
+  return querySubTypesPaginated(context, user, args);
+};

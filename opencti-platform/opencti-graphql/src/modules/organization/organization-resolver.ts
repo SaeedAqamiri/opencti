@@ -1,0 +1,68 @@
+import {
+  addOrganization,
+  buildAdministratedOrganizations,
+  childOrganizationsPaginated,
+  editAuthorizedAuthorities,
+  findOrganizationPaginated,
+  findAllSecurityOrganizations,
+  findById,
+  findGrantableGroups,
+  organizationAdminAdd,
+  organizationAdminRemove,
+  organizationDelete,
+  organizationEditField,
+  organizationMembersPaginated,
+  organizationSectorsPaginated,
+  parentOrganizationsPaginated,
+} from './organization-domain';
+import { stixDomainObjectAddRelation, stixDomainObjectCleanContext, stixDomainObjectDeleteRelation, stixDomainObjectEditContext } from '../../domain/stixDomainObject';
+import type { Resolvers } from '../../generated/graphql';
+import type { BasicStoreEntityOrganization } from './organization-types';
+import { ENTITY_TYPE_WORKSPACE } from '../workspace/workspace-types';
+import { getAuthorizedMembers } from '../../utils/authorizedMembers';
+import { getUserAccessRight } from '../../utils/access';
+
+const organizationResolvers: Resolvers = {
+  Query: {
+    organization: (_, { id }, context) => findById(context, context.user, id),
+    organizations: (_, args, context) => findOrganizationPaginated(context, context.user, args),
+    securityOrganizations: (_, args, context) => findAllSecurityOrganizations(context, context.user, args),
+  },
+  Organization: {
+    sectors: (organization, args, context) => organizationSectorsPaginated<any>(context, context.user, organization.id, args),
+    members: (organization, args, context) => organizationMembersPaginated<any>(context, context.user, organization.id, args),
+    subOrganizations: (organization, args, context) => childOrganizationsPaginated<BasicStoreEntityOrganization>(context, context.user, organization.id, args),
+    parentOrganizations: (organization, args, context) => parentOrganizationsPaginated<BasicStoreEntityOrganization>(context, context.user, organization.id, args),
+    default_dashboard: (current, _, context) => context.batch.idsBatchLoader.load({ id: current.default_dashboard, type: ENTITY_TYPE_WORKSPACE }),
+    grantable_groups: (organization, _, context) => findGrantableGroups(context, context.user, organization),
+    authorized_members: (organization, _, context) => getAuthorizedMembers(context, context.user, organization),
+    currentUserAccessRight: (organization, _, context) => getUserAccessRight(context.user, organization),
+  },
+  User: {
+    administrated_organizations: (user, _, context) => buildAdministratedOrganizations(context, context.user, user),
+  },
+  Mutation: {
+    organizationAdd: (_, { input }, context) => addOrganization(context, context.user, input),
+    organizationDelete: (_, { id }, context) => organizationDelete(context, context.user, id),
+    organizationFieldPatch: (_, { id, input, commitMessage, references }, context) => {
+      return organizationEditField(context, context.user, id, input, { commitMessage, references });
+    },
+    organizationContextPatch: (_, { id, input }, context) => stixDomainObjectEditContext(context, context.user, id, input),
+    organizationContextClean: (_, { id }, context) => stixDomainObjectCleanContext(context, context.user, id),
+    organizationRelationAdd: (_, { id, input }, context) => stixDomainObjectAddRelation(context, context.user, id, input),
+    organizationRelationDelete: (_, { id, toId, relationship_type: relationshipType }, context) => {
+      return stixDomainObjectDeleteRelation(context, context.user, id, toId, relationshipType);
+    },
+    organizationEditAuthorizedAuthorities: (_, { id, input }, context) => {
+      return editAuthorizedAuthorities(context, context.user, id, input);
+    },
+    organizationAdminAdd: (_, { id, memberId }, context) => {
+      return organizationAdminAdd(context, context.user, id, memberId);
+    },
+    organizationAdminRemove: (_, { id, memberId }, context) => {
+      return organizationAdminRemove(context, context.user, id, memberId);
+    },
+  },
+};
+
+export default organizationResolvers;

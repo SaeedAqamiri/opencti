@@ -1,0 +1,45 @@
+import React from 'react';
+import { Navigate, Route, Routes } from 'react-router';
+import Drafts from '../../drafts/Drafts';
+import WorkbenchFile from '../../common/files/workbench/WorkbenchFile';
+import ImportFilesContent from './ImportFilesContent';
+import ImportWorkbenchesContent from './ImportWorkbenchesContent';
+import useGranted, { KNOWLEDGE_KNASKIMPORT } from '../../../../utils/hooks/useGranted';
+import useImportAccess from '../../../../utils/hooks/useImportAccess';
+
+const Root = () => {
+  const canAskImportKnowledge = useGranted([KNOWLEDGE_KNASKIMPORT]);
+  const { hasOnlyAccessToImportDraftTab } = useImportAccess();
+
+  const restrictAccessToDraftOnly = canAskImportKnowledge || !hasOnlyAccessToImportDraftTab;
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={<Navigate to={hasOnlyAccessToImportDraftTab ? '/dashboard/data/import/draft' : '/dashboard/data/import/file'} replace />}
+      />
+      {restrictAccessToDraftOnly && (
+        <>
+          <Route
+            path="/workbench/:fileId"
+            element={<WorkbenchFile />}
+          />
+          <Route
+            path="/file"
+            element={<ImportFilesContent />}
+          />
+          <Route
+            path="/workbench"
+            element={<ImportWorkbenchesContent />}
+          />
+        </>
+      )}
+      <Route
+        path="/draft"
+        element={<Drafts />}
+      />
+    </Routes>
+  );
+};
+
+export default Root;

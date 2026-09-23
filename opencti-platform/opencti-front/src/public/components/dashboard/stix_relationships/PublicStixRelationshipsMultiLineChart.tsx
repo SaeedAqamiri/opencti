@@ -1,0 +1,108 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React from 'react';
+import { useFormatter } from '../../../../components/i18n';
+import WidgetMultiLines from '../../../../components/dashboard/WidgetMultiLines';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import usePublicWidgetDefaultDates from '../usePublicWidgetDefaultDates';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { PublicStixRelationshipsMultiLineChartQuery } from './__generated__/PublicStixRelationshipsMultiLineChartQuery.graphql';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import type { Widget } from '../../../../utils/widget/widget';
+
+const publicStixRelationshipsMultiLineChartQuery = graphql`
+  query PublicStixRelationshipsMultiLineChartQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixRelationshipsMultiTimeSeries(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      data {
+        date
+        value
+      }
+    }
+  }
+`;
+
+interface PublicStixRelationshipsMultiLineChartComponentProps {
+  parameters: Widget['parameters'];
+  dataSelection: Widget['dataSelection'];
+  queryRef: PreloadedQuery<PublicStixRelationshipsMultiLineChartQuery>;
+}
+
+const PublicStixRelationshipsMultiLineChartComponent = ({
+  parameters,
+  dataSelection,
+  queryRef,
+}: PublicStixRelationshipsMultiLineChartComponentProps) => {
+  const { t_i18n } = useFormatter();
+  const { publicStixRelationshipsMultiTimeSeries } = usePreloadedQuery(
+    publicStixRelationshipsMultiLineChartQuery,
+    queryRef,
+  );
+
+  if (publicStixRelationshipsMultiTimeSeries) {
+    return (
+      <WidgetMultiLines
+        series={publicStixRelationshipsMultiTimeSeries.map((serie, i) => ({
+          name: dataSelection[i].label || t_i18n('Number of entities'),
+          data: (serie?.data ?? []).map((entry) => ({
+            x: new Date(entry?.date),
+            y: entry?.value,
+          })),
+        }))}
+        interval={parameters?.interval}
+        hasLegend={!!parameters?.legend}
+      />
+    );
+  }
+  return <WidgetNoData />;
+};
+
+const PublicStixRelationshipsMultiLineChart = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters, dataSelection } = widget;
+  const dates = usePublicWidgetDefaultDates(startDate, endDate);
+  const queryRef = usePublicDashboardViz<PublicStixRelationshipsMultiLineChartQuery>(
+    publicStixRelationshipsMultiLineChartQuery,
+    {
+      uriKey,
+      widgetId: id,
+      ...dates,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      title={parameters?.title ?? title ?? t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixRelationshipsMultiLineChartComponent
+            queryRef={queryRef}
+            parameters={parameters}
+            dataSelection={dataSelection}
+          />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixRelationshipsMultiLineChart;

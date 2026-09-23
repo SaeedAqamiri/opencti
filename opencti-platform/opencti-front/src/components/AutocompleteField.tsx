@@ -1,0 +1,193 @@
+import React, { ReactNode, useCallback } from 'react';
+import IconButton from '@common/button/IconButton';
+import { Add } from '@mui/icons-material';
+import { Autocomplete, AutocompleteProps, AutocompleteValue, TextField, TextFieldProps } from '@mui/material';
+import { FieldProps, useField } from 'formik';
+import { FieldOption } from '../utils/field';
+import { truncate } from '../utils/String';
+import { useFormatter } from './i18n';
+import { isNilField } from '../utils/utils';
+import { fieldToAutocomplete } from 'formik-mui';
+import Tag from '@common/tag/Tag';
+
+type Bool = boolean | undefined;
+type PossibleValue = FieldOption | string;
+
+export type AutocompleteFieldProps<
+  M extends Bool = true,
+  Value extends PossibleValue = FieldOption,
+  DC extends Bool = boolean,
+  FSolo extends Bool = false,
+> = Omit<AutocompleteProps<Value, M, DC, FSolo>, 'onChange' | 'onBlur' | 'onFocus' | 'renderInput'>
+  & FieldProps<Value>
+  & {
+    optionLength?: number;
+    required?: boolean;
+    endAdornment?: ReactNode;
+    textfieldprops?: TextFieldProps;
+    preserveCase?: boolean;
+    onFocus?: (name: string) => void;
+    onChange?: (name: string, value: AutocompleteValue<Value, M, DC, FSolo>) => void;
+    onInternalChange?: (name: string, value: AutocompleteValue<Value, M, DC, FSolo>) => void;
+    openCreate?: () => void;
+  };
+
+const AutocompleteField = <
+  M extends Bool = true,
+  Value extends PossibleValue = FieldOption,
+  DC extends Bool = boolean,
+  FSolo extends Bool = false,
+>({
+  optionLength = 40,
+  required = false,
+  onChange,
+  onFocus,
+  onInternalChange,
+  openCreate,
+  ...muiProps
+}: AutocompleteFieldProps<M, Value, DC, FSolo>) => {
+  type MuiProps = AutocompleteProps<Value, M, DC, FSolo>;
+  const {
+    form: { setFieldValue, setFieldTouched, submitCount },
+    field: { name },
+    noOptionsText,
+    renderOption,
+    isOptionEqualToValue,
+    textfieldprops,
+    preserveCase,
+    getOptionLabel,
+    endAdornment,
+    disabled,
+    renderTags,
+  } = muiProps;
+
+  const [, meta] = useField(name);
+  const { t_i18n } = useFormatter();
+
+  const internalOnChange = useCallback<NonNullable<MuiProps['onChange']>>((_, value) => {
+    if (onInternalChange) {
+      onInternalChange(name, value);
+    } else {
+      setFieldValue(name, value);
+      onChange?.(name, value);
+    }
+  }, [setFieldValue, name, onChange, onInternalChange]);
+
+  const internalOnFocus = useCallback<NonNullable<MuiProps['onFocus']>>(() => {
+    onFocus?.(name);
+  }, [onFocus, name]);
+
+  const internalOnBlur = useCallback<NonNullable<MuiProps['onBlur']>>(() => {
+    setFieldTouched(name, true);
+  }, [setFieldTouched]);
+
+  const defaultOptionToValue = (option: Value, value: Value) => {
+    const optionVal = typeof option === 'object' ? option.value : option;
+    const valueVal = typeof value === 'object' ? value.value : value;
+    return optionVal === valueVal;
+  };
+
+  const defaultGetOptionLabel: MuiProps['getOptionLabel'] = (option) => {
+    return typeof option === 'object'
+      ? truncate(option.label, optionLength)
+      : truncate(option, optionLength);
+  };
+
+  const defaultRenderTags: MuiProps['renderTags'] = (values, getTagProps) => (
+    values.map((option, index) => {
+      const { label, value, color } = getOptionData(option);
+      return (
+        <Tag
+          {...getTagProps({ index })}
+          // a chip row inside a select field is ONE tab stop; the delete
+          // buttons must not each add another
+          deleteTabIndex={-1}
+          labelTextTransform={preserveCase ? 'none' : 'capitalize'}
+          key={value}
+          label={label}
+          color={color}
+        />
+      );
+    })
+  );
+
+  const getOptionData = (option: Value) => {
+    return typeof option === 'object' && option !== null
+      ? { label: option.label, value: option.value, color: option.color }
+      : { label: String(option), value: String(option), color: undefined };
+  };
+
+  const helperText = textfieldprops?.helperText;
+  const showError = !isNilField(meta.error) && (meta.touched || submitCount > 0);
+  const fieldProps = fieldToAutocomplete({
+    ...muiProps,
+    renderInput: ({ inputProps: { value, ...inputProps }, InputProps, ...params }) => (
+      <TextField
+        {...{ ...params, inputProps }}
+        {...textfieldprops}
+        slotProps={{
+          input: {
+            ...InputProps,
+            endAdornment: endAdornment ?? InputProps.endAdornment,
+          },
+        }}
+        value={value}
+        name={name}
+        required={required}
+        fullWidth
+        error={showError}
+        helperText={showError ? meta.error : helperText}
+      />
+    ),
+  });
+
+  // When multiple is true, MUI Autocomplete expects value to be an array.
+  // Formik fields may be initialized as null/undefined/empty string, causing
+  // a "value.some is not a function" crash in useAutocomplete.
+  if (fieldProps.multiple && !Array.isArray(fieldProps.value)) {
+    fieldProps.value = (fieldProps.value != null && fieldProps.value !== '' ? [fieldProps.value] : []) as unknown as typeof fieldProps.value;
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <Autocomplete
+        size="small"
+        selectOnFocus
+        autoHighlight
+        handleHomeEndKeys
+        getOptionLabel={getOptionLabel || defaultGetOptionLabel}
+        noOptionsText={noOptionsText}
+        {...fieldProps}
+        renderOption={renderOption}
+        renderTags={renderTags ?? defaultRenderTags}
+        onChange={internalOnChange}
+        onFocus={internalOnFocus}
+        onBlur={internalOnBlur}
+        isOptionEqualToValue={isOptionEqualToValue ?? defaultOptionToValue}
+        slotProps={{
+          paper: {
+            elevation: 2,
+          },
+        }}
+      />
+
+      {openCreate && (
+        <IconButton
+          disabled={disabled}
+          onClick={() => openCreate()}
+          sx={{
+            position: 'absolute',
+            bottom: showError ? 25 : 4,
+            right: 25,
+          }}
+          title={t_i18n('Add')}
+          aria-label={t_i18n('Add')}
+        >
+          <Add fontSize="small" />
+        </IconButton>
+      )}
+    </div>
+  );
+};
+
+export default AutocompleteField;

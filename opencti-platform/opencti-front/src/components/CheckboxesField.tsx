@@ -1,0 +1,93 @@
+import React from 'react';
+import { FieldProps } from 'formik';
+import FormControl from '@mui/material/FormControl';
+import { FormLabel, Stack } from '@mui/material';
+import FormGroup from '@mui/material/FormGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Button from '@common/button/Button';
+import { useFormatter } from './i18n';
+import { FieldOption } from '../utils/field';
+import { Checkbox } from '@filigran/design-system';
+
+type CheckboxesFieldProps = FieldProps<FieldOption[]> & {
+  label: string;
+  items: FieldOption[];
+};
+
+const CheckboxesField = ({
+  form,
+  field,
+  label,
+  items,
+}: CheckboxesFieldProps) => {
+  const { t_i18n } = useFormatter();
+
+  const { setFieldValue } = form;
+  const { name, value } = field;
+
+  const isChecked = (val: FieldOption) => value.includes(val);
+
+  const toggle = (val: FieldOption) => {
+    if (isChecked(val)) {
+      setFieldValue(name, value.filter((v) => v !== val));
+    } else {
+      setFieldValue(name, [...value, val]);
+    }
+  };
+
+  const checkAll = () => setFieldValue(name, [...items]);
+
+  const checkNone = () => setFieldValue(name, []);
+
+  return (
+    <FormControl component="fieldset" name={name}>
+      <FormLabel component="legend">{label}</FormLabel>
+
+      <Stack direction="row" spacing={1} sx={{ marginY: 1.5 }}>
+        <Button
+          disabled={items.length === 0}
+          variant={(items.length > 0 && value.length === items.length) ? 'primary' : 'secondary'}
+          onClick={checkAll}
+        >
+          {t_i18n('All')}
+        </Button>
+        <Button
+          disabled={items.length === 0}
+          variant={(items.length > 0 && value.length === 0) ? 'primary' : 'secondary'}
+          onClick={checkNone}
+        >
+          {t_i18n('None')}
+        </Button>
+      </Stack>
+
+      <FormGroup sx={{
+        maxHeight: '300px',
+        flexWrap: 'nowrap',
+        overflowY: 'auto',
+        pl: '11px',
+      }}
+      >
+        {items.map((item) => (
+          <FormControlLabel
+            key={item.label}
+            label={item.label}
+            control={(
+              <Checkbox
+                checked={isChecked(item)}
+                name={item.value}
+                onCheckedChange={() => toggle(item)}
+              />
+            )}
+            sx={{
+              '& .MuiFormControlLabel-label': {
+                ml: 1,
+              },
+            }}
+          />
+        ))}
+      </FormGroup>
+    </FormControl>
+  );
+};
+
+export default CheckboxesField;

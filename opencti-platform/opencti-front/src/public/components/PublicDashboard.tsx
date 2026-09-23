@@ -1,0 +1,154 @@
+import React, { useEffect } from 'react';
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import { useNavigate, useParams } from 'react-router';
+import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
+import { ErrorBoundary } from '@components/Error';
+import Loader, { LoaderVariant } from '../../components/Loader';
+import { PublicDashboardQuery } from './__generated__/PublicDashboardQuery.graphql';
+import useQueryLoading from '../../utils/hooks/useQueryLoading';
+import { fromB64 } from '../../utils/String';
+import usePublicDashboardWidgets from './dashboard/usePublicDashboardWidgets';
+import PublicTopBar from './PublicTopBar';
+import PublicDashboardHeader from './dashboard/PublicDashboardHeader';
+import { useFormatter } from '../../components/i18n';
+import type { DashboardManifest } from '../../components/dashboard/dashboard-types';
+import useDashboardRefresh from '../../components/dashboard/useDashboardRefresh';
+import DashboardRefreshControl from '../../components/dashboard/DashboardRefreshControl';
+import { DashboardRefreshProvider } from '../../components/dashboard/DashboardRefreshContext';
+
+const publicDashboardQuery = graphql`
+  query PublicDashboardQuery($uri_key: String!) {
+    publicDashboardByUriKey(uri_key: $uri_key) {
+      name
+      enabled
+      public_manifest
+    }
+  }
+`;
+
+interface PublicDashboardComponentProps {
+  queryRef: PreloadedQuery<PublicDashboardQuery>;
+  uriKey: string;
+}
+
+const PublicDashboardComponent = ({
+  queryRef,
+  uriKey,
+}: PublicDashboardComponentProps) => {
+  const navigate = useNavigate();
+  const { width, containerRef } = useContainerWidth();
+  const { t_i18n } = useFormatter();
+
+  const { publicDashboardByUriKey } = usePreloadedQuery(publicDashboardQuery, queryRef);
+  const manifest = publicDashboardByUriKey?.public_manifest;
+  const parsedManifest: DashboardManifest = JSON.parse(manifest ? fromB64(manifest) : '{}');
+  const { widgets, config } = parsedManifest;
+  const initialRefreshRateSeconds = config?.refresh_interval ?? 0;
+
+  const {
+    localRefreshRateSeconds,
+    refreshToken,
+    isAutoRefreshing,
+    handleManualRefresh,
+    handleRefreshRateChange,
+  } = useDashboardRefresh({
+    initialRefreshRateSeconds,
+  });
+
+  useEffect(() => {
+    if (publicDashboardByUriKey === null || !publicDashboardByUriKey?.enabled) {
+      navigate('/');
+    }
+  }, [publicDashboardByUriKey, navigate]);
+
+  const {
+    entityWidget,
+    relationshipWidget,
+    rawWidget,
+    auditWidget,
+  } = usePublicDashboardWidgets(uriKey, config);
+
+  const onChangeRelativeDate = () => {};
+  const onChangeStartDate = () => {};
+  const onChangeEndDate = () => {};
+
+  if (!publicDashboardByUriKey || !config) {
+    return null;
+  }
+
+  const widgetsArray = Object.values(widgets ?? {});
+  const widgetsWithLayout = widgetsArray.filter((w) => w.layout);
+
+  return (
+    <>
+      <PublicTopBar title={t_i18n('Public dashboard')} />
+      <DashboardRefreshProvider refreshToken={refreshToken}>
+        <PublicDashboardHeader
+          title={publicDashboardByUriKey?.name ?? ''}
+          manifestConfig={config}
+          onChangeRelativeDate={onChangeRelativeDate}
+          onChangeStartDate={onChangeStartDate}
+          onChangeEndDate={onChangeEndDate}
+          actions={(
+            <DashboardRefreshControl
+              onRefresh={handleManualRefresh}
+              interval={localRefreshRateSeconds}
+              onIntervalChange={handleRefreshRateChange}
+              isRefreshing={isAutoRefreshing}
+            />
+          )}
+        />
+
+        <div ref={containerRef}>
+          <ReactGridLayout
+            className="layout"
+            width={width}
+            layout={widgetsWithLayout.map((w) => w.layout!)}
+            gridConfig={{ margin: [20, 20], rowHeight: 50, cols: 12 }}
+            dragConfig={{ enabled: false }}
+            resizeConfig={{ enabled: false }}
+          >
+            {widgetsWithLayout.map((widget) => (
+              <div
+                key={widget.id}
+              >
+                <ErrorBoundary>
+                  {widget.perspective === 'entities' && entityWidget(widget)}
+                  {widget.perspective === 'relationships' && relationshipWidget(widget)}
+                  {widget.perspective === 'audits' && auditWidget(widget)}
+                  {widget.perspective === null && rawWidget(widget)}
+                </ErrorBoundary>
+              </div>
+            ))}
+          </ReactGridLayout>
+        </div>
+      </DashboardRefreshProvider>
+
+    </>
+  );
+};
+
+const PublicDashboard = () => {
+  const { uriKey } = useParams();
+  if (!uriKey) return null;
+
+  const normalizedUriKey = uriKey.toLowerCase();
+
+  const queryRef = useQueryLoading<PublicDashboardQuery>(
+    publicDashboardQuery,
+    { uri_key: normalizedUriKey },
+  );
+
+  return queryRef ? (
+    <React.Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+      <PublicDashboardComponent
+        queryRef={queryRef}
+        uriKey={normalizedUriKey}
+      />
+    </React.Suspense>
+  ) : (
+    <Loader variant={LoaderVariant.container} />
+  );
+};
+
+export default PublicDashboard;

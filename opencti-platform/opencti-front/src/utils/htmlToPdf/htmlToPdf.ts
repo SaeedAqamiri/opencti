@@ -1,0 +1,306 @@
+import { renderToString } from 'react-dom/server';
+import { compiler } from 'markdown-to-jsx';
+import htmlToPdfmake from 'html-to-pdfmake';
+import pdfMake from 'pdfmake/build/pdfmake';
+import { Content, ImageDefinition, TDocumentDefinitions } from 'pdfmake/interfaces';
+import { FintelDesign } from '@components/common/form/FintelDesignField';
+import { APP_BASE_PATH } from '../../relay/environment';
+import { capitalizeWords } from '../String';
+import logoWhite from '../../static/images/logo_text_white.png';
+import { getBase64ImageFromURL, isImageFromUrlSvg } from '../Image';
+import { FONTS, detectLanguage } from './utils/pdfFonts';
+import determineOrientation from './utils/pdfOrientation';
+import setImagesWidth from './utils/pdfImageWidth';
+import setTableFullWidth, { defaultTableLayout } from './utils/pdfTableWidth';
+import addPageBreaks, { pdfPageBreaks } from './utils/pdfPageBreaks';
+import removeUnnecessaryHtml from './utils/pdfUnnecessarytHtml';
+import pdfBackground from './utils/pdfBackground';
+import pdfHeader from './utils/pdfHeader';
+import pdfFooter from './utils/pdfFooter';
+import { DARK, DARK_BLUE, GREY, WHITE } from './utils/constants';
+import { dateFormat } from '../Time';
+
+/**
+ * NOT MEANT FOR EXPORT
+ *
+ * Generate a PDF that can be downloaded.
+ *
+ * @param pdfMakeObject Definition of the PDF to generate.
+ * @param checkOrientation True if check content to determine PDF orientation.
+ * @returns PDF ready to be downloaded.
+ */
+const generatePdf = (
+  pdfMakeObject: TDocumentDefinitions,
+  checkOrientation = false,
+) => {
+  const docDefinition = { ...pdfMakeObject };
+  if (checkOrientation) {
+    docDefinition.pageOrientation = determineOrientation();
+  }
+  pdfMake.setTableLayouts(defaultTableLayout);
+  pdfMake.setFonts(FONTS);
+  return pdfMake.createPdf(docDefinition);
+};
+
+/**
+ * Transform html file into a PDF that can be downloaded.
+ *
+ * @param fileName name of the file to transform.
+ * @param content The content of the file.
+ * @returns PDF object ready to be downloaded.
+ */
+export const htmlToPdf = (
+  fileName: string,
+  content: string,
+) => {
+  let htmlData = removeUnnecessaryHtml(content);
+  htmlData = setImagesWidth(htmlData);
+
+  // Improve render for markdown files.
+  if (fileName && fileName.endsWith('.md')) {
+    htmlData = renderToString(compiler(htmlData, { wrapper: null }));
+  }
+
+  // Detect CJK characters and pick a font that has CJK glyphs.
+  // Roboto (the pdfmake default) has no CJK glyphs, so Japanese/Korean text
+  // would otherwise be garbled in the exported PDF. See issue #15624.
+  const selectedFont = detectLanguage(htmlData);
+
+  // Transform html string into a JS object that lib pdfmake can understand.
+  const pdfMakeObject = htmlToPdfmake(htmlData, {
+    imagesByReference: true,
+    ignoreStyles: ['font-family'], // Ignoring fonts to force Roboto later.
+    defaultStyles: {
+      th: { bold: true, fillColor: '', font: selectedFont },
+      td: { font: selectedFont },
+    },
+  }) as unknown as TDocumentDefinitions; // Because wrong type when using imagesByReference: true.
+
+  pdfMakeObject.images = normalizePdfMakeImageReferences(
+    pdfMakeObject.images,
+    resolvedEntityBaseUrl,
+  );
+
+  pdfMakeObject.defaultStyle = {
+    ...(pdfMakeObject.defaultStyle ?? {}),
+    font: selectedFont,
+  };
+
+  return generatePdf(pdfMakeObject, false);
+};
+/**
+ * Part to handle the embedded images of a file
+ */
+const normalizeEntityBaseUrl = (url: string) =>
+  url
+    .replace(/\/content\/?$/, '')
+    .replace(/\/$/, '');
+
+const entityBaseUrl = `${window.location.origin}${window.location.pathname}`.replace(/\/$/, '');
+const resolvedEntityBaseUrl = normalizeEntityBaseUrl(entityBaseUrl);
+
+const resolvePdfImageUrl = (rawUrl: string, baseUrl: string) => {
+  if (/^https?:\/\//i.test(rawUrl) || rawUrl.startsWith('data:')) return rawUrl;
+  if (rawUrl.startsWith('//')) return `${window.location.protocol}${rawUrl}`;
+  if (rawUrl.startsWith('/')) return `${window.location.origin}${rawUrl}`;
+  if (rawUrl.startsWith('storage/')) return `${window.location.origin}/${rawUrl}`;
+  if (APP_BASE_PATH && rawUrl.startsWith(APP_BASE_PATH)) {
+    return `${window.location.origin}${rawUrl}`;
+  }
+  return `${baseUrl}/${rawUrl.replace(/^\/+/, '')}`;
+};
+
+const normalizePdfMakeImageReferences = (
+  images: TDocumentDefinitions['images'],
+  baseUrl: string,
+): Record<string, string | ImageDefinition> => {
+  if (!images) return {};
+
+  return Object.fromEntries(
+    Object.entries(images).map(([key, value]) => {
+      const strValue = typeof value === 'string' ? value : null;
+      if (!strValue || strValue.startsWith('embedded/')) return [key, value] as const;
+      return [key, resolvePdfImageUrl(strValue, baseUrl)] as const;
+    }),
+  );
+};
+
+export const resolvePdfMakeEmbeddedImages = async (
+  images: TDocumentDefinitions['images'],
+  resolvedEntityBaseUrl: string,
+): Promise<Record<string, string | ImageDefinition>> => {
+  if (!images) return {};
+
+  const entries = await Promise.all(
+    Object.entries(images).map(async ([key, value]) => {
+      const strValue = typeof value === 'string' ? value : null;
+      if (!strValue?.startsWith('embedded/')) return [key, value] as const;
+
+      const fileName = strValue.slice('embedded/'.length);
+      const url = `${resolvedEntityBaseUrl}/embedded/${encodeURIComponent(fileName)}`;
+
+      const img = await getBase64ImageFromURL(url);
+      const resolved = img.startsWith('data:') ? img : `data:image/png;base64,${img}`;
+      return [key, resolved] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries);
+};
+
+/**
+ * Transform html file into a PDF that can be downloaded.
+ * /!\ Used for outcome templates reports.
+ *
+ * @param reportName Name the report outcome should have.
+ * @param content HTML content.
+ * @param templateName Name of the template used for PDF generation.
+ * @param markingNames Markings of the outcome report.
+ * @param fintelDesign Design of the template, optionally enriched with page options
+ * @returns PDF object ready to be downloaded.
+ */
+export const htmlToPdfReport = async (
+  reportName: string,
+  content: string,
+  templateName: string,
+  markingNames: string[],
+  fintelDesign?: FintelDesign | null | undefined,
+  pageOptions?: {
+    includeCoverPage?: boolean;
+    includeBackPage?: boolean;
+  },
+) => {
+  const formattedTemplateName = capitalizeWords(templateName);
+  let logo;
+  let isLogoSvg = false;
+
+  if (fintelDesign?.file_id) {
+    const url = `${APP_BASE_PATH}/storage/view/${encodeURIComponent(
+      fintelDesign?.file_id,
+    )}`;
+    const { isSvg, content: svgContent } = await isImageFromUrlSvg(url);
+    isLogoSvg = isSvg;
+    if (!isLogoSvg) logo = await getBase64ImageFromURL(url);
+    else logo = svgContent;
+  }
+
+  if (!logo) {
+    logo = await getBase64ImageFromURL(logoWhite);
+  }
+
+  let htmlData = removeUnnecessaryHtml(content);
+  htmlData = setImagesWidth(htmlData);
+  htmlData = setTableFullWidth(htmlData);
+  htmlData = addPageBreaks(htmlData);
+
+  const selectedFont = detectLanguage(htmlData);
+
+  // Transform html string into a JS object that lib pdfmake can understand.
+  const pdfMakeObject = htmlToPdfmake(htmlData, {
+    removeExtraBlanks: true,
+    imagesByReference: true,
+    ignoreStyles: ['font-family'], // Ignoring fonts to force Roboto later.
+    defaultStyles: {
+      h1: { margin: [0, 20, 0, 10], color: DARK, fontSize: 32 },
+      h2: { margin: [0, 20, 0, 10], color: DARK, fontSize: 28 },
+      h3: { margin: [0, 20, 0, 10], color: DARK, fontSize: 24 },
+      th: { bold: true, fillColor: '', font: selectedFont },
+      td: { font: selectedFont },
+    },
+  }) as unknown as TDocumentDefinitions; // Because wrong type when using imagesByReference: true.
+
+  const resolvedImages = entityBaseUrl && pdfMakeObject.images
+    ? await resolvePdfMakeEmbeddedImages(
+        pdfMakeObject.images,
+        resolvedEntityBaseUrl,
+      )
+    : pdfMakeObject.images;
+
+  const normalizedImages = normalizePdfMakeImageReferences(
+    resolvedImages,
+    resolvedEntityBaseUrl,
+  );
+
+  const linearGradiant = [
+    fintelDesign?.gradiantFromColor || DARK,
+    fintelDesign?.gradiantToColor || DARK_BLUE,
+  ];
+  const textColor = fintelDesign?.textColor || WHITE;
+  const includeCoverPage = pageOptions?.includeCoverPage ?? true;
+  const includeBackPage = pageOptions?.includeBackPage ?? true;
+
+  const coverPage: Content[] = [
+    {
+      columns: [
+        isLogoSvg
+          ? { svg: logo, width: 133 }
+          : { image: logo, width: 133 },
+        {
+          text: dateFormat(new Date()) ?? '',
+          alignment: 'right',
+          style: ['colorWhite'],
+        },
+      ],
+    },
+    {
+      text: reportName,
+      style: ['colorWhite', selectedFont, 'textXl'],
+      marginTop: 200,
+    },
+    {
+      text: formattedTemplateName,
+      style: ['colorWhite', 'textMd'],
+      marginTop: 10,
+      pageBreak: 'after',
+    },
+  ];
+
+  const backPage: Content[] = [
+    {
+      pageBreak: 'before',
+      absolutePosition: { x: 0, y: 0 },
+      canvas: [{
+        type: 'rect',
+        x: 0,
+        y: 0,
+        w: 600,
+        h: 850,
+        linearGradient: linearGradiant,
+      }],
+    },
+    ...(isLogoSvg
+      ? [{ svg: logo, width: 133, alignment: 'center' as const, margin: [0, 380, 0, 0] as [number, number, number, number] }]
+      : [{ image: logo, width: 133, alignment: 'center' as const, margin: [0, 380, 0, 0] as [number, number, number, number] }]
+    ),
+  ];
+
+  const docDefinition: TDocumentDefinitions = {
+    pageMargins: [20, 30],
+    styles: {
+      colorWhite: { color: textColor },
+      colorLight: { color: GREY },
+      textMd: { fontSize: 14 },
+      textXl: { fontSize: 40 },
+      fontGeo: { font: 'Geologica' },
+    },
+    defaultStyle: {
+      font: selectedFont,
+      fontSize: 12,
+    },
+    ...pdfMakeObject,
+    images: normalizedImages,
+    content: [
+      ...(includeCoverPage ? coverPage : []),
+      {
+        stack: pdfMakeObject.content as Content[],
+      },
+      ...(includeBackPage ? backPage : []),
+    ] as Content[],
+    background: pdfBackground(linearGradiant, { hasCoverPage: includeCoverPage }),
+    header: pdfHeader(linearGradiant, { hasCoverPage: includeCoverPage, hasBackPage: includeBackPage }),
+    footer: pdfFooter(markingNames, { hasCoverPage: includeCoverPage, hasBackPage: includeBackPage }),
+    pageBreakBefore: pdfPageBreaks,
+  };
+
+  return generatePdf(docDefinition, false);
+};

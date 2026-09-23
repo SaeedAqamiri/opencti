@@ -1,0 +1,54 @@
+import { ENTITY_TYPE_CONTAINER_CASE } from '../case-types';
+import { NAME_FIELD, normalizeName } from '../../../schema/identifier';
+import type { ModuleDefinition } from '../../../schema/module';
+import { registerDefinition } from '../../../schema/module';
+import { convertFeedbackToStix_2_0, convertFeedbackToStix_2_1 } from './feedback-converter';
+import { createdBy, objectAssignee, objectMarking, objectOrganization } from '../../../schema/stixRefRelationship';
+import { authorizedMembers, authorizedMembersActivationDate } from '../../../schema/attribute-definition';
+import { ENTITY_TYPE_CONTAINER_FEEDBACK, type Stix2Feedback, type StixFeedback, type StoreEntityFeedback } from './feedback-types';
+
+const FEEDBACK_DEFINITION: ModuleDefinition<StoreEntityFeedback, StixFeedback, Stix2Feedback> = {
+  type: {
+    id: 'feedback',
+    name: ENTITY_TYPE_CONTAINER_FEEDBACK,
+    category: ENTITY_TYPE_CONTAINER_CASE,
+    aliased: false,
+  },
+  identifier: {
+    definition: {
+      [ENTITY_TYPE_CONTAINER_FEEDBACK]: [{ src: NAME_FIELD }, { src: 'created' }],
+    },
+    resolvers: {
+      name(data: object) {
+        return normalizeName(data);
+      },
+    },
+  },
+  overviewLayoutCustomization: [
+    { key: 'details', width: 6, label: 'Entity details' },
+    { key: 'basicInformation', width: 6, label: 'Basic information' },
+    { key: 'relatedEntities', width: 12, label: 'Related entities' },
+    { key: 'externalReferences', width: 6, label: 'External references' },
+    { key: 'mostRecentHistory', width: 6, label: 'Most recent history' },
+  ],
+  attributes: [
+    { name: 'content', label: 'Content', type: 'string', format: 'short', mandatoryType: 'no', editDefault: true, multiple: false, upsert: true, isFilterable: true },
+    { name: 'rating', label: 'Rating', type: 'numeric', precision: 'integer', mandatoryType: 'external', editDefault: true, multiple: false, upsert: true, isFilterable: true },
+    { ...authorizedMembers, editDefault: true },
+    { ...authorizedMembersActivationDate },
+  ],
+  relations: [],
+  relationsRefs: [
+    { ...createdBy, mandatoryType: 'no', editDefault: false },
+    { ...objectMarking, mandatoryType: 'no', editDefault: false },
+    { ...objectAssignee, mandatoryType: 'no', editDefault: false },
+    { ...objectOrganization, isFilterable: false },
+  ],
+  representative: (stix: StixFeedback) => {
+    return stix.name;
+  },
+  converter_2_1: convertFeedbackToStix_2_1,
+  converter_2_0: convertFeedbackToStix_2_0,
+};
+
+registerDefinition(FEEDBACK_DEFINITION);

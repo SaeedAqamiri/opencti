@@ -1,0 +1,66 @@
+import Chart, { OpenCTIChartProps } from '@components/common/charts/Chart';
+import React, { useMemo } from 'react';
+import { useTheme } from '@mui/styles';
+import type { ApexOptions } from 'apexcharts';
+import { donutChartOptions } from '../../utils/Charts';
+import type { Theme } from '../Theme';
+import useDistributionGraphData from '../../utils/hooks/useDistributionGraphData';
+
+interface WidgetDonutProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: readonly any[];
+  groupBy: string;
+  onMounted?: OpenCTIChartProps['onMounted'];
+}
+
+const WidgetDonut = ({
+  data,
+  groupBy,
+  onMounted,
+}: WidgetDonutProps) => {
+  const theme = useTheme<Theme>();
+  const { buildWidgetLabelsOption } = useDistributionGraphData();
+
+  const chartData = useMemo(() => data.map((n) => n.value), [data]);
+
+  const options: ApexOptions = useMemo(() => {
+    const labels = buildWidgetLabelsOption(data, groupBy);
+    let chartColors: (string | undefined)[] = [];
+    if (data.at(0)?.entity?.color) {
+      chartColors = data.map((n) => (theme.palette.mode === 'light' && n.entity?.color === '#ffffff'
+        ? '#000000'
+        : n.entity?.color));
+    }
+    if (data.at(0)?.entity?.x_opencti_color) {
+      chartColors = data.map((n) => (theme.palette.mode === 'light' && n.entity?.x_opencti_color === '#ffffff'
+        ? '#000000'
+        : n.entity?.x_opencti_color));
+    }
+    if (data.at(0)?.entity?.template?.color) {
+      chartColors = data.map((n) => (theme.palette.mode === 'light' && n.entity?.template.color === '#ffffff'
+        ? '#000000'
+        : n.entity?.template.color));
+    }
+
+    return donutChartOptions(
+      theme,
+      labels,
+      'bottom',
+      false,
+      chartColors.filter((o): o is string => !!o),
+    ) as ApexOptions;
+  }, [data, groupBy, theme]);
+
+  return (
+    <Chart
+      options={options}
+      series={chartData}
+      type="donut"
+      width="100%"
+      height="100%"
+      onMounted={onMounted}
+    />
+  );
+};
+
+export default WidgetDonut;

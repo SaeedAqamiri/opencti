@@ -1,0 +1,267 @@
+type CaseIncident implements BasicObject & StixObject & StixCoreObject & StixDomainObject & Container & Case {
+  id: ID! # internal_id
+  standard_id: String!
+  entity_type: String!
+  parent_types: [String!]!
+  metrics:[Metric]
+  # StixObject
+  representative: Representative!
+  x_opencti_stix_ids: [StixId]
+  is_inferred: Boolean!
+  spec_version: String!
+  created_at: DateTime!
+  updated_at: DateTime!
+  x_opencti_modified_at: DateTime
+  refreshed_at: DateTime
+  draftVersion: DraftVersion
+  # inferences
+  x_opencti_inferences: [Inference]
+  # Stix Core Object
+  createdBy: Identity
+  numberOfConnectedElement: Int!
+  objectMarking: [MarkingDefinition!]
+  objectOrganization: [Organization!]
+  objectLabel: [Label!]
+  externalReferences(first: Int): ExternalReferenceConnection
+  containersNumber: Number
+  containers(first: Int, entityTypes: [String!]): ContainerConnection
+  reports(first: Int): ReportConnection
+  notes(first: Int): NoteConnection
+  opinions(first: Int): OpinionConnection
+  observedData(first: Int): ObservedDataConnection
+  groupings(first: Int): GroupingConnection
+  cases(first: Int): CaseConnection
+  stixCoreRelationships(
+    first: Int
+    after: ID
+    orderBy: StixCoreRelationshipsOrdering
+    orderMode: OrderingMode
+    fromId: StixRef
+    toId: StixRef
+    fromTypes: [String]
+    toTypes: [String]
+    relationship_type: String
+    startTimeStart: DateTime
+    startTimeStop: DateTime
+    stopTimeStart: DateTime
+    stopTimeStop: DateTime
+    firstSeenStart: DateTime
+    firstSeenStop: DateTime
+    lastSeenStart: DateTime
+    lastSeenStop: DateTime
+    confidences: [Int]
+    search: String
+    filters: FilterGroup
+  ): StixCoreRelationshipConnection
+  stixCoreObjectsDistribution(
+    relationship_type: [String]
+    toTypes: [String]
+    field: String!
+    startDate: DateTime
+    endDate: DateTime
+    dateAttribute: String
+    operation: StatsOperation!
+    limit: Int
+    order: String
+    types: [String]
+    filters: FilterGroup
+    search: String
+  ): [Distribution] @auth(for: [KNOWLEDGE, EXPLORE])
+  stixCoreRelationshipsDistribution(
+    field: String!
+    operation: StatsOperation!
+    startDate: DateTime
+    endDate: DateTime
+    dateAttribute: String
+    isTo: Boolean
+    limit: Int
+    order: String
+    elementWithTargetTypes: [String]
+    fromId: [String]
+    fromRole: String
+    fromTypes: [String]
+    toId: [String]
+    toRole: String
+    toTypes: [String]
+    relationship_type: [String]
+    confidences: [Int]
+    search: String
+    filters: FilterGroup
+  ): [Distribution] @auth(for: [KNOWLEDGE, EXPLORE])
+  opinions_metrics: OpinionsMetrics
+  # Stix Domain Object
+  revoked: Boolean!
+  confidence: Int
+  lang: String
+  created: DateTime
+  modified: DateTime
+  x_opencti_graph_data: String
+  objectAssignee: [Assignee!]
+  objectParticipant: [Participant!]
+  avatar: OpenCtiFile
+  fintelTemplates: [FintelTemplate!]
+  filesFromTemplate(
+    first: Int
+    prefixMimeType: String
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  # Container
+  authorized_members: [MemberAccess!]
+  authorized_members_activation_date: DateTime
+  currentUserAccessRight: String
+  objects(
+    first: Int
+    after: ID
+    orderBy: StixObjectOrStixRelationshipsOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+    types: [String]
+    all: Boolean
+  ): StixObjectOrStixRelationshipRefConnection
+  relatedContainers(
+    first: Int
+    after: ID
+    orderBy: ContainersOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+    types: [String]
+    viaTypes: [String]
+  ): ContainerConnection
+  # Technical
+  creators: [Creator!]
+  toStix(version: Version): String
+  importFiles(
+    first: Int
+    prefixMimeType: String
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  pendingFiles(
+    first: Int
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  exportFiles(first: Int): FileConnection
+  editContext: [EditUserContext!]
+  connectors(onlyAlive: Boolean): [Connector]
+  jobs(first: Int): [Work]
+  status: Status
+  workflowEnabled: Boolean
+  workflowInstance: WorkflowInstance
+  pirInformation(pirId: ID!): PirInformation @auth(for: [PIRAPI])
+  securityCoverage: SecurityCoverage
+  # Cases
+  name: String!
+  description: String
+  content: String
+  content_mapping: String
+  tasks: TaskConnection!
+  # Incident Response
+  rating: Int
+  response_types: [String!]
+  severity: String
+  priority: String
+  # Custom fields
+  customFieldValues: [CustomFieldValue!] @ff(flags: ["CUSTOM_FIELDS"], softFail: true, defaultValue: "[]")
+}
+
+# Ordering
+enum CaseIncidentsOrdering {
+  name
+  created
+  modified
+  context
+  severity
+  priority
+  created_at
+  updated_at
+  creator
+  createdBy
+  objectAssignee
+  x_opencti_workflow_id
+  confidence
+  objectMarking
+  _score
+}
+# Relay connections
+type CaseIncidentConnection {
+  pageInfo: PageInfo!
+  edges: [CaseIncidentEdge]
+}
+
+type CaseIncidentEdge {
+  cursor: String!
+  node: CaseIncident!
+}
+
+# Queries
+type Query {
+  caseIncident(id: String!): CaseIncident @auth(for: [KNOWLEDGE])
+  caseIncidents(
+    first: Int
+    after: ID
+    orderBy: CaseIncidentsOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+    toStix: Boolean
+  ): CaseIncidentConnection @auth(for: [KNOWLEDGE])
+  caseIncidentContainsStixObjectOrStixRelationship(id: String!, stixObjectOrStixRelationshipId: String!): Boolean @auth(for: [KNOWLEDGE])
+}
+
+# Mutations
+input CaseIncidentAddInput {
+  stix_id: StixId
+  x_opencti_stix_ids: [StixId]
+  name: String! @constraint(minLength: 2, format: "not-blank")
+  severity: String
+  priority: String
+  description: String
+  content: String
+  content_mapping: String
+  confidence: Int
+  revoked: Boolean
+  lang: String
+  objects: [String]
+  createdBy: String
+  objectMarking: [String]
+  objectAssignee: [String]
+  objectParticipant: [String]
+  objectOrganization: [String]
+  objectLabel: [String]
+  externalReferences: [String]
+  created: DateTime
+  modified: DateTime
+  response_types: [String!]
+  caseTemplates: [String!]
+  x_opencti_modified_at: DateTime
+  x_opencti_workflow_id: String
+  file: Upload
+  fileMarkings: [String]
+  files: [Upload]
+  filesMarkings: [[String]]
+  noTriggerImport: [Boolean]
+  embedded: [Boolean]
+  clientMutationId: String
+  update: Boolean
+  authorized_members: [MemberAccessInput!]
+  upsertOperations: [EditInput!]
+  customFieldValues: [CustomFieldValueAddInput!]
+}
+
+type Mutation {
+  caseIncidentAdd(input: CaseIncidentAddInput!): CaseIncident @auth(for: [KNOWLEDGE_KNUPDATE])
+  caseIncidentDelete(id: ID!): ID @auth(for: [KNOWLEDGE_KNUPDATE_KNDELETE])
+}

@@ -1,0 +1,52 @@
+{
+  "name": "opencti-worker",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "opencti-worker",
+  "projectType": "application",
+  "targets": {
+    "install": {
+      "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["client-python"], "target": "install" }],
+      "options": {
+        "cwd": "opencti-worker",
+        "command": "pip install -r requirements.txt"
+      },
+      "metadata": {
+        "description": "Install the OpenCTI worker dependencies"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": [{ "projects": ["opencti-graphql"], "target": "dev" }],
+      "options": {
+        "cwd": "opencti-worker/src",
+        "command": "python worker.py"
+      },
+      "metadata": {
+        "description": "Run the OpenCTI worker in development mode"
+      }
+    },
+    "build-ubi9": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "opencti-worker",
+        "command": "podman build -f Dockerfile_ubi9 -t opencti/worker:{args.ver}-ubi9 ."
+      },
+      "metadata": {
+        "description": "Build the OpenCTI worker UBI9 Docker image"
+      }
+    },
+    "push-ubi9": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build-ubi9"],
+      "options": {
+        "cwd": "opencti-worker",
+        "command": "podman push opencti/worker:{args.ver}-ubi9"
+      },
+      "metadata": {
+        "description": "Push the OpenCTI worker UBI9 Docker image"
+      }
+    }
+  }
+}

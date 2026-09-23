@@ -1,0 +1,145 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'docker:enableMajor',
+    ':semanticCommits',
+  ],
+  labels: [
+    'dependencies',
+    'filigran team',
+  ],
+  minimumReleaseAge: '3 days',
+  // high limits so that all PRs are created at once during the schedule window rather than being drip-fed across multiple runs
+  prHourlyLimit: 100,
+  prConcurrentLimit: 100,
+  branchConcurrentLimit: 100,
+  timezone: 'Europe/Paris',
+  // weekdays outside working hours (22h-5h) + all weekend
+  schedule: [
+    '* 0-4,22-23 * * 1-5',
+    '* * * * 0,6',
+  ],
+  // prevent Renovate from updating existing PRs outside the schedule window
+  updateNotScheduled: false,
+  // only rebase when there is a conflict; avoids unnecessary CI runs on every base branch change, can be removed when number of open PR is low
+  rebaseWhen: 'conflicted',
+  vulnerabilityAlerts: {
+    // as we don't rely on Renovate to be informed of dependency security advisories,
+    // vulnerabilityAlerts is disabled since it can cause problems by skipping minimumReleaseAge, schedule and others constraints
+    enabled: false,
+  },
+  packageRules: [
+    // sticks to Node 22.x docker image, matching engines.node (>= 22.0.0)
+    {
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'node',
+      ],
+      allowedVersions: '<23',
+      description: 'Keep node docker image at version 22.x',
+    },
+    {
+      matchDepNames: [
+        '@types/node',
+      ],
+      allowedVersions: '<23',
+      description: 'Keep @types/node at version 22.x, matching engines.node',
+    },
+    // sticks to MIT version of apexcharts
+    {
+      matchDepNames: [
+        'apexcharts'
+      ],
+      allowedVersions: '<5',
+      description: 'Keep apexcharts at version 4.x',
+    },
+    {
+      matchDepNames: [
+        'react-apexcharts'
+      ],
+      allowedVersions: '<1.8',
+      description: 'Keep react-apexcharts before 1.8',
+    },
+
+    // openid-clientv5 is an aliased+patched dependency pinned to openid-client@5.7.1.
+    // Its jose resolution is also pinned. Disable all Renovate updates for both.
+    {
+      matchDepNames: [
+        'openid-clientv5',
+      ],
+      matchUpdateTypes: [
+        'major'
+      ],
+      enabled: false,
+      description: 'Do not update openid-clientv5 (aliased and patched, pinned to v5)',
+    },
+    {
+      matchPackageNames: [
+        'jose',
+      ],
+      matchDepTypes: [
+        'resolutions',
+      ],
+      matchUpdateTypes: [
+        'major',
+      ],
+      enabled: false,
+      description: 'Do not update openid-clientv5/jose resolution to major versions',
+    },
+    {
+      description: 'Disable updates of images intentionally pinned to older versions for compatibility testing',
+      matchFileNames: [
+        '.drone.yml',
+      ],
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'python',
+      ],
+      matchCurrentVersion: '<=3.12',
+      enabled: false,
+    },
+    // aws-sdk-js-v3 is too frequently updated, so we update it only once a week on Sunday
+    {
+      extends: [
+        'monorepo:aws-sdk-js-v3',
+      ],
+      description: 'Update aws-sdk-js-v3 only once a week on Sunday',
+      schedule: ['* * * * 0'],
+    },
+    // group non-major devDependencies and GitHub Actions once a week to avoid Renovate noise
+    {
+      groupName: 'devDependencies (non-major)',
+      groupSlug: 'dev-dependencies-non-major',
+      description: 'Batch non-major updates of dev dependencies and GitHub Actions once a week on Sunday',
+      schedule: [
+        '* * * * 0',
+      ],
+      matchDepTypes: [
+        'devDependencies',
+        'action',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+        'pin',
+        'digest',
+      ],
+      // use 'auto' here so grouped PRs stay up-to-date automatically,
+      // since we batch them and want them merge-ready on Monday
+      rebaseWhen: 'auto',
+    },
+  ],
+  // do lock file maintenance once a week on Sunday
+  lockFileMaintenance: {
+    schedule: [
+      '* * * * 0',
+    ],
+    rebaseWhen: 'auto',
+    enabled: true,
+  },
+}

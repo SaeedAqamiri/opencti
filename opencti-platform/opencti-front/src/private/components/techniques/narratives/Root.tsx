@@ -1,0 +1,214 @@
+import { useMemo, Suspense } from 'react';
+import { Route, Routes, useLocation, useParams } from 'react-router';
+import { graphql, useSubscription, usePreloadedQuery, PreloadedQuery } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import { RootNarrativeQuery } from '@components/techniques/narratives/__generated__/RootNarrativeQuery.graphql';
+import { RootNarrativeSubscription } from '@components/techniques/narratives/__generated__/RootNarrativeSubscription.graphql';
+import useQueryLoading from 'src/utils/hooks/useQueryLoading';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import Narrative from './Narrative';
+import NarrativeKnowledge from './NarrativeKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import FileManager from '../../common/files/FileManager';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import NarrativeEdition from './NarrativeEdition';
+import NarrativeDeletion from './NarrativeDeletion';
+import { PATH_NARRATIVE, PATH_NARRATIVES } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootNarrativeSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on Narrative {
+        ...Narrative_narrative
+        ...NarrativeEditionContainer_narrative
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const narrativeQuery = graphql`
+  query RootNarrativeQuery($id: String!) {
+    narrative(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      standard_id
+      entity_type
+      name
+      aliases
+      x_opencti_graph_data
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...Narrative_narrative
+      ...NarrativeKnowledge_narrative
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+      ...StixCoreObjectSharingListFragment
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+type RootNarrativeProps = {
+  narrativeId: string;
+  queryRef: PreloadedQuery<RootNarrativeQuery>;
+};
+const RootNarrative = ({ narrativeId, queryRef }: RootNarrativeProps) => {
+  const subConfig = useMemo<GraphQLSubscriptionConfig<RootNarrativeSubscription>>(() => ({
+    subscription,
+    variables: { id: narrativeId },
+  }), [narrativeId]);
+
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  useSubscription<RootNarrativeSubscription>(subConfig);
+
+  const {
+    narrative,
+    connectorsForExport,
+    connectorsForImport,
+  } = usePreloadedQuery<RootNarrativeQuery>(narrativeQuery, queryRef);
+
+  const { forceUpdate } = useForceUpdate();
+
+  const basePath = PATH_NARRATIVE(narrativeId);
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  const link = `${basePath}/knowledge`;
+  return (
+    <CreateRelationshipContextProvider>
+      {narrative ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={(
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'channels',
+                    'observables',
+                    'sightings',
+                  ]}
+                  data={narrative}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Techniques') },
+              { label: t_i18n('Narratives'), link: PATH_NARRATIVES },
+              { label: narrative.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Narrative"
+              stixDomainObject={narrative}
+              enableEnrollPlaybook={true}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <NarrativeEdition narrativeId={narrative.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={narrative}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <NarrativeDeletion id={narrative.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+            />
+            <StixDomainObjectMain
+              entity={narrative}
+              basePath={basePath}
+              pages={{
+                overview:
+                  <Narrative narrativeData={narrative} />,
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <NarrativeKnowledge narrativeData={narrative} />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={narrative}
+                  />
+                ),
+                analyses:
+                  <StixCoreObjectOrStixCoreRelationshipContainers stixDomainObjectOrStixCoreRelationship={narrative} />,
+                files: (
+                  <FileManager
+                    id={narrativeId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={narrative}
+                  />
+                ),
+                history:
+                  <StixCoreObjectHistory stixCoreObjectId={narrativeId} />,
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+
+const Root = () => {
+  const { narrativeId } = useParams() as { narrativeId: string };
+  const queryRef = useQueryLoading<RootNarrativeQuery>(narrativeQuery, {
+    id: narrativeId,
+  });
+
+  return (
+    <>
+      {queryRef && (
+        <Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootNarrative narrativeId={narrativeId} queryRef={queryRef} />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+export default Root;

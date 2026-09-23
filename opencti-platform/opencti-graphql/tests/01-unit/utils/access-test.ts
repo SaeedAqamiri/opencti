@@ -1,0 +1,651 @@
+import { describe, it, expect } from 'vitest';
+import { v4 as uuid } from 'uuid';
+import {
+  ADMINISTRATOR_ROLE,
+  BYPASS,
+  checkOTPValidationStatus,
+  checkUserCanAccessStixElement,
+  checkUserFilterStoreElements,
+  DEFAULT_ROLE,
+  getUserAccessRight,
+  isMarkingAllowed,
+  isOrganizationAllowed,
+  isUserCanAccessStreamUpdateEvent,
+  isUserInPlatformOrganization,
+  KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS,
+  MEMBER_ACCESS_RIGHT_ADMIN,
+  MEMBER_ACCESS_RIGHT_EDIT,
+  MEMBER_ACCESS_RIGHT_VIEW,
+  OTPValidationStatus,
+  SYSTEM_USER,
+} from '../../../src/utils/access';
+import type { AuthContext } from '../../../src/types/user';
+import type { BasicStoreCommon, StoreMarkingDefinition } from '../../../src/types/store';
+import { MARKING_TLP_AMBER, MARKING_TLP_CLEAR, MARKING_TLP_GREEN, MARKING_TLP_RED } from '../../../src/schema/identifier';
+import type { AuthUser } from '../../../src/types/user';
+import type { BasicStoreSettings } from '../../../src/types/settings';
+import { PLATFORM_ORGANIZATION, TEST_ORGANIZATION, testContext } from '../../utils/testQuery';
+import { RELATION_GRANTED_TO } from '../../../src/schema/stixRefRelationship';
+import type { BasicStoreEntityOrganization } from '../../../src/modules/organization/organization-types';
+import type { StixObject, StixOpenctiExtension } from '../../../src/types/stix-2-1-common';
+import type { Group } from '../../../src/types/group';
+import type { UpdateEvent } from '../../../src/types/event';
+
+const inPlatformContext = { ...testContext, user_inside_platform_organization: true };
+
+describe('Check markings test coverage', () => {
+  it('should element with no marking be allowed', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      'object-marking': [],
+    };
+    const userAllowedMarking: string[] = [];
+    expect(isMarkingAllowed(element as BasicStoreCommon, userAllowedMarking)).toBeTruthy();
+  });
+
+  it('should element with marking refused for user without markings', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      'object-marking': [MARKING_TLP_GREEN],
+    };
+    const userAllowedMarking: string[] = [];
+    expect(isMarkingAllowed(element as BasicStoreCommon, userAllowedMarking)).toBeFalsy();
+  });
+
+  it('should element with marking refused for user with lower marking', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      'object-marking': [MARKING_TLP_GREEN],
+    };
+    const userAllowedMarking: string[] = [MARKING_TLP_CLEAR];
+    expect(isMarkingAllowed(element as BasicStoreCommon, userAllowedMarking)).toBeFalsy();
+  });
+
+  it('should element with marking allowed for user with higher marking', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      'object-marking': [MARKING_TLP_CLEAR],
+    };
+    const userAllowedMarking: string[] = [MARKING_TLP_GREEN, MARKING_TLP_CLEAR];
+    expect(isMarkingAllowed(element as BasicStoreCommon, userAllowedMarking)).toBeTruthy();
+  });
+
+  it('should element with one marking higher than user ones be refused', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      'object-marking': [MARKING_TLP_CLEAR, MARKING_TLP_RED],
+    };
+    const userAllowedMarking: string[] = [MARKING_TLP_GREEN, MARKING_TLP_AMBER];
+    expect(isMarkingAllowed(element as BasicStoreCommon, userAllowedMarking)).toBeFalsy();
+  });
+});
+
+describe('Check organization access for element.', () => {
+  it('should element when no platform organization setup be allowed', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      internal_id: uuid(),
+    };
+
+    const user: Partial<AuthUser> = {
+      organizations: [],
+      internal_id: uuid(),
+    };
+
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: undefined,
+    };
+    const hasPlatformOrg = !!settings.platform_organization;
+    expect(isOrganizationAllowed(inPlatformContext, element as BasicStoreCommon, user as AuthUser, hasPlatformOrg)).toBeTruthy();
+  });
+
+  it('should element not shared be allowed to user in platform organization', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      internal_id: uuid(),
+    };
+
+    const org: Partial<BasicStoreEntityOrganization> = {
+      internal_id: PLATFORM_ORGANIZATION.id,
+    };
+    const allOrgs: BasicStoreEntityOrganization[] = [];
+    allOrgs.push(org as BasicStoreEntityOrganization);
+
+    const user: Partial<AuthUser> = {
+      organizations: allOrgs,
+      internal_id: uuid(),
+    };
+
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: PLATFORM_ORGANIZATION.name,
+    };
+    const hasPlatformOrg = !!settings.platform_organization;
+    expect(isOrganizationAllowed(inPlatformContext, element as BasicStoreCommon, user as AuthUser, hasPlatformOrg)).toBeTruthy();
+  });
+
+  it('should element not shared not be allowed to user in another organization', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      internal_id: uuid(),
+    };
+
+    const org: Partial<BasicStoreEntityOrganization> = {
+      internal_id: TEST_ORGANIZATION.id,
+    };
+    const allOrgs: BasicStoreEntityOrganization[] = [];
+    allOrgs.push(org as BasicStoreEntityOrganization);
+
+    const user: Partial<AuthUser> = {
+      organizations: allOrgs,
+      internal_id: uuid(),
+    };
+
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: PLATFORM_ORGANIZATION.name,
+    };
+    const hasPlatformOrg = !!settings.platform_organization;
+    expect(isOrganizationAllowed(testContext, element as BasicStoreCommon, user as AuthUser, hasPlatformOrg)).toBeFalsy();
+  });
+
+  it('should element shared to user organization be allowed', async () => {
+    const element: Partial<BasicStoreCommon> = {
+      internal_id: uuid(),
+    };
+    element[RELATION_GRANTED_TO] = [TEST_ORGANIZATION.id];
+
+    const org: Partial<BasicStoreEntityOrganization> = {
+      internal_id: TEST_ORGANIZATION.id,
+      id: TEST_ORGANIZATION.id,
+    };
+    const allOrgs: BasicStoreEntityOrganization[] = [];
+    allOrgs.push(org as BasicStoreEntityOrganization);
+
+    const user: Partial<AuthUser> = {
+      organizations: allOrgs,
+      internal_id: uuid(),
+    };
+
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: PLATFORM_ORGANIZATION.name,
+    };
+    const hasPlatformOrg = !!settings.platform_organization;
+    expect(isOrganizationAllowed(inPlatformContext, element as BasicStoreCommon, user as AuthUser, hasPlatformOrg)).toBeTruthy();
+  });
+});
+
+describe('User access entity testing', async () => {
+  const user_is_allowed: Partial<AuthUser> = {
+    id: '55ec0c6a-13ce-5e39-b486-354fe4a7084f',
+    internal_id: '55ec0c6a-13ce-5e39-b486-354fe4a7084f',
+    capabilities: [{ name: KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS }],
+    organizations: [],
+    allowed_marking: [],
+    roles: [ADMINISTRATOR_ROLE],
+    groups: [],
+  };
+
+  const user_is_not_allowed: Partial<AuthUser> = {
+    id: '48ec0c6a-13ce-5e39-b486-354fe4a7084f',
+    internal_id: '48ec0c6a-13ce-5e39-b486-354fe4a7084f',
+    allowed_marking: [],
+    roles: [ADMINISTRATOR_ROLE],
+    groups: [],
+    capabilities: [{ name: KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS }],
+    organizations: [],
+  };
+
+  const report: Partial<StixObject> = {
+    id: 'report--f3e554eb-60f5-587c-9191-4f25e9ba9f32',
+    spec_version: '2.1',
+    type: 'report',
+    extensions: {
+      'extension-definition--ea279b3e-5c71-4632-ac08-831c66a786ba': {
+        extension_type: 'property-extension',
+        id: 'f13cd64f-9268-4d77-9850-eb6fbe322463',
+        type: 'Report',
+        authorized_members: [
+          {
+            id: '88ec0c6a-13ce-5e39-b486-354fe4a7084f',
+            access_right: 'admin',
+          },
+          {
+            id: '55ec0c6a-13ce-5e39-b486-354fe4a7084f',
+            access_right: 'view',
+          },
+        ],
+      } as StixOpenctiExtension,
+    },
+  };
+
+  const element: Partial<BasicStoreCommon> = {
+    id: 'report--f3e554eb-60f5-587c-9191-4f25e9ba9f32',
+    spec_version: '2.1',
+    entity_type: 'Report',
+    internal_id: 'f13cd64f-9268-4d77-9850-eb6fbe322463',
+    restricted_members: [
+      {
+        id: '88ec0c6a-13ce-5e39-b486-354fe4a7084f',
+        access_right: 'admin',
+      },
+      {
+        id: '55ec0c6a-13ce-5e39-b486-354fe4a7084f',
+        access_right: 'view',
+      },
+    ],
+  } as BasicStoreCommon;
+
+  it('user in auth members should access element', () => {
+    const hasAccess = checkUserCanAccessStixElement(testContext, user_is_allowed as AuthUser, report as StixObject, true);
+    expect(hasAccess).toEqual(true);
+  });
+  it('User not in authorized members should not access STIX element', () => {
+    const hasAccess = checkUserCanAccessStixElement(testContext, user_is_not_allowed as AuthUser, report as StixObject, true);
+    expect(hasAccess).toEqual(false);
+  });
+  it('User in authorized members should access stored element', () => {
+    const hasAccess = checkUserFilterStoreElements(testContext, user_is_allowed as AuthUser, element as BasicStoreCommon, [], true);
+    expect(hasAccess).toEqual(true);
+  });
+  it('User not in authorized members should not access stored element', () => {
+    const hasAccess = checkUserFilterStoreElements(testContext, user_is_not_allowed as AuthUser, element as BasicStoreCommon, [], true);
+    expect(hasAccess).toEqual(false);
+  });
+});
+
+describe('User stream update event testing', async () => {
+  it('user with marking allowed/not_allowed should/should_not access event with markings restrictions', async () => {
+    const user_is_allowed: Partial<AuthUser> = {
+      id: '55ec0c6a-13ce-5e39-b486-354fe4a7084f',
+      allowed_marking: [{
+        internal_id: 'f2aedb16-b107-49d3-adc5-edc945514360',
+      } as StoreMarkingDefinition],
+      roles: [ADMINISTRATOR_ROLE],
+    };
+
+    const user_is_not_allowed: Partial<AuthUser> = {
+      id: '48ec0c6a-13ce-5e39-b486-354fe4a7084f',
+      allowed_marking: [],
+      roles: [ADMINISTRATOR_ROLE],
+    };
+
+    const updateEvent: Partial<UpdateEvent> = {
+      type: 'update',
+      scope: 'external',
+      message: 'adds `A new campaign` in `Contains`',
+      context: {
+        patch: [{ op: 'add', path: '/object_refs/4', value: 'campaign--bce98eb5-25a9-5ba7-b4a0-b160a79d0de7' }],
+        reverse_patch: [{ op: 'remove', path: '/objects_refs/4' }],
+        related_restrictions: { markings: ['f2aedb16-b107-49d3-adc5-edc945514360'] },
+        changes: [],
+      },
+    };
+    const hasAccess_userAllowed = await isUserCanAccessStreamUpdateEvent(user_is_allowed as AuthUser, updateEvent as UpdateEvent);
+    expect(hasAccess_userAllowed).toEqual(true);
+    const hasAccess_userNotAllowed = await isUserCanAccessStreamUpdateEvent(user_is_not_allowed as AuthUser, updateEvent as UpdateEvent);
+    expect(hasAccess_userNotAllowed).toEqual(false);
+    const hasAccess_userWithByPass = await isUserCanAccessStreamUpdateEvent(SYSTEM_USER, updateEvent as UpdateEvent);
+    expect(hasAccess_userWithByPass).toEqual(true);
+  });
+  it('user should access event with no markings restrictions', async () => {
+    const user: Partial<AuthUser> = {
+      id: '48ec0c6a-13ce-5e39-b486-354fe4a7084f',
+      allowed_marking: [],
+      roles: [ADMINISTRATOR_ROLE],
+    };
+
+    const updateEvent: Partial<UpdateEvent> = {
+      type: 'update',
+      scope: 'external',
+      message: 'adds `A new campaign` in `Contains`',
+      context: {
+        patch: [{ op: 'add', path: '/object_refs/4', value: 'campaign--bce98eb5-25a9-5ba7-b4a0-b160a79d0de7' }],
+        reverse_patch: [{ op: 'remove', path: '/objects_refs/4' }],
+        related_restrictions: { markings: [] },
+        changes: [],
+      },
+    };
+    const hasAccess = await isUserCanAccessStreamUpdateEvent(user as AuthUser, updateEvent as UpdateEvent);
+    expect(hasAccess).toEqual(true);
+  });
+});
+
+describe('getUserAccessRight testing', () => {
+  const groupId = '8a522ce7-j325-6hc8-a2ab-t8a934a1c647';
+  const group: Partial<Group> = {
+    id: groupId,
+    internal_id: groupId,
+  };
+
+  const group2Id = '4d522ce7-j325-6hc8-a2ab-t8a934a1c657';
+  const group2: Partial<Group> = {
+    id: group2Id,
+    internal_id: group2Id,
+  };
+
+  const orgaId = '7b522ce7-j325-6hc8-a2ab-t8a934a1c612';
+  const orga: Partial<BasicStoreEntityOrganization> = {
+    id: orgaId,
+    internal_id: orgaId,
+  };
+
+  const userId = '55ec0c6a-13ce-5e39-b486-354fe4a7084f';
+  const user: Partial<AuthUser> = {
+    id: userId,
+    internal_id: userId,
+    capabilities: [{ name: KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS }],
+    organizations: [orga as BasicStoreEntityOrganization],
+    allowed_marking: [],
+    roles: [DEFAULT_ROLE],
+    groups: [group as Group, group2 as Group],
+  };
+
+  const bypassUserId = '2a522ce7-j325-4hc8-a2ab-t8a934a1c645';
+  const bypassUser: Partial<AuthUser> = {
+    id: bypassUserId,
+    capabilities: [{ name: BYPASS }],
+    organizations: [],
+    allowed_marking: [],
+    roles: [ADMINISTRATOR_ROLE],
+    groups: [],
+  };
+
+  it('should return "admin" if no restricted members', () => {
+    const element = { restricted_members: [], authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_ADMIN);
+  });
+  it('should return "admin" for BYPASS User', () => {
+    const restricted_members = [{
+      id: '66ac180d-aa8d-4566-ba51-8b385b6ec38e',
+      access_right: 'edit',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(bypassUser as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_ADMIN);
+  });
+  it('should return "admin" with authorized authorities', () => {
+    const restricted_members = [{
+      id: '66ac180d-aa8d-4566-ba51-8b385b6ec38e',
+      access_right: 'edit',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [userId] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_ADMIN);
+  });
+  it('should return "admin" if member has access right "admin"', () => {
+    const restricted_members = [{
+      id: userId,
+      access_right: 'admin',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_ADMIN);
+  });
+  it('should return "edit" if member has access right "edit"', () => {
+    const restricted_members = [{
+      id: userId,
+      access_right: 'edit',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_EDIT);
+  });
+  it('should return "view" if member has access right "view"', () => {
+    const restricted_members = [{
+      id: userId,
+      access_right: 'view',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_VIEW);
+  });
+  it('should return access right if user belongs to orga and to groups_restriction_ids', () => {
+    const restricted_members = [{
+      id: orgaId,
+      access_right: 'view',
+      groups_restriction_ids: [groupId],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_VIEW);
+  });
+  it('should return access right if user belongs to orga and to all groups_restriction_ids', () => {
+    const restricted_members = [{
+      id: orgaId,
+      access_right: 'view',
+      groups_restriction_ids: [groupId, group2Id],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_VIEW);
+  });
+  it('should return null if user belongs to orga but not to groups_restriction_ids', () => {
+    const restricted_members = [{
+      id: orgaId,
+      access_right: 'view',
+      groups_restriction_ids: ['1e522ce6-f324-4cc9-a2ab-a1a934a1c209'],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(null);
+  });
+  it('should return nul if user belongs to orga and not to all groups_restriction_ids', () => {
+    const restricted_members = [{
+      id: orgaId,
+      access_right: 'view',
+      groups_restriction_ids: [groupId, '1e522ce6-f324-4cc9-a2ab-a1a934a1c209'],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(null);
+  });
+  it('should return null if user not in restricted members', () => {
+    const restricted_members = [{
+      id: '66ac180d-aa8d-4566-ba51-8b385b6ec38e',
+      access_right: 'view',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(user as AuthUser, element);
+    expect(expected).toEqual(null);
+  });
+});
+
+describe('getUserAccessRight testing - service account behavior', () => {
+  const serviceAccountId = '9f3e1c2d-ab44-4e7b-9c3f-123456789abc';
+  const serviceAccount: Partial<AuthUser> = {
+    id: serviceAccountId,
+    internal_id: serviceAccountId,
+    user_service_account: true,
+    capabilities: [],
+    organizations: [],
+    allowed_marking: [],
+    roles: [DEFAULT_ROLE],
+    groups: [],
+  };
+
+  it('should return "admin" if service account is explicitly set as admin in restricted_members', () => {
+    const restricted_members = [{
+      id: serviceAccountId,
+      access_right: 'admin',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(serviceAccount as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_ADMIN);
+  });
+
+  it('should return "edit" as fallback if service account is not in restricted_members', () => {
+    const restricted_members = [{
+      id: '66ac180d-aa8d-4566-ba51-8b385b6ec38e',
+      access_right: 'admin',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(serviceAccount as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_EDIT);
+  });
+
+  it('should return "edit" as fallback if service account is explicitly set as "view" in restricted_members', () => {
+    const restricted_members = [{
+      id: serviceAccountId,
+      access_right: 'view',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(serviceAccount as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_EDIT);
+  });
+
+  it('should return "edit" if service account is explicitly set as "edit" in restricted_members', () => {
+    const restricted_members = [{
+      id: serviceAccountId,
+      access_right: 'edit',
+      groups_restriction_ids: [],
+    }];
+    const element = { restricted_members, authorized_authorities: [] };
+    const expected = getUserAccessRight(serviceAccount as AuthUser, element);
+    expect(expected).toEqual(MEMBER_ACCESS_RIGHT_EDIT);
+  });
+});
+
+describe('checkOTPValidationStatus testing', () => {
+  const buildContext = (overrides: Partial<AuthContext>): AuthContext => ({
+    otp_mandatory: false,
+    source: 'test',
+    user: undefined,
+    user_inside_platform_organization: false,
+    ...overrides,
+  } as AuthContext);
+
+  it('should require authentication when no user is set', () => {
+    const context = buildContext({ user: undefined });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.AUTHENTICATION_REQUIRED);
+  });
+
+  it('should be valid when allowUnprotectedOTP is true even if OTP is not validated', () => {
+    const context = buildContext({
+      user: { otp_activated: true } as AuthUser,
+      otp_mandatory: true,
+      user_otp_validated: false,
+    });
+    expect(checkOTPValidationStatus(context, true)).toEqual(OTPValidationStatus.VALID);
+  });
+
+  it('should require activation when OTP is mandatory, not validated and not activated', () => {
+    const context = buildContext({
+      user: { otp_activated: false } as AuthUser,
+      otp_mandatory: true,
+      user_otp_validated: false,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.ACTIVATION_REQUIRED);
+  });
+
+  it('should require validation when OTP is mandatory, activated but not validated', () => {
+    const context = buildContext({
+      user: { otp_activated: true } as AuthUser,
+      otp_mandatory: true,
+      user_otp_validated: false,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.VALIDATION_REQUIRED);
+  });
+
+  it('should be valid when OTP is mandatory and session is validated', () => {
+    const context = buildContext({
+      user: { otp_activated: true } as AuthUser,
+      otp_mandatory: true,
+      user_otp_validated: true,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.VALID);
+  });
+
+  it('should require validation when OTP self-activated but session not validated', () => {
+    const context = buildContext({
+      user: { otp_activated: true } as AuthUser,
+      otp_mandatory: false,
+      user_otp_validated: false,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.VALIDATION_REQUIRED);
+  });
+
+  it('should be valid when OTP is not mandatory and not activated', () => {
+    const context = buildContext({
+      user: { otp_activated: false } as AuthUser,
+      otp_mandatory: false,
+      user_otp_validated: false,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.VALID);
+  });
+
+  it('should be valid when OTP is self-activated and session is validated', () => {
+    const context = buildContext({
+      user: { otp_activated: true } as AuthUser,
+      otp_mandatory: false,
+      user_otp_validated: true,
+    });
+    expect(checkOTPValidationStatus(context)).toEqual(OTPValidationStatus.VALID);
+  });
+});
+
+describe('isUserInPlatformOrganization testing', () => {
+  const orgaPlatformId = '7b522ce7-j325-6hc8-a2ab-t8a934a1c612';
+  const orgaPlatform: Partial<BasicStoreEntityOrganization> = {
+    id: orgaPlatformId,
+    internal_id: orgaPlatformId,
+  };
+
+  const userId = '55ec0c6a-13ce-5e39-b486-354fe4a7084f';
+  const user: Partial<AuthUser> = {
+    id: userId,
+    internal_id: userId,
+    capabilities: [{ name: KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS }],
+    organizations: [orgaPlatform as BasicStoreEntityOrganization],
+  };
+
+  const bypassUserId = '2a522ce7-j325-4hc8-a2ab-t8a934a1c645';
+  const bypassUser: Partial<AuthUser> = {
+    id: bypassUserId,
+    capabilities: [{ name: BYPASS }],
+    organizations: [],
+  };
+
+  const serviceAccountId = '2a522ce7-j325-4hc8-a2ab-t8a934a1c645';
+  const serviceAccountUser: Partial<AuthUser> = {
+    id: serviceAccountId,
+    capabilities: [{ name: BYPASS }],
+    organizations: [],
+    user_service_account: true,
+  };
+
+  it('should return true for user service account', () => {
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: 'Filigran',
+    };
+    const expected = isUserInPlatformOrganization(serviceAccountUser as AuthUser, settings as BasicStoreSettings);
+    expect(expected).toEqual(true);
+  });
+  it('should return true for BYPASS User', () => {
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: 'Filigran',
+    };
+    const expected = isUserInPlatformOrganization(bypassUser as AuthUser, settings as BasicStoreSettings);
+    expect(expected).toEqual(true);
+  });
+  it('should return true if no platform Organization', () => {
+    const settings: Partial<BasicStoreSettings> = {
+    };
+    const expected = isUserInPlatformOrganization(user as AuthUser, settings as BasicStoreSettings);
+    expect(expected).toEqual(true);
+  });
+  it('should return true if User is part of platform Organization', () => {
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: '7b522ce7-j325-6hc8-a2ab-t8a934a1c612',
+    };
+    const expected = isUserInPlatformOrganization(user as AuthUser, settings as BasicStoreSettings);
+    expect(expected).toEqual(true);
+  });
+  it('should return false if User is not part of platform Organization', () => {
+    const settings: Partial<BasicStoreSettings> = {
+      platform_organization: '9b522ce7-j325-6hc8-a2ab-t8a934a1c765',
+    };
+    const expected = isUserInPlatformOrganization(user as AuthUser, settings as BasicStoreSettings);
+    expect(expected).toEqual(false);
+  });
+});

@@ -1,0 +1,48 @@
+import { Page } from '@playwright/test';
+import AutocompleteFieldPageModel from './field/AutocompleteField.pageModel';
+import SelectFieldPageModel from './field/SelectField.pageModel';
+
+export type AccessLevelLocator = 'can view' | 'can edit' | 'can manage';
+
+export default class AccessRestrictionPageModel {
+  private identityAutocomplete: AutocompleteFieldPageModel;
+  private accessSelect: SelectFieldPageModel;
+
+  constructor(private page: Page) {
+    this.identityAutocomplete = new AutocompleteFieldPageModel(this.page, 'Users, groups or organizations', false);
+    this.accessSelect = new SelectFieldPageModel(this.page, 'Access right', false);
+  }
+
+  openForm() {
+    return this.page.getByRole('button', { name: 'Manage access restriction' }).click();
+  }
+
+  openFormInMenu() {
+    return this.page.getByRole('menuitem', { name: 'Manage access restriction' }).click();
+  }
+
+  async addAccess(identity: string, level: AccessLevelLocator) {
+    await this.identityAutocomplete.selectOption(identity);
+    await this.accessSelect.selectOption(level);
+    return this.page.getByRole('button', { name: 'More' }).click();
+  }
+
+  editAccess(identity: string, level: AccessLevelLocator) {
+    const identityRow = this.page.getByText(identity).locator('../..');
+    const select = new SelectFieldPageModel(this.page, '', false, identityRow);
+    return select.selectOption(level);
+  }
+
+  deleteAccess(identity: string) {
+    const identityRow = this.page.getByText(identity).locator('../..');
+    return identityRow.getByRole('button', { name: 'Delete' }).click();
+  }
+
+  cancel() {
+    return this.page.getByRole('button', { name: 'cancel' }).click();
+  }
+
+  save() {
+    return this.page.getByRole('button', { name: 'save' }).click();
+  }
+}

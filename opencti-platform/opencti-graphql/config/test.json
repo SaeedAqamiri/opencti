@@ -1,0 +1,128 @@
+{
+  "app": {
+    "port": 4010,
+    "liveness_port": 4001,
+    "base_url": "http://127.0.0.1:4010/",
+    "performance_logger": false,
+    "enabled_dev_features": ["*"],
+    "sync_raw_start_remote_uri": "http://127.0.0.1:4200/graphql",
+    "sync_live_start_remote_uri": "http://127.0.0.1:4200/graphql",
+    "sync_direct_start_remote_uri": "http://127.0.0.1:4200/graphql",
+    "sync_restore_start_remote_uri": "http://127.0.0.1:4200/graphql",
+    "app_logs": {
+      "logs_level": "info",
+      "logs_files": false,
+      "logs_console": true,
+      "extended_error_message": true
+    },
+    "audit_logs": {
+      "logs_files": false,
+      "logs_console": false
+    },
+    "event_loop_logs": {
+      "enabled": true,
+      "max_time": 1000
+    },
+    "telemetry": {
+      "tracing": {
+        "enabled": false,
+        "exporter_otlp": "http://127.0.0.1:4318/v1/traces"
+      },
+      "metrics": {
+        "enabled": false,
+        "exporter_otlp": "",
+        "exporter_prometheus": 14269
+      },
+      "filigran": {
+        "enabled": false,
+        "exporter_otlp": ""
+      }
+    },
+    "admin": {
+      "email": "admin@opencti.io",
+      "password": "admin",
+      "token": "d434ce02-e58e-4cac-8b4c-42bf16748e84"
+    },
+    "encryption_key": "wbQnxC2ZIoohYzkXW19LiYU2V3lfoCVFkBadFd/dFAY="
+  },
+  "platform_id": "7992a4b1-128c-4656-bf97-2018b6f1f395",
+  "http_proxy": "http://proxy.opencti.io:2000",
+  "https_proxy": "https://proxy.opencti.io:2100",
+  "no_proxy": "127.0.0.1,127.0.0.0/8,internal.opencti.io,rabbitmq",
+  "https_proxy_ca": [],
+  "https_proxy_reject_unauthorized": false,
+  "aliases_identifier_rules": {
+    "vulnerability": ["CVE-\\d{4}-\\d{4,7}"]
+  },
+  "redis": {
+    "namespace": "test",
+    "hostname": "127.0.0.1",
+    "include_inferences": true
+  },
+  "elasticsearch": {
+    "index_prefix": "test",
+    "url": "http://127.0.0.1:9200"
+  },
+  "minio": {
+    "bucket_name": "test",
+    "endpoint": "127.0.0.1",
+    "port": 9000
+  },
+  "rabbitmq": {
+    "queue_prefix": "test",
+    "hostname": "127.0.0.1"
+  },
+  "subscription_scheduler": {
+    "enabled": false
+  },
+  "rule_engine": {
+    "enabled": true
+  },
+  "history_manager": {
+    "enabled": true
+  },
+  "connector_manager": {
+    "enabled": true
+  },
+  "import_csv_built_in_connector": {
+    "enabled": true,
+    "interval": 2000,
+    "validate_before_import": false,
+    "bulk_creation_size": 5
+  },
+  "task_scheduler": {
+    "enabled": true,
+    "interval": 1000
+  },
+  "expiration_scheduler": {
+    "enabled": true
+  },
+  "sync_manager": {
+    "enabled": true
+  },
+  "retention_manager": {
+    "enabled": true
+  },
+  "indicator_decay_manager": {
+    "enabled": true,
+    "interval": 6000000
+  },
+  "ingestion_manager": {
+    "enabled": false
+  },
+  "telemetry_manager": {
+    "enabled": false
+  },
+  "providers": {
+    "local": {
+      "strategy": "LocalStrategy"
+    }
+  },
+  "smtp": {
+    "enabled": true,
+    "hostname": "smtp",
+    "use_ssl": false,
+    "rejectUnauthorized": false,
+    "port": 1025
+  }
+}

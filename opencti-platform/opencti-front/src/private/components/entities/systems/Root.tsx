@@ -1,0 +1,281 @@
+import React, { useMemo, Suspense, useState } from 'react';
+import { Route, Routes, useLocation, useParams, useNavigate } from 'react-router';
+import { graphql, useSubscription, usePreloadedQuery, PreloadedQuery } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import { propOr } from 'ramda';
+import { RootSystemQuery } from '@components/entities/systems/__generated__/RootSystemQuery.graphql';
+import { RootSystemsSubscription } from '@components/entities/systems/__generated__/RootSystemsSubscription.graphql';
+import useQueryLoading from 'src/utils/hooks/useQueryLoading';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import System from './System';
+import SystemKnowledge from './SystemKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import FileManager from '../../common/files/FileManager';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import SystemAnalysis from './SystemAnalysis';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import { buildViewParamsFromUrlAndStorage, saveViewParameters } from '../../../../utils/ListParameters';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import SystemEdition from './SystemEdition';
+import SystemDeletion from './SystemDeletion';
+import { PATH_SYSTEM, PATH_SYSTEMS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootSystemsSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on System {
+        ...System_system
+        ...SystemEditionContainer_system
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const systemQuery = graphql`
+  query RootSystemQuery($id: String!) {
+    system(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      entity_type
+      name
+      x_opencti_aliases
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...System_system
+      ...SystemKnowledge_system
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+      ...StixCoreObjectSharingListFragment
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+type RootSystemProps = {
+  systemId: string;
+  queryRef: PreloadedQuery<RootSystemQuery>;
+};
+
+const RootSystem = ({ systemId, queryRef }: RootSystemProps) => {
+  const subConfig = useMemo<GraphQLSubscriptionConfig<RootSystemsSubscription>>(() => ({
+    subscription,
+    variables: { id: systemId },
+  }), [systemId]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const LOCAL_STORAGE_KEY = `system-${systemId}`;
+  const params = buildViewParamsFromUrlAndStorage(
+    navigate,
+    location,
+    LOCAL_STORAGE_KEY,
+  );
+
+  const [viewAs, setViewAs] = useState<string>(propOr('knowledge', 'viewAs', params));
+
+  const saveView = () => {
+    saveViewParameters(
+      navigate,
+      location,
+      LOCAL_STORAGE_KEY,
+      viewAs,
+    );
+  };
+
+  const handleChangeViewAs = (value: string) => {
+    setViewAs(value);
+    saveView();
+  };
+
+  const { t_i18n } = useFormatter();
+  useSubscription<RootSystemsSubscription>(subConfig);
+
+  const {
+    system,
+    connectorsForExport,
+    connectorsForImport,
+  } = usePreloadedQuery<RootSystemQuery>(systemQuery, queryRef);
+
+  const { forceUpdate } = useForceUpdate();
+
+  const basePath = PATH_SYSTEM(systemId);
+  const link = `${basePath}/knowledge`;
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  return (
+    <CreateRelationshipContextProvider>
+      {system ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={viewAs === 'knowledge' && (
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'systems',
+                    'systems',
+                    'threats',
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'malwares',
+                    'attack_patterns',
+                    'tools',
+                    'observables',
+                    'vulnerabilities',
+                  ]}
+                  data={system}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Entities') },
+              { label: t_i18n('Systems'), link: PATH_SYSTEMS },
+              { label: system.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="System"
+              stixDomainObject={system}
+              isOpenctiAlias={true}
+              enableQuickSubscription={true}
+              enableEnricher={true}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <SystemEdition systemId={system.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={system}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <SystemDeletion id={system.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              onViewAs={handleChangeViewAs}
+              viewAs={viewAs}
+              redirectToContent={true}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={system}
+              basePath={basePath}
+              pages={{
+                overview: (
+                  <System
+                    systemData={system}
+                    viewAs={viewAs}
+                  />
+                ),
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <SystemKnowledge
+                      systemData={system}
+                      viewAs={viewAs}
+                    />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={system}
+                  />
+                ),
+                analyses: (
+                  <SystemAnalysis
+                    system={system}
+                    viewAs={viewAs}
+                  />
+                ),
+                sightings: (
+                  <EntityStixSightingRelationships
+                    entityId={system.id}
+                    entityLink={link}
+                    noPadding={true}
+                    isTo={true}
+                    stixCoreObjectTypes={[
+                      'Region',
+                      'Country',
+                      'City',
+                      'Position',
+                      'Sector',
+                      'Organization',
+                      'Individual',
+                      'System',
+                    ]}
+                  />
+                ),
+                files: (
+                  <FileManager
+                    id={systemId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={system}
+                  />
+                ),
+                history: (
+                  <StixCoreObjectHistory
+                    stixCoreObjectId={systemId}
+                  />
+                ),
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+const Root = () => {
+  const { systemId } = useParams() as { systemId: string };
+  const queryRef = useQueryLoading<RootSystemQuery>(systemQuery, {
+    id: systemId,
+  });
+
+  return (
+    <>
+      {queryRef && (
+        <Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootSystem systemId={systemId} queryRef={queryRef} />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+export default Root;

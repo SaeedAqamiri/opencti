@@ -1,0 +1,796 @@
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import UserConfidenceLevel from '@components/settings/users/UserConfidenceLevel';
+import { Add, DeleteForeverOutlined, DeleteOutlined } from '@mui/icons-material';
+import { ListItemButton, Stack } from '@mui/material';
+import DialogTitle from '@mui/material/DialogTitle';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContentText from '@mui/material/DialogContentText';
+import Grid from '@mui/material/Grid';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import { SimplePaletteColorOptions } from '@mui/material/styles/createPalette';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/styles';
+import { ApexOptions } from 'apexcharts';
+import { FunctionComponent, useState } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import { Link } from 'react-router';
+import Card from '../../../../components/common/card/Card';
+import Label from '../../../../components/common/label/Label';
+import Tag from '../../../../components/common/tag/Tag';
+import FieldOrEmpty from '../../../../components/FieldOrEmpty';
+import { useFormatter } from '../../../../components/i18n';
+import ItemAccountStatus from '../../../../components/ItemAccountStatus';
+import ItemIcon from '../../../../components/ItemIcon';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import type { Theme } from '../../../../components/Theme';
+import { handleError, QueryRenderer } from '../../../../relay/environment';
+import { areaChartOptions } from '../../../../utils/Charts';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import useAuth from '../../../../utils/hooks/useAuth';
+import useEnterpriseEdition from '../../../../utils/hooks/useEnterpriseEdition';
+import useGranted, { BYPASS, KNOWLEDGE, SETTINGS_SECURITYACTIVITY, SETTINGS_SETACCESSES } from '../../../../utils/hooks/useGranted';
+
+import { simpleNumberFormat } from '../../../../utils/Number';
+import Security from '../../../../utils/Security';
+import { EMPTY_VALUE } from '../../../../utils/String';
+import { now, timestamp, yearsAgo } from '../../../../utils/Time';
+import Chart from '../../common/charts/Chart';
+import Triggers from '../common/Triggers';
+import HiddenTypesChipList from '../hidden_types/HiddenTypesChipList';
+import { User_user$key } from './__generated__/User_user.graphql';
+import { UserAuditsTimeSeriesQuery$data } from './__generated__/UserAuditsTimeSeriesQuery.graphql';
+import { UserOtpDeactivationMutation } from './__generated__/UserOtpDeactivationMutation.graphql';
+import { UserSessionKillMutation } from './__generated__/UserSessionKillMutation.graphql';
+import { UserUserSessionsKillMutation } from './__generated__/UserUserSessionsKillMutation.graphql';
+import UserHistory from './UserHistory';
+import UserTokenList from './UserTokenList';
+import { SURFACE_LAYER, fdsLayerClass, layerInputVars } from '../../../../utils/fdsLayer';
+
+const startDate = yearsAgo(1);
+const endDate = now();
+
+export const userSessionKillMutation = graphql`
+  mutation UserSessionKillMutation($id: ID!) {
+    sessionKill(id: $id)
+  }
+`;
+
+export const userUserSessionsKillMutation = graphql`
+  mutation UserUserSessionsKillMutation($id: ID!) {
+    userSessionsKill(id: $id)
+  }
+`;
+
+export const userOtpDeactivationMutation = graphql`
+  mutation UserOtpDeactivationMutation($id: ID!) {
+    otpUserDeactivation(id: $id) {
+      ...ProfileOverview_me
+    }
+  }
+`;
+
+const UserAuditsTimeSeriesQuery = graphql`
+  query UserAuditsTimeSeriesQuery(
+    $types: [String!]
+    $field: String!
+    $operation: StatsOperation!
+    $startDate: DateTime!
+    $endDate: DateTime!
+    $interval: String!
+    $filters: FilterGroup
+  ) {
+    auditsTimeSeries(
+      types: $types
+      field: $field
+      filters: $filters
+      operation: $operation
+      startDate: $startDate
+      endDate: $endDate
+      interval: $interval
+    ) {
+      date
+      value
+    }
+  }
+`;
+
+const UserFragment = graphql`
+  fragment User_user on User
+  @argumentDefinitions(
+    groupsOrderBy: { type: "GroupsOrdering", defaultValue: name }
+    groupsOrderMode: { type: "OrderingMode", defaultValue: asc }
+    organizationsOrderBy: { type: "OrganizationsOrdering", defaultValue: name }
+    organizationsOrderMode: { type: "OrderingMode", defaultValue: asc }
+    organizationsCount: { type: "Int", defaultValue: 500 }
+    rolesOrderBy: { type: "RolesOrdering", defaultValue: name }
+    rolesOrderMode: { type: "OrderingMode", defaultValue: asc }
+  ) {
+    id
+    name
+    description
+    external
+    user_email
+    firstname
+    lastname
+    account_status
+    account_lock_after_date
+    language
+    otp_activated
+    password_valid_until
+    created_at
+    creator {
+      name
+    }
+    roles(orderBy: $rolesOrderBy, orderMode: $rolesOrderMode) {
+      id
+      name
+      description
+    }
+    capabilities {
+      id
+      name
+    }
+    capabilitiesInDraft {
+      id
+      name
+    }
+    groups(orderBy: $groupsOrderBy, orderMode: $groupsOrderMode) {
+      edges {
+        node {
+          id
+          name
+          description
+        }
+      }
+    }
+    default_hidden_types
+    user_confidence_level {
+      max_confidence
+      overrides {
+        max_confidence
+        entity_type
+      }
+    }
+    user_service_account
+    effective_confidence_level {
+      max_confidence
+      overrides {
+        max_confidence
+        entity_type
+        source {
+          type
+          object {
+            ... on User { entity_type id name }
+            ... on Group { entity_type id name }
+          }
+        }
+      }
+      source {
+        type
+        object {
+          ... on User { entity_type id name }
+          ... on Group { entity_type id name }
+        }
+      }
+    }
+    objectOrganization(
+      first: $organizationsCount
+      orderBy: $organizationsOrderBy
+      orderMode: $organizationsOrderMode
+    ) {
+      edges {
+        node {
+          id
+          name
+          authorized_authorities
+        }
+      }
+    }
+    sessions {
+      id
+      created
+      ttl
+    }
+    ...UserTokenList_node
+  }
+`;
+
+type Session = {
+  id: string;
+  created?: string;
+  ttl?: number;
+};
+
+interface UserProps {
+  data: User_user$key;
+  refetch: () => void;
+}
+
+const User: FunctionComponent<UserProps> = ({ data, refetch }) => {
+  const { t_i18n, nsdt, fsd, fldt, fd } = useFormatter();
+  const { me } = useAuth();
+  const theme = useTheme<Theme>();
+  const [displayKillSession, setDisplayKillSession] = useState<boolean>(false);
+  const [displayKillSessions, setDisplayKillSessions] = useState<boolean>(false);
+  const [killing, setKilling] = useState<boolean>(false);
+  const [sessionToKill, setSessionToKill] = useState<string | null>(null);
+  const [openTokenCreationDrawer, setOpenTokenCreationDrawer] = useState(false);
+
+  const user = useFragment(UserFragment, data);
+  const isEnterpriseEdition = useEnterpriseEdition();
+  const isGrantedToAudit = useGranted([SETTINGS_SECURITYACTIVITY]);
+  const isGrantedToKnowledge = useGranted([KNOWLEDGE]);
+  const [commitUserSessionKill] = useApiMutation<UserSessionKillMutation>(
+    userSessionKillMutation,
+  );
+  const [commitUserUserSessionsKill] = useApiMutation<UserUserSessionsKillMutation>(userUserSessionsKillMutation);
+  const [commitUserOtpDeactivation] = useApiMutation<UserOtpDeactivationMutation>(
+    userOtpDeactivationMutation,
+  );
+  const userCapabilities = (me.capabilities ?? []).map((c) => c.name);
+  const userHasSettingsCapability = userCapabilities.includes(SETTINGS_SETACCESSES) || userCapabilities.includes(BYPASS);
+  const handleOpenKillSession = (sessionId: string) => {
+    setDisplayKillSession(true);
+    setSessionToKill(sessionId);
+  };
+  const handleCloseKillSession = () => {
+    setDisplayKillSession(false);
+    setSessionToKill(null);
+  };
+  const submitKillSession = () => {
+    if (sessionToKill) {
+      setKilling(true);
+      commitUserSessionKill({
+        variables: {
+          id: sessionToKill,
+        },
+        onError: (error: Error) => {
+          handleError(error);
+          setKilling(false);
+        },
+        onCompleted: () => {
+          setKilling(false);
+          handleCloseKillSession();
+          refetch();
+        },
+      });
+    }
+  };
+  const handleOpenKillSessions = () => {
+    setDisplayKillSessions(true);
+  };
+  const handleCloseKillSessions = () => {
+    setDisplayKillSessions(false);
+  };
+  const submitKillSessions = () => {
+    setKilling(true);
+    commitUserUserSessionsKill({
+      variables: {
+        id: user.id,
+      },
+      onError: (error: Error) => {
+        handleError(error);
+        setKilling(false);
+      },
+      onCompleted: () => {
+        setKilling(false);
+        handleCloseKillSessions();
+        refetch();
+      },
+    });
+  };
+
+  const otpUserDeactivation = () => {
+    commitUserOtpDeactivation({
+      variables: {
+        id: user.id,
+      },
+      onError: (error: Error) => {
+        handleError(error);
+      },
+    });
+  };
+  const orderedSessions: Session[] = (user.sessions ?? [])
+    .map((s) => ({
+      created: s?.created ?? '',
+      id: s?.id ?? '',
+      ttl: s?.ttl ?? 0,
+    }))
+    .sort(
+      (a: Session, b: Session) => (timestamp(a.created) ?? 0) - (timestamp(b.created) ?? 0),
+    );
+  const accountExpireDate = fldt(user.account_lock_after_date);
+  const passwordValidUntil = (user as { password_valid_until?: string | null }).password_valid_until;
+  const passwordValidUntilDate = passwordValidUntil ? fd(passwordValidUntil) : EMPTY_VALUE;
+  const isServiceAccount = user.user_service_account;
+  const creationDate = fldt(user.created_at);
+  const creatorName = user.creator ? user.creator?.name : EMPTY_VALUE;
+  let historyTypes = ['History'];
+  if (isGrantedToAudit && !isGrantedToKnowledge) {
+    historyTypes = ['Activity'];
+  } else if (isGrantedToAudit && isGrantedToKnowledge) {
+    historyTypes = ['History', 'Activity'];
+  }
+
+  return (
+    <>
+      <Grid
+        container={true}
+        spacing={3}
+        style={{
+          marginBottom: 50,
+        }}
+      >
+        <Grid item xs={6}>
+          <Card title={t_i18n('Basic information')}>
+            <Grid container={true} spacing={2}>
+              {!isServiceAccount && (
+                <>
+                  <Grid item xs={8}>
+                    <Label>
+                      {t_i18n('Email address')}
+                    </Label>
+                    <pre style={{ margin: 0 }}>{user.user_email}</pre>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Label action={user.otp_activated && (
+                      <IconButton
+                        color="primary"
+                        onClick={otpUserDeactivation}
+                        aria-label="Delete all"
+                        size="small"
+                      >
+                        <DeleteForeverOutlined fontSize="small" />
+                      </IconButton>
+                    )}
+                    >
+                      {t_i18n('2FA state')}
+                    </Label>
+                    <pre style={{ margin: 0 }}>
+                      {user.otp_activated ? t_i18n('Enabled') : t_i18n('Disabled')}
+                    </pre>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Label>
+                      {t_i18n('Password valid until')}
+                    </Label>
+                    {passwordValidUntilDate}
+                  </Grid>
+                </>
+              )}
+              {isServiceAccount && (
+                <>
+                  <Grid item xs={4}>
+                    <Label>
+                      {t_i18n('Account type')}
+                    </Label>
+                    {user.user_service_account
+                      ? <Tag label={t_i18n('Service account')} />
+                      : EMPTY_VALUE
+                    }
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Label>
+                      {t_i18n('Account status')}
+                    </Label>
+                    <FieldOrEmpty source={user.account_status}>
+                      <ItemAccountStatus
+                        account_status={user.account_status}
+                        label={t_i18n(user.account_status)}
+                        variant="outlined"
+                      />
+                    </FieldOrEmpty>
+                  </Grid>
+                  <Grid item xs={4}>
+                    <Label>
+                      {t_i18n('Account expiration date')}
+                    </Label>
+                    {accountExpireDate || EMPTY_VALUE}
+                  </Grid>
+                </>
+              )}
+              <Grid item xs={12}>
+                <Stack gap={1}>
+                  <Label
+                    action={(
+                      <Button
+                        variant="tertiary"
+                        size="small"
+                        onClick={() => setOpenTokenCreationDrawer(true)}
+                        startIcon={<Add fontSize="small" />}
+                        aria-label="generate-token"
+                      >
+                        {t_i18n('Generate Token')}
+                      </Button>
+                    )}
+                  >{t_i18n('API Tokens')}
+                  </Label>
+
+                  <UserTokenList
+                    node={user}
+                    openDrawer={openTokenCreationDrawer}
+                    onCloseDrawer={() => setOpenTokenCreationDrawer(false)}
+                  />
+                </Stack>
+              </Grid>
+              {!isServiceAccount && (
+                <>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Firstname')}
+                    </Label>
+                    {user.firstname || EMPTY_VALUE}
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Lastname')}
+                    </Label>
+                    {user.lastname || EMPTY_VALUE}
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Account status')}
+                    </Label>
+                    <FieldOrEmpty source={user.account_status}>
+                      <ItemAccountStatus
+                        account_status={user.account_status}
+                        label={t_i18n(user.account_status)}
+                        variant="outlined"
+                      />
+                    </FieldOrEmpty>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Account expiration date')}
+                    </Label>
+                    {accountExpireDate || EMPTY_VALUE}
+                  </Grid>
+                </>
+              )}
+              {isServiceAccount && (
+                <>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Created by')}
+                    </Label>
+                    {creatorName}
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Label>
+                      {t_i18n('Creation date')}
+                    </Label>
+                    {creationDate || EMPTY_VALUE}
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </Card>
+        </Grid>
+        <Grid item xs={6}>
+          <Card title={t_i18n('Permissions')}>
+            <Grid container={true} spacing={2}>
+              <Grid item xs={6}>
+                <Label>
+                  {t_i18n('Roles')}
+                </Label>
+                <FieldOrEmpty source={user.roles ?? []}>
+                  <List sx={{ py: 0 }}>
+                    {(user.roles ?? []).map((role) => (userHasSettingsCapability ? (
+                      <ListItemButton
+                        key={role?.id}
+                        dense={true}
+                        divider={true}
+                        component={Link}
+                        to={`/dashboard/settings/accesses/roles/${role?.id}`}
+                      >
+                        <ListItemIcon>
+                          <ItemIcon type="Role" />
+                        </ListItemIcon>
+                        <ListItemText primary={role?.name} />
+                      </ListItemButton>
+                    ) : (
+                      <ListItem key={role?.id} dense={true} divider={true}>
+                        <ListItemIcon>
+                          <ItemIcon type="Role" />
+                        </ListItemIcon>
+                        <ListItemText primary={role?.name} />
+                      </ListItem>
+                    )))}
+                  </List>
+                </FieldOrEmpty>
+              </Grid>
+              <Grid item xs={6}>
+                <Label>
+                  {t_i18n('Groups')}
+                </Label>
+                <FieldOrEmpty source={user.groups?.edges}>
+                  <List sx={{ py: 0 }}>
+                    {(user.groups?.edges ?? []).map((groupEdge) => (userHasSettingsCapability ? (
+                      <ListItemButton
+                        key={groupEdge?.node.id}
+                        dense={true}
+                        divider={true}
+                        component={Link}
+                        to={`/dashboard/settings/accesses/groups/${groupEdge?.node.id}`}
+                      >
+                        <ListItemIcon>
+                          <ItemIcon type="Group" />
+                        </ListItemIcon>
+                        <ListItemText primary={groupEdge?.node.name} />
+                      </ListItemButton>
+                    ) : (
+                      <ListItem
+                        key={groupEdge?.node.id}
+                        dense={true}
+                        divider={true}
+                      >
+                        <ListItemIcon>
+                          <ItemIcon type="Group" />
+                        </ListItemIcon>
+                        <ListItemText primary={groupEdge?.node.name} />
+                      </ListItem>
+                    )))}
+                  </List>
+                </FieldOrEmpty>
+              </Grid>
+              <Grid item xs={6}>
+                <Label>
+                  {t_i18n('Organizations')}
+                </Label>
+                <FieldOrEmpty source={user.objectOrganization?.edges}>
+                  <List>
+                    {user.objectOrganization?.edges.map((organizationEdge) => (
+                      <ListItemButton
+                        key={organizationEdge.node.id}
+                        dense={true}
+                        divider={true}
+                        component={Link}
+                        to={`/dashboard/settings/accesses/organizations/${organizationEdge.node.id}`}
+                      >
+                        <ListItemIcon>
+                          <ItemIcon
+                            type="Organization"
+                            color={
+                              (
+                                organizationEdge.node.authorized_authorities
+                                ?? []
+                              ).includes(user.id)
+                                ? (
+                                    theme.palette
+                                      .warning as SimplePaletteColorOptions
+                                  ).main
+                                : theme.palette.primary.main
+                            }
+                          />
+                        </ListItemIcon>
+                        <ListItemText primary={organizationEdge.node.name} />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </FieldOrEmpty>
+              </Grid>
+              <Grid item xs={6}>
+                <Label action={(
+                  <Security needs={[SETTINGS_SETACCESSES]}>
+                    <Tooltip title={t_i18n('Kill all sessions')}>
+                      <IconButton
+                        color="primary"
+                        aria-label={t_i18n('Delete all')}
+                        onClick={handleOpenKillSessions}
+                        size="small"
+                      >
+                        <DeleteForeverOutlined fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Security>
+                )}
+                >
+                  {t_i18n('Sessions')}
+                </Label>
+                <FieldOrEmpty source={orderedSessions}>
+                  <List sx={{ py: 0, width: '100%', maxHeight: 400, overflowY: 'auto' }}>
+                    {orderedSessions
+                      && orderedSessions.map((session: Session) => (
+                        <ListItem
+                          key={session.id}
+                          dense={true}
+                          divider={true}
+                          secondaryAction={(
+                            <IconButton
+                              aria-label="Kill"
+                              onClick={() => handleOpenKillSession(session.id)}
+                              size="small"
+                            >
+                              <DeleteOutlined fontSize="small" />
+                            </IconButton>
+                          )}
+                        >
+                          <ListItemIcon>
+                            <ItemIcon type="Session" />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={(
+                              <>
+                                <div style={{ float: 'left', width: '50%' }}>
+                                  {nsdt(session.created)}
+                                </div>
+                                <div style={{ float: 'left', width: '20%' }}>
+                                  {session.ttl
+                                    ? Math.round(session.ttl / 60)
+                                    : 0}{' '}
+                                  {t_i18n('minutes')}
+                                </div>
+                              </>
+                            )}
+                          />
+                        </ListItem>
+                      ))}
+                  </List>
+                </FieldOrEmpty>
+              </Grid>
+              {!isServiceAccount && (
+                <Grid item xs={6}>
+                  <HiddenTypesChipList
+                    hiddenTypes={user.default_hidden_types ?? []}
+                  />
+                </Grid>
+              )}
+              <Grid item xs={6}>
+                <Label>
+                  {t_i18n('Max Confidence Level')}
+                </Label>
+                <UserConfidenceLevel user={user} />
+              </Grid>
+            </Grid>
+          </Card>
+        </Grid>
+        {!isServiceAccount && (
+          <Triggers recipientId={user.id} filterKey="authorized_members.id" />
+        )}
+        <Grid item xs={6} style={{ marginTop: 10 }}>
+          <Card
+            title={t_i18n('Operations')}
+            sx={{ minHeight: 500 }}
+          >
+            {!isEnterpriseEdition ? (
+              <div style={{ display: 'table', height: '100%', width: '100%' }}>
+                <span
+                  style={{
+                    display: 'table-cell',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                  }}
+                >
+                  {t_i18n(
+                    'This feature is only available in OpenCTI Enterprise Edition.',
+                  )}
+                </span>
+              </div>
+            ) : (
+              <QueryRenderer
+                query={UserAuditsTimeSeriesQuery}
+                variables={{
+                  types: historyTypes,
+                  field: 'timestamp',
+                  operation: 'count',
+                  startDate,
+                  endDate,
+                  interval: 'month',
+                  filters: {
+                    mode: 'and',
+                    filters: [
+                      { key: ['user_id'], values: [user.id], operator: 'wildcard', mode: 'or' },
+                    ],
+                    filterGroups: [],
+                  },
+                }}
+                render={({
+                  props,
+                }: {
+                  props: UserAuditsTimeSeriesQuery$data;
+                }) => {
+                  if (props && props.auditsTimeSeries) {
+                    const chartData = props.auditsTimeSeries.map((entry) => ({
+                      x: new Date(entry?.date),
+                      y: entry?.value,
+                    }));
+                    return (
+                      <Chart
+                        options={
+                          areaChartOptions(
+                            theme,
+                            true,
+                            fsd,
+                            simpleNumberFormat,
+                            undefined,
+                          ) as ApexOptions
+                        }
+                        series={[
+                          {
+                            name: t_i18n('Number of operations'),
+                            data: chartData,
+                          },
+                        ]}
+                        type="area"
+                        width="100%"
+                        height="100%"
+                      />
+                    );
+                  }
+                  return <Loader variant={LoaderVariant.inElement} />;
+                }}
+              />
+            )}
+          </Card>
+        </Grid>
+        <Grid item xs={6} style={{ marginTop: 10 }}>
+          {isGrantedToAudit ? (
+            <UserHistory userId={user.id} />
+          ) : (
+            <Card title={t_i18n('History')}>
+              <span
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  height: '100%',
+                }}
+              >
+                {t_i18n('You are not authorized to see this data.')}
+              </span>
+            </Card>
+          )}
+        </Grid>
+      </Grid>
+      <Dialog
+        slotProps={{ paper: { className: fdsLayerClass(SURFACE_LAYER), sx: { ...layerInputVars } } }}
+        open={displayKillSession}
+        onClose={handleCloseKillSession}
+      >
+        <DialogTitle>{t_i18n('Are you sure?')}</DialogTitle>
+        <DialogContentText>
+          {t_i18n('Do you want to kill this session?')}
+        </DialogContentText>
+        <DialogActions>
+          <Button variant="secondary" onClick={handleCloseKillSession} disabled={killing}>
+            {t_i18n('Cancel')}
+          </Button>
+          <Button
+            onClick={submitKillSession}
+            disabled={killing}
+          >
+            {t_i18n('Confirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        slotProps={{ paper: { className: fdsLayerClass(SURFACE_LAYER), sx: { ...layerInputVars } } }}
+        open={displayKillSessions}
+        onClose={handleCloseKillSessions}
+      >
+        <DialogTitle>{t_i18n('Are you sure?')}</DialogTitle>
+        <DialogContentText>
+          {t_i18n('Do you want to kill all the sessions of this user?')}
+        </DialogContentText>
+        <DialogActions>
+          <Button variant="secondary" onClick={handleCloseKillSessions} disabled={killing}>
+            {t_i18n('Cancel')}
+          </Button>
+          <Button
+            onClick={submitKillSessions}
+            disabled={killing}
+          >
+            {t_i18n('Confirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
+export default User;

@@ -1,0 +1,262 @@
+import React, { useState } from 'react';
+import { Field, Form, Formik } from 'formik';
+import Button from '@common/button/Button';
+import InputAdornment from '@mui/material/InputAdornment';
+import * as Yup from 'yup';
+import { graphql } from 'react-relay';
+import Tooltip from '@mui/material/Tooltip';
+import { InformationOutline } from 'mdi-material-ui';
+import Box from '@mui/material/Box';
+import { RetentionLinesPaginationQuery$variables } from '@components/settings/retention/__generated__/RetentionLinesPaginationQuery.graphql';
+import { FormikConfig } from 'formik/dist/types';
+import { RetentionCreationCheckMutation$data } from '@components/settings/retention/__generated__/RetentionCreationCheckMutation.graphql';
+import { RecordSourceSelectorProxy } from 'relay-runtime';
+import { useTheme } from '@mui/material/styles';
+import Drawer, { DrawerControlledDialProps } from '../../common/drawer/Drawer';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation, MESSAGING$ } from '../../../../relay/environment';
+import TextField from '../../../../components/TextField';
+import Filters from '../../common/lists/Filters';
+import { serializeFilterGroupForBackend, useAvailableFilterKeysForEntityTypes } from '../../../../utils/filters/filtersUtils';
+import FilterIconButton from '../../../../components/FilterIconButton';
+import { insertNode } from '../../../../utils/store';
+import useFiltersState from '../../../../utils/filters/useFiltersState';
+import SelectFieldFds, { SelectItem } from '../../../../components/fields/SelectFieldFds';
+import { fieldSpacingContainerStyle } from '../../../../utils/field';
+import CreateEntityControlledDial from '../../../../components/CreateEntityControlledDial';
+import FormButtonContainer from '../../../../components/common/form/FormButtonContainer';
+
+const RetentionCreationMutation = graphql`
+    mutation RetentionCreationMutation($input: RetentionRuleAddInput!) {
+        retentionRuleAdd(input: $input) {
+            ...RetentionLine_node
+        }
+    }
+`;
+
+const RetentionCheckMutation = graphql`
+    mutation RetentionCreationCheckMutation($input: RetentionRuleAddInput!) {
+        retentionRuleCheck(input: $input)
+    }
+`;
+
+const RetentionCreationValidation = (t: (text: string) => string) => Yup.object().shape({
+  name: Yup.string().required(t('This field is required')),
+  retention_unit: Yup.string().required(t('This field is required')),
+  max_retention: Yup.number().min(1, t('This field must be >= 1')),
+});
+
+const CreateRetentionControlledDial = (props: DrawerControlledDialProps) => (
+  <CreateEntityControlledDial
+    entityType="RetentionRule"
+    {...props}
+  />
+);
+
+interface RetentionFormValues {
+  name: string;
+  max_retention: string;
+  retention_unit: 'minutes' | 'hours' | 'days';
+  filters: string;
+}
+
+const RetentionCreation = ({ paginationOptions }: { paginationOptions: RetentionLinesPaginationQuery$variables }) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme();
+
+  const [filters, helpers] = useFiltersState();
+  const [verified, setVerified] = useState(false);
+  const availableFilterKeys = useAvailableFilterKeysForEntityTypes(['Stix-Core-Object', 'stix-core-relationship']);
+
+  const onSubmit: FormikConfig<RetentionFormValues>['onSubmit'] = (values, { setSubmitting, resetForm }) => {
+    const jsonFilters = serializeFilterGroupForBackend(filters);
+    const finalValues = {
+      ...values,
+      max_retention: Number(values.max_retention),
+      scope: 'knowledge',
+      filters: jsonFilters,
+    };
+    commitMutation({
+      mutation: RetentionCreationMutation,
+      variables: {
+        input: finalValues,
+      },
+      updater: (store: RecordSourceSelectorProxy) => {
+        insertNode(
+          store,
+          'Pagination_retentionRules',
+          paginationOptions,
+          'retentionRuleAdd',
+        );
+      },
+      setSubmitting,
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+      },
+      onError: undefined,
+      optimisticResponse: undefined,
+      optimisticUpdater: undefined,
+    });
+  };
+
+  const handleVerify = (values: RetentionFormValues) => {
+    const jsonFilters = serializeFilterGroupForBackend(filters);
+    const finalValues = {
+      ...values,
+      max_retention: Number(values.max_retention),
+      scope: 'knowledge',
+      filters: jsonFilters,
+    };
+    commitMutation({
+      mutation: RetentionCheckMutation,
+      variables: {
+        input: finalValues,
+      },
+      onCompleted: (data: RetentionCreationCheckMutation$data) => {
+        setVerified(true);
+        MESSAGING$.notifySuccess(
+          t_i18n(`Retention policy will delete ${data.retentionRuleCheck} elements`),
+        );
+      },
+      onError: () => {
+        setVerified(false);
+      },
+      optimisticResponse: undefined,
+      optimisticUpdater: undefined,
+      updater: undefined,
+      setSubmitting: undefined,
+    });
+  };
+
+  return (
+    <Drawer
+      title={t_i18n('Create a retention policy')}
+      onClose={helpers.handleClearAllFilters}
+      controlledDial={CreateRetentionControlledDial}
+    >
+      {({ onClose }) => (
+        <Formik
+          initialValues={{ name: '', max_retention: '31', retention_unit: 'days', scope: 'knowledge', filters: '' }}
+          validationSchema={RetentionCreationValidation(t_i18n)}
+          onSubmit={onSubmit}
+          onReset={onClose}
+        >
+          {({ submitForm, handleReset, isSubmitting, values: formValues, validateForm, setTouched }) => (
+            <Form>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="name"
+                label={t_i18n('Name')}
+                fullWidth={true}
+                mandatory
+              />
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="retention_unit"
+                label={t_i18n('Unit')}
+                fullWidth={true}
+                containerstyle={fieldSpacingContainerStyle}
+              >
+                <SelectItem value="minutes">{t_i18n('minutes')}</SelectItem>
+                <SelectItem value="hours">{t_i18n('hours')}</SelectItem>
+                <SelectItem value="days">{t_i18n('days')}</SelectItem>
+              </Field>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="max_retention"
+                label={t_i18n('Maximum retention')}
+                fullWidth={true}
+                onChange={() => setVerified(false)}
+                style={{ marginTop: 20 }}
+                slotProps={{
+                  input: {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip
+                          title={t_i18n(
+                            'All objects matching the filters that have not been updated since this amount of units will be deleted',
+                          )}
+                        >
+                          <InformationOutline
+                            fontSize="small"
+                            color="primary"
+                            style={{ cursor: 'default' }}
+                          />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="scope"
+                label={t_i18n('Scope')}
+                fullWidth={true}
+                containerstyle={fieldSpacingContainerStyle}
+                disabled={true}
+              >
+                <SelectItem value="knowledge">{t_i18n('Knowledge')}</SelectItem>
+              </Field>
+              <Box sx={{
+                paddingTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: theme.spacing(1),
+                marginBottom: theme.spacing(1),
+              }}
+              >
+                <Filters
+                  availableFilterKeys={availableFilterKeys}
+                  helpers={helpers}
+                  searchContext={{ entityTypes: ['Stix-Core-Object', 'stix-core-relationship'] }}
+                />
+              </Box>
+              <FilterIconButton
+                filters={filters}
+                helpers={helpers}
+                redirection
+                searchContext={{ entityTypes: ['Stix-Core-Object', 'stix-core-relationship'] }}
+              />
+              <FormButtonContainer>
+                <Button
+                  variant="secondary"
+                  onClick={handleReset}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Cancel')}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={async () => {
+                    const errors = await validateForm();
+                    setTouched({ name: true, retention_unit: true, max_retention: true });
+                    if (Object.keys(errors).length === 0) {
+                      handleVerify(formValues);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Verify')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={!verified || isSubmitting}
+                >
+                  {t_i18n('Create')}
+                </Button>
+              </FormButtonContainer>
+            </Form>
+          )}
+        </Formik>
+      )}
+    </Drawer>
+  );
+};
+
+export default RetentionCreation;

@@ -1,0 +1,34 @@
+import { Page } from '@playwright/test';
+import SDOTabs from './SDOTabs.pageModel';
+
+export default class InfrastructureDetailsPageModel {
+  tabs: SDOTabs;
+  constructor(private page: Page) {
+    this.tabs = new SDOTabs(this.page);
+  }
+
+  getInfrastructureDetailsPage() {
+    return this.page.getByTestId('infrastructure-details-page');
+  }
+
+  getPage() {
+    return this.page.getByTestId('infrastructure-overview');
+  }
+
+  getTitle(name: string) {
+    return this.page.getByRole('heading', { name });
+  }
+
+  getKnowledgeTab() {
+    return this.page.getByRole('tab', { name: 'Knowledge' }).click();
+  }
+
+  getCampaignsTab() {
+    // Same as the Victimology entries: the knowledge bar's rows are links now.
+    return this.page.getByRole('link', { name: 'Campaigns' }).click();
+  }
+
+  getCreateRelationshipButton() {
+    return this.page.getByRole('button', { name: 'Create Relationship' });
+  }
+}

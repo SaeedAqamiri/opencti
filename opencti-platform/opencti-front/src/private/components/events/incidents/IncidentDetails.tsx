@@ -1,0 +1,196 @@
+import React, { FunctionComponent } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import Grid from '@mui/material/Grid';
+import { useFormatter } from '../../../../components/i18n';
+import ExpandableMarkdown from '../../../../components/ExpandableMarkdown';
+import { IncidentDetails_incident$data, IncidentDetails_incident$key } from './__generated__/IncidentDetails_incident.graphql';
+import StixCoreObjectsDonut from '../../common/stix_core_objects/StixCoreObjectsDonut';
+import ItemOpenVocab from '../../../../components/ItemOpenVocab';
+import ItemScore from '../../../../components/ItemScore';
+import Card from '../../../../components/common/card/Card';
+import Label from '../../../../components/common/label/Label';
+import FieldOrEmpty from '../../../../components/FieldOrEmpty';
+import Tag from '../../../../components/common/tag/Tag';
+
+const incidentDetailsFragment = graphql`
+  fragment IncidentDetails_incident on Incident {
+    id
+    first_seen
+    last_seen
+    objective
+    description
+    incident_type
+    severity
+    source
+    x_opencti_score
+    status {
+      id
+      order
+      template {
+        name
+        color
+      }
+    }
+    workflowEnabled
+    is_inferred
+  }
+`;
+
+interface IncidentDetailsProps {
+  incidentData: IncidentDetails_incident$key;
+}
+const IncidentDetails: FunctionComponent<IncidentDetailsProps> = ({
+  incidentData,
+}) => {
+  const { t_i18n, fldt } = useFormatter();
+
+  const incident: IncidentDetails_incident$data = useFragment(
+    incidentDetailsFragment,
+    incidentData,
+  );
+
+  const entitiesDataSelection = [
+    {
+      attribute: 'entity_type',
+      filters: {
+        mode: 'and',
+        filters: [
+          {
+            key: 'entity_type',
+            values: ['Stix-Domain-Object'],
+          },
+          {
+            key: 'regardingOf',
+            values: [
+              { key: 'id', values: [incident.id], operator: 'eq' },
+              { key: 'relationship_type', values: ['related-to', 'targets', 'uses', 'attributed-to'] },
+            ],
+          },
+        ],
+        filterGroups: [],
+      },
+    },
+  ];
+  const observablesDataSelection = [
+    {
+      attribute: 'entity_type',
+      filters: {
+        mode: 'and',
+        filters: [
+          {
+            key: 'entity_type',
+            values: ['Stix-Cyber-Observable'],
+          },
+          {
+            key: 'regardingOf',
+            values: [
+              { key: 'id', values: [incident.id], operator: 'eq' },
+              { key: 'relationship_type', values: ['related-to'], operator: 'eq' },
+            ],
+          },
+        ],
+        filterGroups: [],
+      },
+    },
+  ];
+
+  const config = {
+    startDate: undefined,
+    endDate: undefined,
+  };
+
+  return (
+    <div style={{ height: '100%' }} data-testid="incident-details-page">
+      <Card title={t_i18n('Details')}>
+        <Grid container={true} spacing={2}>
+          <Grid item xs={12}>
+            <Label>
+              {t_i18n('Description')}
+            </Label>
+            <ExpandableMarkdown source={incident.description} limit={400} />
+          </Grid>
+          <Grid item xs={6}>
+            <Label>
+              {t_i18n('Incident type')}
+            </Label>
+            <FieldOrEmpty source={incident.incident_type}>
+              <Tag
+                label={incident.incident_type}
+              />
+            </FieldOrEmpty>
+            <Label
+              sx={{ marginTop: 2 }}
+            >
+              {t_i18n('Score')}
+            </Label>
+            <ItemScore score={incident.x_opencti_score} />
+            <Label
+              sx={{ marginTop: 2 }}
+            >
+              {t_i18n('First seen')}
+            </Label>
+            {fldt(incident.first_seen)}
+          </Grid>
+          <Grid item xs={6}>
+            <Label>
+              {t_i18n('Severity')}
+            </Label>
+            <ItemOpenVocab
+              key="type"
+              small={true}
+              type="incident_severity_ov"
+              value={incident.severity}
+              displayMode="chip"
+            />
+            <Label
+              sx={{ marginTop: 2 }}
+            >
+              {t_i18n('Last seen')}
+            </Label>
+            {fldt(incident.last_seen)}
+            <Label
+              sx={{ marginTop: 2 }}
+            >
+              {t_i18n('Source')}
+            </Label>
+            <FieldOrEmpty source={incident.source}>
+              <Tag
+                label={incident.source}
+              />
+            </FieldOrEmpty>
+            <Label
+              sx={{ marginTop: 2 }}
+            >
+              {t_i18n('Objective')}
+            </Label>
+            <ExpandableMarkdown source={incident.objective} limit={100} />
+          </Grid>
+          <Grid item xs={6}>
+            <StixCoreObjectsDonut
+              dataSelection={entitiesDataSelection}
+              parameters={{ title: t_i18n('Entities distribution') }}
+              variant="inEntity"
+              height={250}
+              config={config}
+              popover={undefined}
+              host={undefined}
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <StixCoreObjectsDonut
+              dataSelection={observablesDataSelection}
+              parameters={{ title: t_i18n('Observables distribution') }}
+              variant="inEntity"
+              height={250}
+              config={config}
+              popover={undefined}
+              host={undefined}
+            />
+          </Grid>
+        </Grid>
+      </Card>
+    </div>
+  );
+};
+
+export default IncidentDetails;

@@ -1,0 +1,59 @@
+import React, { FunctionComponent } from 'react';
+import { useFormatter } from './i18n';
+import { stixDomainObjectMutation } from '@components/common/stix_domain_objects/StixDomainObjectHeader';
+import Tooltip from '@mui/material/Tooltip';
+import Stack from '@mui/material/Stack';
+import FieldOrEmpty from './FieldOrEmpty';
+import useGranted, { KNOWLEDGE_KNUPDATE } from '../utils/hooks/useGranted';
+import { truncate } from '../utils/String';
+import { commitMutation, defaultCommitMutation } from '../relay/environment';
+import { GraphQLTaggedNode } from 'react-relay';
+import Tag from './common/tag/Tag';
+
+interface ItemParticipantsProps {
+  participants: readonly {
+    readonly entity_type: string;
+    readonly id: string;
+    readonly name: string;
+  }[];
+  stixDomainObjectId: string;
+  removeMutation?: GraphQLTaggedNode;
+  readOnly?: boolean;
+}
+
+const ItemParticipants: FunctionComponent<ItemParticipantsProps> = ({ participants, stixDomainObjectId, removeMutation = stixDomainObjectMutation, readOnly }) => {
+  const { t_i18n } = useFormatter();
+  const canUpdateKnowledge = useGranted([KNOWLEDGE_KNUPDATE]);
+  const handleRemoveParticipant = (removedId: string) => {
+    const values = participants.filter((participant) => participant.id !== removedId);
+    const valuesIds = values.map((value) => value.id);
+    commitMutation({
+      mutation: removeMutation,
+      variables: {
+        id: stixDomainObjectId,
+        input: {
+          key: 'objectParticipant',
+          value: valuesIds,
+        },
+      },
+      ...defaultCommitMutation,
+    });
+  };
+  return (
+    <FieldOrEmpty source={participants}>
+      <Stack direction="row" gap={1} flexWrap="wrap">
+        {participants.map((participant) => (
+          <Tooltip key={participant.id} title={participant.name}>
+            <Tag
+              key={participant.id}
+              label={truncate(participant.name, 25)}
+              deleteLabel={`${t_i18n('Remove')} ${participant.name}`}
+              onDelete={!readOnly && canUpdateKnowledge ? () => (handleRemoveParticipant(participant.id)) : undefined}
+            />
+          </Tooltip>
+        ))}
+      </Stack>
+    </FieldOrEmpty>
+  );
+};
+export default ItemParticipants;

@@ -1,0 +1,148 @@
+import { FunctionComponent, useEffect, useRef, useState } from 'react';
+import LoginForm from './LoginForm';
+import { LoginRootPublicQuery$data } from '../../__generated__/LoginRootPublicQuery.graphql';
+import { isNotEmptyField } from '../../../utils/utils';
+import ResetPassword from './ResetPassword';
+import ExternalAuths from './ExternalAuths';
+import AlertLogout from './AlertLogout';
+import AlertFlashError from './AlertFlashError';
+import ConsentMessage from './ConsentMessage';
+import LoginLayout from './LoginLayout';
+import Card from '../../../components/common/card/Card';
+import { Stack, Typography } from '@mui/material';
+import LoginMarkdown from './LoginMarkdown';
+import AlertValidateOtp from './AlertValidateOtp';
+import AlertChangePwd from './AlertChangePwd';
+import { useLoginContext } from './loginContext';
+import AlertMfa from './AlertMfa';
+import { useFormatter } from '../../../components/i18n';
+import ForcePasswordChange from './ForcePasswordChange';
+
+interface LoginPageProps {
+  settings: LoginRootPublicQuery$data['publicSettings'];
+}
+
+const LoginPage: FunctionComponent<LoginPageProps> = ({ settings }) => {
+  const { t_i18n } = useFormatter();
+  const { resetPwdStep, forcePasswordChange } = useLoginContext();
+  const [checked, setChecked] = useState(false);
+
+  const loginMessageRef = useRef<HTMLElement>(null);
+  const [isLoginMessageOverflowing, setIsLoginMessageOverflowing] = useState(false);
+  const loginMessageMaxHeight = window.innerHeight * 0.25;
+
+  const consentMessage = settings.platform_consent_message;
+  const loginMessage = settings.platform_login_message;
+  const providers = settings.platform_providers;
+  const hasAuthForm = providers.filter((p) => p?.type === 'FORM').length > 0;
+  const hasConsentMessage = isNotEmptyField(consentMessage);
+
+  useEffect(() => {
+    if (loginMessageRef.current) {
+      setIsLoginMessageOverflowing(loginMessageRef.current.scrollHeight > loginMessageMaxHeight);
+    }
+  }, [loginMessage]);
+
+  const handleChange = () => {
+    setChecked(!checked);
+    // Auto scroll to bottom of unhidden/re-hidden login options.
+    window.setTimeout(() => {
+      const scrollingElement = document.scrollingElement ?? document.body;
+      scrollingElement.scrollTop = scrollingElement.scrollHeight;
+    }, 1);
+  };
+
+  const consentOk = !hasConsentMessage || (hasConsentMessage && checked);
+  const showLoginForm = consentOk && hasAuthForm && !resetPwdStep && !forcePasswordChange;
+
+  return (
+    <LoginLayout settings={settings}>
+      <Stack gap={1} sx={{ width: 500 }}>
+        <ConsentMessage
+          value={checked}
+          data={settings}
+          onToggle={handleChange}
+        />
+
+        <AlertLogout />
+        <AlertFlashError />
+        <AlertValidateOtp />
+        <AlertChangePwd />
+        <AlertMfa />
+
+        {providers.length === 0 && (
+          <Card>
+            <Typography textAlign="center" variant="body2">
+              {t_i18n('No authentication provider available')}
+            </Typography>
+          </Card>
+        )}
+
+        {!!loginMessage && (
+          <Typography
+            ref={loginMessageRef}
+            textAlign="center"
+            variant="body2"
+            sx={{
+              maxHeight: loginMessageMaxHeight,
+              overflowY: isLoginMessageOverflowing ? 'auto' : undefined,
+            }}
+          >
+            <LoginMarkdown sx={{ mb: 2 }}>
+              {loginMessage}
+            </LoginMarkdown>
+          </Typography>
+        )}
+
+        {consentOk
+          && providers.filter((p) => p.type === 'FORM').length > 0
+          && (showLoginForm || !!resetPwdStep || !!forcePasswordChange)
+          && (
+            <Card
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div>
+                {!!resetPwdStep && (
+                  <ResetPassword
+                    policies={{
+                      minLength: settings.password_policy_min_length,
+                      maxLength: settings.password_policy_max_length,
+                      minSymbols: settings.password_policy_min_symbols,
+                      minNumbers: settings.password_policy_min_numbers,
+                      minWords: settings.password_policy_min_words,
+                      minLowercase: settings.password_policy_min_lowercase,
+                      minUppercase: settings.password_policy_min_uppercase,
+                    }}
+                  />
+                )}
+                {!!forcePasswordChange && (
+                  <ForcePasswordChange
+                    policies={{
+                      minLength: settings.password_policy_min_length,
+                      maxLength: settings.password_policy_max_length,
+                      minSymbols: settings.password_policy_min_symbols,
+                      minNumbers: settings.password_policy_min_numbers,
+                      minWords: settings.password_policy_min_words,
+                      minLowercase: settings.password_policy_min_lowercase,
+                      minUppercase: settings.password_policy_min_uppercase,
+                    }}
+                  />
+                )}
+                {showLoginForm && <LoginForm />}
+              </div>
+            </Card>
+          )}
+
+        <ExternalAuths
+          data={settings}
+          consentValue={checked}
+        />
+      </Stack>
+    </LoginLayout>
+  );
+};
+
+export default LoginPage;

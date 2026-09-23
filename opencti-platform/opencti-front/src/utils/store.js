@@ -1,0 +1,133 @@
+import { ConnectionHandler } from 'relay-runtime';
+
+export const isNodeInConnection = (payload, conn) => {
+  const records = conn.getLinkedRecords('edges');
+  const recordsIds = records.map((n) => n.getLinkedRecord('node').getValue('id'));
+  const payloadId = payload.getValue('id');
+  return recordsIds.includes(payloadId);
+};
+
+export const insertNode = (
+  store,
+  key,
+  filters,
+  rootField,
+  objectId,
+  linkedRecord,
+  input,
+  relKey,
+) => {
+  // Build record ids
+  let record;
+  if (objectId) {
+    record = store.get(objectId);
+  } else {
+    record = store.get(store.getRoot().getDataID());
+  }
+  // Connections cannot use count as a filter because we NEED to update the count when we push new elements
+  const params = { ...filters };
+  delete params.count;
+  delete params.id;
+  let conn;
+  if (Object.keys(params).length === 0) {
+    conn = ConnectionHandler.getConnection(record, key);
+  } else {
+    conn = ConnectionHandler.getConnection(record, key, params);
+  }
+  if (conn) {
+    // Build the payload to add
+    let payload;
+    if (linkedRecord && input && relKey) {
+      const result = store
+        .getRootField(rootField)
+        .getLinkedRecord(linkedRecord, input);
+      payload = result.getLinkedRecord(relKey);
+    } else if (relKey) {
+      const result = store.getRootField(rootField);
+      payload = result.getLinkedRecord(relKey);
+    } else {
+      payload = store.getRootField(rootField);
+    }
+    // If payload id not already in the list, add the node and increment global count
+    if (!isNodeInConnection(payload, conn)) {
+      const newEdge = payload.setLinkedRecord(payload, 'node');
+      ConnectionHandler.insertEdgeBefore(conn, newEdge);
+      const pageInfo = conn.getLinkedRecord('pageInfo');
+      if (!pageInfo) return;
+      const globalCount = pageInfo.getValue('globalCount');
+      if (!Number.isInteger(globalCount)) return;
+      pageInfo.setValue(globalCount + 1, 'globalCount');
+    }
+  }
+  // When the connection is not mounted (e.g. the mutation is triggered from a
+  // screen that does not render the paginated list), there is nothing to
+  // update: the list will be refetched on its next mount.
+};
+
+export const deleteNodeFromId = (store, containerId, key, filters, id) => {
+  const record = store.get(containerId);
+  // Connections cannot use count as a filter because we NEED to update the count when we remove new elements
+  const params = { ...filters };
+  delete params.count;
+  delete params.id;
+
+  let conn;
+  if (Object.keys(params).length === 0) {
+    conn = ConnectionHandler.getConnection(record, key);
+  } else {
+    conn = ConnectionHandler.getConnection(record, key, params);
+  }
+
+  // When the connection is not mounted (e.g. the mutation is triggered from a
+  // screen that does not render the paginated list), there is nothing to
+  // update: the list will be refetched on its next mount.
+  if (!conn) {
+    return;
+  }
+
+  const edges = conn.getLinkedRecords('edges') || [];
+  const nodeExists = edges.some((edge) => {
+    const node = edge.getLinkedRecord('node');
+    return node.getValue('id') === id;
+  });
+
+  if (!nodeExists) {
+    return;
+  }
+
+  ConnectionHandler.deleteNode(conn, id);
+
+  const pageInfo = conn.getLinkedRecord('pageInfo');
+  if (pageInfo) {
+    const globalCount = pageInfo.getValue('globalCount');
+
+    if (Number.isInteger(globalCount) && globalCount > 0) {
+      const newCount = globalCount - 1;
+      pageInfo.setValue(newCount, 'globalCount');
+    }
+  }
+};
+
+export const deleteNode = (store, key, filters, id) => {
+  deleteNodeFromId(store, store.getRoot().getDataID(), key, filters, id);
+};
+
+export const deleteNodeFromContainer = (store, containerId, key, filters, id) => {
+  deleteNodeFromId(store, containerId ?? store.getRoot().getDataID(), key, filters, id);
+};
+
+export const deleteNodeFromEdge = (store, path, rootId, deleteId, params) => {
+  const node = store.get(rootId);
+  const records = node.getLinkedRecord(path, params);
+  const edges = records.getLinkedRecords('edges') || [];
+  const newEdges = edges.filter((n) => n.getLinkedRecord('node').getValue('id') !== deleteId);
+  records.setLinkedRecords(newEdges, 'edges');
+};
+
+export const insertNodeFromEdge = (store, parentId, edgesPath, dataPath, params) => {
+  const node = store.get(parentId);
+  const records = node.getLinkedRecord(edgesPath, params);
+  const payload = store.getRootField(dataPath);
+  const newEdge = payload.setLinkedRecord(payload, 'node');
+  ConnectionHandler.insertEdgeBefore(records, newEdge);
+};

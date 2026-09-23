@@ -1,0 +1,334 @@
+import { describe, expect, it } from 'vitest';
+import { parseDotPath, resolvePath, resolveDotPath, createGroupsMapper, createOrganizationsMapper } from '../../../../src/modules/authenticationProvider/mappings-utils';
+
+describe('mappings-utils', () => {
+  describe('parseDotPath', () => {
+    it('should split simple dot-separated path', () => {
+      expect(parseDotPath('a.b.c')).toEqual(['a', 'b', 'c']);
+    });
+
+    it('should treat quoted segment as single component (SAML URI)', () => {
+      expect(parseDotPath('user_info."http://example.com/claims/email"')).toEqual(['user_info', 'http://example.com/claims/email']);
+    });
+
+    it('should support multiple quoted segments', () => {
+      expect(parseDotPath('"http://a".b."http://c"')).toEqual(['http://a', 'b', 'http://c']);
+    });
+
+    it('should allow escaped double quote inside quoted segment (double double quote)', () => {
+      expect(parseDotPath('"say ""hi"""')).toEqual(['say "hi"']);
+    });
+
+    it('should return single segment when no dots', () => {
+      expect(parseDotPath('mail')).toEqual(['mail']);
+    });
+
+    it('should handle empty path', () => {
+      expect(parseDotPath('')).toEqual([]);
+    });
+
+    it('should handle trailing dot (empty segment not pushed)', () => {
+      expect(parseDotPath('a.')).toEqual(['a']);
+    });
+  });
+
+  describe('resolveDotPath', () => {
+    it('should resolve path with quoted segment (SAML-style URI key)', async () => {
+      const obj = {
+        attributes: {
+          'http://example.com/claims/email': 'user@example.com',
+        },
+      };
+      const result = await resolveDotPath('attributes."http://example.com/claims/email"')(obj);
+      expect(result).toBe('user@example.com');
+    });
+
+    it('should resolve plain dot path as before (backward compatible)', async () => {
+      const obj = { user_info: { email: 'a@b.com' } };
+      const result = await resolveDotPath('user_info.email')(obj);
+      expect(result).toBe('a@b.com');
+    });
+  });
+
+  describe('resolvePath', () => {
+    it('should resolve simple property', async () => {
+      const obj = { foo: 'bar' };
+      const result = await resolvePath(['foo'])(obj);
+      expect(result).toBe('bar');
+    });
+
+    it('should resolve nested property', async () => {
+      const obj = { foo: { bar: 'baz' } };
+      const result = await resolvePath(['foo', 'bar'])(obj);
+      expect(result).toBe('baz');
+    });
+
+    it('should resolve function returning value', async () => {
+      const obj = { foo: () => 'bar' };
+      const result = await resolvePath(['foo'])(obj);
+      expect(result).toBe('bar');
+    });
+
+    it('should resolve nested function returning value', async () => {
+      const obj = { foo: { bar: () => 'baz' } };
+      const result = await resolvePath(['foo', 'bar'])(obj);
+      expect(result).toBe('baz');
+    });
+
+    it('should resolve async function returning value', async () => {
+      const obj = { foo: async () => 'bar' };
+      const result = await resolvePath(['foo'])(obj);
+      expect(result).toBe('bar');
+    });
+
+    it('should resolve function with arguments', async () => {
+      const obj = { foo: (arg: string) => `bar-${arg}` };
+      const result = await resolvePath(['foo', 'suffix'])(obj);
+      expect(result).toBe('bar-suffix');
+    });
+
+    it('should resolve function can be called many times', async () => {
+      const obj1 = { foo: (arg: string) => `bar-${arg}` };
+      const obj2 = { foo: (arg: string) => `foo-${arg}` };
+      const resolver = resolvePath(['foo', 'suffix']);
+      const result1_1 = await resolver(obj1);
+      expect(result1_1).toBe('bar-suffix');
+      const result1_2 = await resolver(obj1);
+      expect(result1_2).toBe('bar-suffix');
+      const result2_1 = await resolver(obj2);
+      expect(result2_1).toBe('foo-suffix');
+      const result2_2 = await resolver(obj2);
+      expect(result2_2).toBe('foo-suffix');
+    });
+
+    it('should resolve nested function with arguments', async () => {
+      // Logic: obj.foo('arg1').bar
+      const obj = {
+        foo: (arg: string) => ({
+          bar: `baz-${arg}`,
+        }),
+      };
+      // For resolvePath, if function has args, it takes next item in array as arg
+      // So ['foo', 'arg1', 'bar'] -> obj.foo('arg1').bar
+      const result = await resolvePath(['foo', 'arg1', 'bar'])(obj);
+      expect(result).toBe('baz-arg1');
+    });
+
+    it('should handle missing property gracefully', async () => {
+      const obj = { foo: 'bar' };
+      const result = await resolvePath(['baz'])(obj);
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle null/undefined intermediate value', async () => {
+      const obj = { foo: null };
+      const result = await resolvePath(['foo', 'bar'])(obj);
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle complex mixed path', async () => {
+      const obj = {
+        a: {
+          b: async (arg: string) => ({
+            c: `value-${arg}`,
+          }),
+        },
+      };
+      // path: a -> b('arg1') -> c
+      const result = await resolvePath(['a', 'b', 'arg1', 'c'])(obj);
+      expect(result).toBe('value-arg1');
+    });
+
+    it('should resolve function with argument but no provided argument (undefined)', async () => {
+      const obj = { foo: (arg: string | undefined) => `bar-${arg}` };
+      const result = await resolvePath(['foo'])(obj);
+      expect(result).toBe('bar-undefined');
+    });
+
+    describe('array support', () => {
+      it('should resolve array at leaf and return array of values', async () => {
+        const obj = { items: [1, 2, 3] };
+        const result = await resolvePath(['items'])(obj);
+        expect(result).toEqual([1, 2, 3]);
+      });
+
+      it('should resolve path through array and return array of nested values', async () => {
+        const obj = {
+          list: [
+            { name: 'a' },
+            { name: 'b' },
+            { name: 'c' },
+          ],
+        };
+        const result = await resolvePath(['list', 'name'])(obj);
+        expect(result).toEqual(['a', 'b', 'c']);
+      });
+
+      it('should return empty array when array is empty', async () => {
+        const obj = { items: [] };
+        const result = await resolvePath(['items'])(obj);
+        expect(result).toEqual([]);
+      });
+
+      it('should resolve path through array of objects with deeper nesting', async () => {
+        const obj = {
+          groups: [
+            { meta: { id: 'g1' } },
+            { meta: { id: 'g2' } },
+          ],
+        };
+        const result = await resolvePath(['groups', 'meta', 'id'])(obj);
+        expect(result).toEqual(['g1', 'g2']);
+      });
+
+      it('should not include undefined for array elements missing the remaining path', async () => {
+        const obj = {
+          list: [
+            { name: 'a' },
+            {},
+            { name: 'c' },
+          ],
+        };
+        const result = await resolvePath(['list', 'name'])(obj);
+        expect(result).toEqual(['a', 'c']);
+      });
+
+      it('should handle array at root object and resolve path on each element', async () => {
+        const rootArray = [
+          { name: 'a' },
+          { name: 'b' },
+          { name: 'c' },
+        ];
+        const result = await resolvePath(['name'])(rootArray);
+        expect(result).toEqual(['a', 'b', 'c']);
+      });
+
+      it('should handle empty array at root object', async () => {
+        const result = await resolvePath(['name'])([]);
+        expect(result).toEqual([]);
+      });
+
+      it('should handle array at root with nested path', async () => {
+        const rootArray = [
+          { meta: { id: 'id1' } },
+          { meta: { id: 'id2' } },
+        ];
+        const result = await resolvePath(['meta', 'id'])(rootArray);
+        expect(result).toEqual(['id1', 'id2']);
+      });
+    });
+
+    describe('case-insensitive fallback', () => {
+      it('should resolve exact case-sensitive property first', async () => {
+        const obj = { Email: 'upper@example.com', email: 'lower@example.com' };
+        const result = await resolvePath(['email'])(obj);
+        expect(result).toBe('lower@example.com');
+      });
+
+      it('should fall back to case-insensitive match when exact key is missing', async () => {
+        const obj = { Email: 'upper@example.com' };
+        const result = await resolvePath(['email'])(obj);
+        expect(result).toBe('upper@example.com');
+      });
+
+      it('should fall back to case-insensitive match for nested paths', async () => {
+        const obj = { UserInfo: { Email: 'user@example.com' } };
+        const result = await resolvePath(['userinfo', 'email'])(obj);
+        expect(result).toBe('user@example.com');
+      });
+
+      it('should return undefined when no case-insensitive match exists', async () => {
+        const obj = { name: 'test' };
+        const result = await resolvePath(['email'])(obj);
+        expect(result).toBeUndefined();
+      });
+
+      it('should work with resolveDotPath for case-insensitive fallback', async () => {
+        const obj = { User_Info: { EMAIL: 'user@example.com' } };
+        const result = await resolveDotPath('user_info.email')(obj);
+        expect(result).toBe('user@example.com');
+      });
+    });
+  });
+
+  describe('case-insensitive mapping in groups', () => {
+    const resolveExpr = (expr: string) => (obj: unknown) => {
+      const record = obj as Record<string, unknown>;
+      return record[expr] as string | string[] | undefined;
+    };
+
+    it('should match group mapping case-sensitively first', async () => {
+      const conf = {
+        default_groups: [],
+        groups_expr: ['groups'],
+        group_splitter: undefined,
+        groups_mapping: [
+          { provider: 'Admin', platform: 'Administrators' },
+          { provider: 'admin', platform: 'LowercaseAdmins' },
+        ],
+        auto_create_groups: false,
+        prevent_default_groups: false,
+        extend_platform_groups: false,
+      };
+      const mapper = createGroupsMapper(conf, resolveExpr);
+      const result = await mapper({ groups: 'admin' });
+      expect(result).toEqual(['LowercaseAdmins']);
+    });
+
+    it('should fall back to case-insensitive match when no exact match', async () => {
+      const conf = {
+        default_groups: [],
+        groups_expr: ['groups'],
+        group_splitter: undefined,
+        groups_mapping: [
+          { provider: 'Admin', platform: 'Administrators' },
+        ],
+        auto_create_groups: false,
+        prevent_default_groups: false,
+        extend_platform_groups: false,
+      };
+      const mapper = createGroupsMapper(conf, resolveExpr);
+      const result = await mapper({ groups: 'admin' });
+      expect(result).toEqual(['Administrators']);
+    });
+
+    it('should return default groups when no mapping matches at all', async () => {
+      const conf = {
+        default_groups: ['DefaultGroup'],
+        groups_expr: ['groups'],
+        group_splitter: undefined,
+        groups_mapping: [
+          { provider: 'Admin', platform: 'Administrators' },
+        ],
+        auto_create_groups: false,
+        prevent_default_groups: false,
+        extend_platform_groups: false,
+      };
+      const mapper = createGroupsMapper(conf, resolveExpr);
+      const result = await mapper({ groups: 'viewer' });
+      expect(result).toEqual(['DefaultGroup']);
+    });
+  });
+
+  describe('case-insensitive mapping in organizations', () => {
+    const resolveExpr = (expr: string) => (obj: unknown) => {
+      const record = obj as Record<string, unknown>;
+      return record[expr] as string | string[] | undefined;
+    };
+
+    it('should fall back to case-insensitive match for organizations', async () => {
+      const conf = {
+        default_organizations: [],
+        organizations_expr: ['orgs'],
+        organizations_splitter: undefined,
+        organizations_mapping: [
+          { provider: 'MyOrg', platform: 'My Organization' },
+        ],
+        auto_create_organizations: false,
+      };
+      const mapper = createOrganizationsMapper(conf, resolveExpr);
+      const result = await mapper({ orgs: 'myorg' });
+      expect(result).toEqual(['My Organization']);
+    });
+  });
+});

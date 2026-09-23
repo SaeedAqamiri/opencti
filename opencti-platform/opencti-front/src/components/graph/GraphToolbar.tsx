@@ -1,0 +1,147 @@
+import Drawer from '@mui/material/Drawer';
+import React from 'react';
+import Divider from '@mui/material/Divider';
+import { useTheme } from '@mui/material/styles';
+import LinearProgress from '@mui/material/LinearProgress';
+import useGraphInteractions from './utils/useGraphInteractions';
+import SearchInput from '../SearchInput';
+import type { Theme } from '../Theme';
+import GraphToolbarDisplayTools, { GraphToolbarDisplayToolsProps } from './components/GraphToolbarDisplayTools';
+import GraphToolbarSelectTools from './components/GraphToolbarSelectTools';
+import GraphToolbarFilterTools from './components/GraphToolbarFilterTools';
+import GraphToolbarContentTools, { GraphToolbarContentToolsProps } from './components/GraphToolbarContentTools';
+import GraphToolbarTimeRange from './components/GraphToolbarTimeRange';
+import { useGraphContext } from './GraphContext';
+import GraphToolbarCorrelationTools from './components/GraphToolbarCorrelationTools';
+import GraphToolbarExpandTools, { GraphToolbarExpandToolsProps } from './components/GraphToolbarExpandTools';
+import useAuth from '../../utils/hooks/useAuth';
+import { OPEN_BAR_WIDTH, SMALL_BAR_WIDTH } from '@components/nav/navBarConstants';
+import useDraftContext, { DRAFT_TOOLBAR_HEIGHT } from '../../utils/hooks/useDraftContext';
+import { RIGHT_BAR_LAYER, fdsLayerClass, layerInputVars } from '../../utils/fdsLayer';
+
+export type GraphToolbarProps = GraphToolbarContentToolsProps & GraphToolbarExpandToolsProps & GraphToolbarDisplayToolsProps & {
+  warning?: React.ReactNode;
+};
+
+const GraphToolbar = ({
+  onInvestigationExpand,
+  onInvestigationRollback,
+  onUnfixNodes,
+  warning,
+  ...props
+}: GraphToolbarProps) => {
+  const theme = useTheme<Theme>();
+  const draftContext = useDraftContext();
+  const { bannerSettings: { bannerHeightNumber } } = useAuth();
+  const navOpen = localStorage.getItem('navOpen') === 'true';
+  const { selectBySearch } = useGraphInteractions();
+
+  const posBottom = draftContext ? DRAFT_TOOLBAR_HEIGHT : 0;
+
+  const {
+    graphState: {
+      showTimeRange,
+      showLinearProgress,
+      loadingCurrent,
+      loadingTotal,
+      search,
+    },
+    context,
+  } = useGraphContext();
+
+  const isLoadingData = (loadingCurrent ?? 0) < (loadingTotal ?? 0);
+
+  return (
+    <Drawer
+      anchor="bottom"
+      variant="permanent"
+      slotProps={{ paper: {
+        elevation: 1,
+        className: fdsLayerClass(RIGHT_BAR_LAYER),
+        sx: { ...layerInputVars },
+        style: {
+          zIndex: 1,
+          paddingLeft: navOpen ? OPEN_BAR_WIDTH : SMALL_BAR_WIDTH,
+          right: 'var(--chatbot-sidebar-width, 0px)',
+          transition: 'right 225ms cubic-bezier(0.4, 0, 0.2, 1), height 0.2s ease',
+          height: showTimeRange ? 134 : 54,
+          overflow: 'hidden',
+          marginBottom: bannerHeightNumber,
+          bottom: posBottom,
+        },
+      } }}
+    >
+      <LinearProgress
+        style={{
+          width: '100%',
+          height: 2,
+          position: 'absolute',
+          top: -1,
+          visibility: showLinearProgress || isLoadingData ? 'visible' : 'hidden',
+        }}
+      />
+      <div
+        className="hide-scrollbar"
+        style={{
+          height: 54,
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: theme.spacing(0.5),
+          padding: `0 ${theme.spacing(1)}`,
+          overflowX: 'scroll',
+          overflowY: 'hidden',
+        }}
+      >
+        <GraphToolbarDisplayTools onUnfixNodes={onUnfixNodes} />
+        <Divider sx={{ margin: 1, height: '80%' }} orientation="vertical" />
+
+        <GraphToolbarSelectTools />
+        <Divider sx={{ margin: 1, height: '80%' }} orientation="vertical" />
+
+        <GraphToolbarFilterTools />
+        <Divider sx={{ margin: 1, height: '80%' }} orientation="vertical" />
+
+        {warning && (
+          <div style={{ flexShrink: 1, minWidth: 0, marginRight: theme.spacing(1) }}>
+            {warning}
+          </div>
+        )}
+
+        {context === 'correlation' && (
+          <>
+            <GraphToolbarCorrelationTools />
+            <Divider sx={{ margin: 1, marginRight: 2, height: '80%' }} orientation="vertical" />
+          </>
+        )}
+
+        <div style={{ flex: 1 }}>
+          {context !== 'analyses' && (
+            <SearchInput
+              keyword={search ?? ''}
+              variant="thin"
+              onSubmit={selectBySearch}
+            />
+          )}
+        </div>
+
+        {context === 'investigation' && (
+          <>
+            <Divider sx={{ margin: 1, height: '80%' }} orientation="vertical" />
+            <GraphToolbarExpandTools
+              onInvestigationExpand={onInvestigationExpand}
+              onInvestigationRollback={onInvestigationRollback}
+            />
+            <Divider sx={{ margin: 1, height: '80%' }} orientation="vertical" />
+          </>
+        )}
+
+        {context !== 'analyses' && <GraphToolbarContentTools {...props} />}
+      </div>
+
+      <GraphToolbarTimeRange />
+    </Drawer>
+  );
+};
+
+export default GraphToolbar;

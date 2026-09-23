@@ -1,0 +1,278 @@
+import React, { FunctionComponent } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import { LayersClearOutlined, MoreVert } from '@mui/icons-material';
+import Skeleton from '@mui/material/Skeleton';
+import { Chip } from '@filigran/design-system';
+import makeStyles from '@mui/styles/makeStyles';
+import { Theme } from '@mui/material/styles/createTheme';
+import { RetentionLinesPaginationQuery$variables } from '@components/settings/retention/__generated__/RetentionLinesPaginationQuery.graphql';
+import { RetentionLine_node$key } from '@components/settings/retention/__generated__/RetentionLine_node.graphql';
+import { InformationOutline } from 'mdi-material-ui';
+import Tooltip from '@mui/material/Tooltip';
+import Box from '@mui/material/Box';
+import { useFormatter } from '../../../../components/i18n';
+import RetentionPopover from './RetentionPopover';
+import { deserializeFilterGroupForFrontend, isFilterGroupNotEmpty } from '../../../../utils/filters/filtersUtils';
+import FilterIconButton from '../../../../components/FilterIconButton';
+import { DataColumns } from '../../../../components/list_lines';
+import ItemBoolean from '../../../../components/ItemBoolean';
+import { bodyItemStyle } from '../../../../components/list_lines/listLineStyles';
+
+const useStyles = makeStyles<Theme>((theme) => ({
+  item: {
+    paddingLeft: 10,
+    height: 50,
+  },
+  itemIcon: {
+    color: theme.palette.primary.main,
+  },
+  bodyItem: bodyItemStyle,
+  itemIconDisabled: {
+    color: theme.palette.grey[700],
+  },
+}));
+
+const RetentionLineFragment = graphql`
+    fragment RetentionLine_node on RetentionRule {
+        id
+        name
+        max_retention
+        retention_unit
+        last_execution_date
+        remaining_count
+        filters
+        scope
+        active
+    }
+`;
+
+interface RetentionLineProps {
+  dataColumns: DataColumns;
+  node: RetentionLine_node$key;
+  paginationOptions: RetentionLinesPaginationQuery$variables;
+}
+
+export const RetentionLine: FunctionComponent<RetentionLineProps> = ({ dataColumns, node, paginationOptions }) => {
+  const classes = useStyles();
+  const { nsdt, n, t_i18n } = useFormatter();
+  const data = useFragment(RetentionLineFragment, node);
+
+  const isActive = data.active;
+  const filters = deserializeFilterGroupForFrontend(data.filters);
+  let scopeSeverity: 'low' | 'info' | 'high' | 'critical' = 'low';
+  let appliedOnContent = t_i18n('Everything');
+  if (data.scope === 'file') {
+    scopeSeverity = 'critical';
+    appliedOnContent = t_i18n('Global files');
+  } else if (data.scope === 'workbench') {
+    scopeSeverity = 'info';
+    appliedOnContent = t_i18n('All workbenches');
+  } else if (data.scope === 'history') {
+    scopeSeverity = 'critical';
+    appliedOnContent = t_i18n('Knowledge history logs');
+  } else if (data.scope === 'activity') {
+    scopeSeverity = 'high';
+    appliedOnContent = t_i18n('Activity logs');
+  }
+  return (
+    <ListItem
+      classes={{ root: classes.item }}
+      divider={true}
+      secondaryAction={(
+        <RetentionPopover
+          retentionRuleId={data.id}
+          paginationOptions={paginationOptions}
+        />
+      )}
+    >
+      <ListItemIcon classes={{ root: classes.itemIcon }}>
+        <LayersClearOutlined />
+      </ListItemIcon>
+      <ListItemText
+        primary={(
+          <div>
+            <div className={classes.bodyItem} style={{ width: dataColumns.name.width }}>
+              {data.name}
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.max_retention.width }}
+            >
+              {data.max_retention} {t_i18n(data.retention_unit)}
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.last_execution_date.width }}
+            >
+              {nsdt(data.last_execution_date)}
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.remaining_count.width }}
+            >
+              {n(data.remaining_count)}
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.scope.width }}
+            >
+              <Chip
+                severity={scopeSeverity}
+                label={t_i18n(data.scope)}
+              />
+            </div>
+            {dataColumns.active && (
+              <div
+                className={classes.bodyItem}
+                style={{ width: dataColumns.active.width }}
+              >
+                <ItemBoolean
+                  status={isActive}
+                  label={isActive ? t_i18n('Active') : t_i18n('Inactive')}
+                />
+              </div>
+            )}
+            {isFilterGroupNotEmpty(filters) ? (
+              <FilterIconButton
+                filters={filters}
+                dataColumns={dataColumns}
+                variant="small"
+                redirection
+              />
+            ) : (
+              <div className={classes.bodyItem} style={{ width: dataColumns.filters.width }}>
+                <span>{appliedOnContent}</span>
+                {data.scope !== 'knowledge' && data.scope !== 'history' && data.scope !== 'activity'
+                  && (
+                    <Tooltip
+                      title={`${t_i18n('Files contained in')} ${t_i18n('Data')}/${t_i18n('Import')}`}
+                    >
+                      <InformationOutline
+                        fontSize="small"
+                        color="primary"
+                        sx={{ ml: 1 }}
+                      />
+                    </Tooltip>
+                  )
+                }
+              </div>
+            )}
+          </div>
+        )}
+      />
+    </ListItem>
+  );
+};
+
+export const RetentionLineDummy = ({ dataColumns }: { dataColumns: DataColumns }) => {
+  const classes = useStyles();
+  return (
+    <ListItem
+      classes={{ root: classes.item }}
+      divider={true}
+      secondaryAction={(
+        <Box sx={{ root: classes.itemIconDisabled }}>
+          <MoreVert />
+        </Box>
+      )}
+    >
+      <ListItemIcon classes={{ root: classes.itemIcon }}>
+        <Skeleton
+          animation="wave"
+          variant="circular"
+          width={30}
+          height={30}
+        />
+      </ListItemIcon>
+      <ListItemText
+        primary={(
+          <div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.name.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="90%"
+                height="100%"
+              />
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.max_retention.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="90%"
+                height="100%"
+              />
+            </div>
+
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.last_execution_date.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="20%"
+                height="100%"
+              />
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.remaining_count.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="20%"
+                height="100%"
+              />
+            </div>
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.scope.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="70%"
+                height="100%"
+              />
+            </div>
+            {dataColumns.active && (
+              <div
+                className={classes.bodyItem}
+                style={{ width: dataColumns.active.width }}
+              >
+                <Skeleton
+                  animation="wave"
+                  variant="rectangular"
+                  width="70%"
+                  height="100%"
+                />
+              </div>
+            )}
+            <div
+              className={classes.bodyItem}
+              style={{ width: dataColumns.filters.width }}
+            >
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="70%"
+                height="100%"
+              />
+            </div>
+          </div>
+        )}
+      />
+    </ListItem>
+  );
+};

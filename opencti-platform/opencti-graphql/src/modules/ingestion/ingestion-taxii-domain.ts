@@ -1,0 +1,234 @@
+import { type BasicStoreEntityIngestionTaxii, ENTITY_TYPE_INGESTION_TAXII, type StoreEntityIngestionTaxii } from './ingestion-types';
+import { createEntity, deleteElementById, patchAttribute, updateAttribute } from '../../database/middleware';
+import { fullEntitiesList, pageEntitiesConnection, storeLoadById } from '../../database/middleware-loader';
+import { BUS_TOPICS, PLATFORM_VERSION } from '../../config/conf';
+import { publishUserAction } from '../../listener/UserActionListener';
+import { notify } from '../../database/redis';
+import { ABSTRACT_INTERNAL_OBJECT } from '../../schema/general';
+import type { AuthContext, AuthUser } from '../../types/user';
+import { type EditInput, type IngestionTaxiiAddAutoUserInput, type IngestionTaxiiAddInput } from '../../generated/graphql';
+import { addAuthenticationCredentials, verifyIngestionAuthenticationContent, verifyIngestionUri } from './ingestion-common';
+import { encryptIngestionCredential, decryptIngestionCredential } from './ingestion-common';
+import { registerConnectorForIngestion, unregisterConnectorForIngestion } from '../../domain/connector';
+import { createOnTheFlyUser } from '../user/user-domain';
+import type { FileHandle } from 'fs/promises';
+import { extractContentFrom } from '../../utils/fileToContent';
+import { isCompatibleVersionWithMinimal } from '../../utils/version';
+import { FunctionalError } from '../../config/errors';
+const MINIMAL_TAXII_FEED_COMPATIBLE_VERSION = '6.9.4';
+
+export const findTaxiiIngestionById = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  return storeLoadById<BasicStoreEntityIngestionTaxii>(context, user, ingestionId, ENTITY_TYPE_INGESTION_TAXII);
+};
+
+export const findTaxiiIngestionPaginated = async (context: AuthContext, user: AuthUser, opts = {}) => {
+  return pageEntitiesConnection<BasicStoreEntityIngestionTaxii>(context, user, [ENTITY_TYPE_INGESTION_TAXII], opts);
+};
+
+export const findAllTaxiiIngestion = async (context: AuthContext, user: AuthUser, opts = {}) => {
+  return fullEntitiesList<BasicStoreEntityIngestionTaxii>(context, user, [ENTITY_TYPE_INGESTION_TAXII], opts);
+};
+
+export const ingestionTaxiiAdd = async (context: AuthContext, user: AuthUser, input: IngestionTaxiiAddInput) => {
+  verifyIngestionUri(input.uri);
+  if (input.automatic_user) {
+    const onTheFlyCreatedUser = await createOnTheFlyUser(
+      context,
+      user,
+      { userName: input.user_id, serviceAccount: true, confidenceLevel: input.confidence_level },
+    );
+    input = { ...input, user_id: onTheFlyCreatedUser.id };
+  }
+  if (input.authentication_value) {
+    verifyIngestionAuthenticationContent(input.authentication_type, input.authentication_value);
+  }
+
+  const { automatic_user: _automatic_user, confidence_level: _confidence_level, ...taxiiFeedToCreate } = input;
+  if (taxiiFeedToCreate.authentication_value) {
+    taxiiFeedToCreate.authentication_value = await encryptIngestionCredential(taxiiFeedToCreate.authentication_value);
+  }
+  const { element, isCreation } = await createEntity(context, user, taxiiFeedToCreate, ENTITY_TYPE_INGESTION_TAXII, { complete: true });
+  if (isCreation) {
+    await registerConnectorForIngestion(context, {
+      id: element.id,
+      type: 'TAXII',
+      name: element.name,
+      is_running: element.ingestion_running ?? false,
+      connector_user_id: input.user_id,
+    });
+    await publishUserAction({
+      user,
+      event_type: 'mutation',
+      event_scope: 'create',
+      event_access: 'administration',
+      message: `creates taxii ingestion \`${input.name}\``,
+      context_data: { id: element.id, entity_type: ENTITY_TYPE_INGESTION_TAXII, input },
+    });
+  }
+  return element;
+};
+
+export interface TaxiiIngestionPatch {
+  current_state_cursor?: string | undefined;
+  last_execution_date?: string;
+  last_execution_status?: string;
+  added_after_start?: string;
+}
+
+export const patchTaxiiIngestion = async (context: AuthContext, user: AuthUser, id: string, patch: TaxiiIngestionPatch) => {
+  const verifiedPatch = patch;
+  if (patch.current_state_cursor) {
+    verifiedPatch.current_state_cursor = `${patch.current_state_cursor}`;
+  }
+  const patched = await patchAttribute<StoreEntityIngestionTaxii>(context, user, id, ENTITY_TYPE_INGESTION_TAXII, verifiedPatch);
+  return patched.element;
+};
+
+export const ingestionTaxiiEditField = async (context: AuthContext, user: AuthUser, ingestionId: string, input: EditInput[]) => {
+  const uriField = input.find((editInput) => editInput.key === 'uri');
+  if (uriField && uriField.value[0]) {
+    verifyIngestionUri(uriField.value[0]);
+  }
+  const patchInput = [...input];
+
+  if (input.some((editInput) => editInput.key === 'authentication_value')) {
+    const { authentication_value: encrypted_value, authentication_type } = await findTaxiiIngestionById(context, user, ingestionId);
+    const authentication_value = await decryptIngestionCredential(encrypted_value);
+    const authenticationValueField = input.find((editInput) => editInput.key === 'authentication_value');
+    if (authenticationValueField?.value[0]) {
+      verifyIngestionAuthenticationContent(authentication_type, authenticationValueField?.value[0]);
+    }
+    const updatedAuthenticationValue = addAuthenticationCredentials(
+      authentication_value,
+      authenticationValueField?.value[0],
+      authentication_type,
+    );
+    const encryptedAuthenticationValue = await encryptIngestionCredential(updatedAuthenticationValue);
+
+    const updatedInput = patchInput.map((editInput) => {
+      if (editInput.key === 'authentication_value') {
+        return {
+          ...editInput,
+          value: [encryptedAuthenticationValue],
+        };
+      }
+      return editInput;
+    });
+
+    patchInput.splice(0, patchInput.length, ...updatedInput);
+  }
+
+  // Reset `authentication_value` on `authentication_type` change
+  if (input.some((editInput) => editInput.key === 'authentication_type')) {
+    const resetAuthenticationValue: EditInput = {
+      key: 'authentication_value',
+      value: [''],
+    };
+    patchInput.push(resetAuthenticationValue);
+  }
+
+  if (input.some((editInput) => editInput.key === 'added_after_start')) {
+    const cursorEditInput: EditInput = {
+      key: 'current_state_cursor',
+      value: [undefined],
+    };
+    patchInput.push(cursorEditInput);
+  }
+
+  const { element } = await updateAttribute<StoreEntityIngestionTaxii>(context, user, ingestionId, ENTITY_TYPE_INGESTION_TAXII, patchInput);
+  await registerConnectorForIngestion(context, {
+    id: element.id,
+    type: 'TAXII',
+    name: element.name,
+    is_running: element.ingestion_running ?? false,
+    connector_user_id: element.user_id,
+  });
+
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `updates \`${input.map((i) => i.key).join(', ')}\` for taxii ingestion \`${element.name}\``,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_TAXII, input },
+  });
+
+  return notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, element, user);
+};
+
+export const ingestionTaxiiDelete = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  const deleted = await deleteElementById<StoreEntityIngestionTaxii>(context, user, ingestionId, ENTITY_TYPE_INGESTION_TAXII);
+  await unregisterConnectorForIngestion(context, deleted.id);
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'delete',
+    event_access: 'administration',
+    message: `deletes taxii ingestion \`${deleted.name}\``,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_TAXII, input: deleted },
+  });
+  return ingestionId;
+};
+
+export const ingestionTaxiiResetState = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  await patchTaxiiIngestion(context, user, ingestionId, { current_state_cursor: undefined });
+  const ingestionUpdated = await findTaxiiIngestionById(context, user, ingestionId);
+
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `reset state of taxii ingestion \`${ingestionUpdated.name}\``,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_TAXII, input: ingestionUpdated },
+  });
+  return notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, ingestionUpdated, user);
+};
+
+export const ingestionTaxiiAddAutoUser = async (context: AuthContext, user: AuthUser, ingestionId: string, input: IngestionTaxiiAddAutoUserInput) => {
+  const onTheFlyCreatedUser = await createOnTheFlyUser(context, user,
+    { userName: input.user_name, confidenceLevel: input.confidence_level, serviceAccount: true });
+
+  return ingestionTaxiiEditField(context, user, ingestionId, [{ key: 'user_id', value: [onTheFlyCreatedUser.id] }]);
+};
+
+export const taxiiFeedAddInputFromImport = async (file: Promise<FileHandle>) => {
+  const parsedData = await extractContentFrom(file);
+
+  // check platform version compatibility
+  if (!isCompatibleVersionWithMinimal(parsedData.openCTI_version, MINIMAL_TAXII_FEED_COMPATIBLE_VERSION)) {
+    throw FunctionalError(
+      `Invalid version of the platform. Please upgrade your OpenCTI. Minimal version required: ${MINIMAL_TAXII_FEED_COMPATIBLE_VERSION}`,
+      { reason: parsedData.openCTI_version },
+    );
+  }
+
+  return parsedData.configuration;
+};
+
+export const taxiiFeedExport = async (ingestionTaxii: BasicStoreEntityIngestionTaxii) => {
+  const {
+    name,
+    description,
+    scheduling_period,
+    uri,
+    version,
+    collection,
+    authentication_type,
+    added_after_start,
+  } = ingestionTaxii;
+  return JSON.stringify({
+    openCTI_version: PLATFORM_VERSION,
+    type: 'taxiiFeeds',
+    configuration: {
+      name,
+      description,
+      scheduling_period,
+      uri,
+      version,
+      collection,
+      authentication_type,
+      added_after_start,
+    },
+  });
+};

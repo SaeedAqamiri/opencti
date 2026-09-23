@@ -1,0 +1,156 @@
+import ConnectorWorkLine from '@components/data/connectors/ConnectorWorkLine';
+import { Stack } from '@mui/material';
+import Typography from '@mui/material/Typography';
+import { FunctionComponent, useEffect } from 'react';
+import { createRefetchContainer, graphql, RelayRefetchProp } from 'react-relay';
+import { interval } from 'rxjs';
+import Card from '../../../../components/common/card/Card';
+import CardTitle from '../../../../components/common/card/CardTitle';
+import { useFormatter } from '../../../../components/i18n';
+import { FIVE_SECONDS } from '../../../../utils/Time';
+import { ConnectorWorksQuery$variables } from './__generated__/ConnectorWorksQuery.graphql';
+import { ConnectorWorks_data$data } from './__generated__/ConnectorWorks_data.graphql';
+
+const interval$ = interval(FIVE_SECONDS);
+
+export const connectorWorksWorkDeletionMutation = graphql`
+  mutation ConnectorWorksWorkDeletionMutation($id: ID!) {
+    workEdit(id: $id) {
+      delete
+    }
+  }
+`;
+
+export type WorkMessages = NonNullable<NonNullable<NonNullable<ConnectorWorks_data$data['works']>['edges']>[0]>['node']['errors'];
+
+interface ConnectorWorksComponentProps {
+  data: ConnectorWorks_data$data;
+  options: ConnectorWorksQuery$variables[];
+  relay: RelayRefetchProp;
+  inProgress?: boolean;
+}
+
+const ConnectorWorksComponent: FunctionComponent<ConnectorWorksComponentProps> = ({
+  data,
+  options,
+  relay,
+  inProgress,
+}) => {
+  const works = data.works?.edges ?? [];
+  const { t_i18n } = useFormatter();
+
+  useEffect(() => {
+    const subscription = interval$.subscribe(() => {
+      relay.refetch(options);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const title = `${inProgress ? t_i18n('In progress works') : t_i18n('Completed works')}${` (${works.length})`}`;
+
+  return (
+    <Stack gap={1}>
+      <CardTitle>{title}</CardTitle>
+      {works.length === 0 && (
+        <Card>
+          <Typography align="center">
+            {t_i18n('No work')}
+          </Typography>
+        </Card>
+      )}
+      {works.map((workEdge) => {
+        const work = workEdge?.node;
+        if (!work) return null;
+        return (
+          <Card key={work.id}>
+            <ConnectorWorkLine
+              workId={work.id}
+              workName={work.name}
+              workStatus={work.status}
+              workReceivedTime={work.received_time}
+              workEndTime={work.completed_time}
+              workExpectedNumber={work.tracking?.import_expected_number}
+              workProcessedNumber={work.tracking?.import_processed_number}
+              workErrors={work.errors}
+              readOnly
+            />
+          </Card>
+        );
+      })}
+    </Stack>
+  );
+};
+
+export const connectorWorksQuery = graphql`
+  query ConnectorWorksQuery(
+    $count: Int
+    $orderBy: WorksOrdering
+    $orderMode: OrderingMode
+    $filters: FilterGroup
+  ) {
+    ...ConnectorWorks_data
+      @arguments(
+        count: $count
+        orderBy: $orderBy
+        orderMode: $orderMode
+        filters: $filters
+      )
+  }
+`;
+
+const ConnectorWorks = createRefetchContainer(
+  ConnectorWorksComponent,
+  {
+    data: graphql`
+      fragment ConnectorWorks_data on Query
+      @argumentDefinitions(
+        count: { type: "Int" }
+        orderBy: { type: "WorksOrdering", defaultValue: timestamp }
+        orderMode: { type: "OrderingMode", defaultValue: desc }
+        filters: { type: "FilterGroup" }
+      ) {
+        works(
+          first: $count
+          orderBy: $orderBy
+          orderMode: $orderMode
+          filters: $filters
+        ) {
+          edges {
+            node {
+              id
+              name
+              user {
+                name
+              }
+              timestamp
+              status
+              event_source_id
+              received_time
+              processed_time
+              completed_time
+              tracking {
+                import_expected_number
+                import_processed_number
+              }
+              messages {
+                timestamp
+                message
+                sequence
+                source
+              }
+              errors {
+                timestamp
+                message
+                sequence
+                source
+              }
+            }
+          }
+        }
+      }
+    `,
+  },
+  connectorWorksQuery,
+);
+
+export default ConnectorWorks;

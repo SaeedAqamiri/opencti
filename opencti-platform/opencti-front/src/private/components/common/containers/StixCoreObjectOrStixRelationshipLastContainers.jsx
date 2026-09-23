@@ -1,0 +1,465 @@
+import React from 'react';
+import { Link } from 'react-router';
+import { graphql } from 'react-relay';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Skeleton from '@mui/material/Skeleton';
+import Tooltip from '@mui/material/Tooltip';
+import { makeStyles } from '@mui/styles';
+import { ListItemButton } from '@mui/material';
+import Card from '@common/card/Card';
+import { QueryRenderer } from '../../../../relay/environment';
+import ItemIcon from '../../../../components/ItemIcon';
+import ItemMarkings from '../../../../components/ItemMarkings';
+import { resolveLink } from '../../../../utils/Entity';
+import ItemEntityType from '../../../../components/ItemEntityType';
+import { useFormatter } from '../../../../components/i18n';
+import { EMPTY_VALUE } from '../../../../utils/String';
+
+const useStyles = makeStyles((theme) => ({
+  item: {
+    height: 50,
+    minHeight: 50,
+    maxHeight: 50,
+    paddingRight: 0,
+  },
+  bodyItem: {
+    height: 25,
+    fontSize: 13,
+    float: 'left',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    paddingRight: 10,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  itemIcon: {
+    marginRight: 0,
+    color: theme.palette.primary.main,
+  },
+}));
+
+const stixCoreObjectOrStixRelationshipLastContainersQuery = graphql`
+  query StixCoreObjectOrStixRelationshipLastContainersQuery(
+    $first: Int
+    $orderBy: ContainersOrdering
+    $orderMode: OrderingMode
+    $filters: FilterGroup
+  ) {
+    containers(
+      first: $first
+      orderBy: $orderBy
+      orderMode: $orderMode
+      filters: $filters
+    ) {
+      edges {
+        node {
+          id
+          created
+          workflowEnabled
+          entity_type
+          status {
+            id
+            order
+            template {
+              name
+              color
+            }
+          }
+          creators {
+            id
+            name
+          }
+          ... on Note {
+            attribute_abstract
+            content
+            created
+          }
+          ... on Opinion {
+            opinion
+            created
+          }
+          ... on ObservedData {
+            name
+            first_observed
+            last_observed
+          }
+          ... on Report {
+            name
+          }
+          ... on Grouping {
+            name
+            created
+          }
+          ... on Case {
+            name
+            created
+          }
+          ... on Task {
+            name
+          }
+          createdBy {
+            ... on Identity {
+              id
+              name
+              entity_type
+            }
+          }
+          objectMarking {
+            id
+            definition_type
+            definition
+            x_opencti_order
+            x_opencti_color
+          }
+          objectLabel {
+            id
+            value
+            color
+          }
+          ... on ObservedData {
+            name
+            objects(first: 1) {
+              edges {
+                node {
+                  ... on StixCoreObject {
+                    id
+                    entity_type
+                    parent_types
+                    created_at
+                    createdBy {
+                      ... on Identity {
+                        id
+                        name
+                        entity_type
+                      }
+                    }
+                    objectMarking {
+                      id
+                      definition_type
+                      definition
+                      x_opencti_order
+                      x_opencti_color
+                    }
+                  }
+                  ... on AttackPattern {
+                    name
+                    description
+                    x_mitre_id
+                  }
+                  ... on Campaign {
+                    name
+                    description
+                    first_seen
+                    last_seen
+                  }
+                  ... on Note {
+                    attribute_abstract
+                  }
+                  ... on ObservedData {
+                    name
+                    first_observed
+                    last_observed
+                  }
+                  ... on Opinion {
+                    opinion
+                  }
+                  ... on Report {
+                    name
+                    description
+                  }
+                  ... on CourseOfAction {
+                    name
+                    description
+                  }
+                  ... on Individual {
+                    name
+                    description
+                  }
+                  ... on Organization {
+                    name
+                    description
+                  }
+                  ... on Sector {
+                    name
+                    description
+                  }
+                  ... on System {
+                    name
+                    description
+                  }
+                  ... on Indicator {
+                    name
+                    description
+                    valid_from
+                  }
+                  ... on Infrastructure {
+                    name
+                    description
+                  }
+                  ... on IntrusionSet {
+                    name
+                    description
+                    first_seen
+                    last_seen
+                  }
+                  ... on Position {
+                    name
+                    description
+                  }
+                  ... on City {
+                    name
+                    description
+                  }
+                  ... on AdministrativeArea {
+                    name
+                    description
+                  }
+                  ... on Country {
+                    name
+                    description
+                  }
+                  ... on Region {
+                    name
+                    description
+                  }
+                  ... on Malware {
+                    name
+                    description
+                    first_seen
+                    last_seen
+                  }
+                  ... on ThreatActor {
+                    name
+                    description
+                    first_seen
+                    last_seen
+                  }
+                  ... on Tool {
+                    name
+                    description
+                  }
+                  ... on Vulnerability {
+                    name
+                    description
+                  }
+                  ... on Incident {
+                    name
+                    description
+                    first_seen
+                    last_seen
+                  }
+                  ... on Event {
+                    name
+                    description
+                    start_time
+                    stop_time
+                  }
+                  ... on Channel {
+                    name
+                    description
+                  }
+                  ... on Narrative {
+                    name
+                    description
+                  }
+                  ... on Language {
+                    name
+                  }
+                  ... on DataComponent {
+                    name
+                  }
+                  ... on DataSource {
+                    name
+                  }
+                  ... on Case {
+                    name
+                  }
+                  ... on Task {
+                    name
+                  }
+                  ... on StixCyberObservable {
+                    observable_value
+                    x_opencti_description
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const StixCoreObjectOrStixRelationshipLastContainers = (props) => {
+  const { stixCoreObjectOrStixRelationshipId = null, authorId = null } = props;
+  const { t_i18n, fsd } = useFormatter();
+  const classes = useStyles();
+  const filtersContent = [
+    {
+      key: 'entity_type',
+      values: ['Report', 'Case', 'Observed-Data', 'Grouping', 'Task'],
+    },
+  ];
+  if (authorId) {
+    filtersContent.push({ key: 'createdBy', values: [authorId] });
+  }
+  if (stixCoreObjectOrStixRelationshipId) {
+    filtersContent.push({
+      key: 'objects',
+      values: [stixCoreObjectOrStixRelationshipId],
+    });
+  }
+  const filters = {
+    mode: 'and',
+    filters: filtersContent,
+    filterGroups: [],
+  };
+  return (
+    <Card
+      padding="horizontal"
+      title={authorId
+        ? t_i18n('Latest containers authored by this entity')
+        : t_i18n('Latest containers about the object')
+      }
+    >
+      <QueryRenderer
+        query={stixCoreObjectOrStixRelationshipLastContainersQuery}
+        variables={{
+          first: 8,
+          orderBy: 'created',
+          orderMode: 'desc',
+          filters,
+        }}
+        render={({ props: renderProps }) => {
+          if (renderProps && renderProps.containers) {
+            if (renderProps.containers.edges.length > 0) {
+              return (
+                <>
+                  <List>
+                    {renderProps.containers.edges.map((containerEdge) => {
+                      const container = containerEdge.node;
+                      return (
+                        <ListItemButton
+                          key={container.id}
+                          dense={true}
+                          classes={{ root: classes.item }}
+                          divider={true}
+                          component={Link}
+                          to={`${resolveLink(container.entity_type)}/${
+                            container.id
+                          }`}
+                        >
+                          <ListItemIcon>
+                            <ItemIcon type={container.entity_type} />
+                          </ListItemIcon>
+                          <ListItemText
+                            primary={(
+                              <>
+                                <div
+                                  className={classes.bodyItem}
+                                  style={{ width: '12%' }}
+                                >
+                                  <ItemEntityType entityType={container.entity_type} />
+                                </div>
+                                <Tooltip title={container.name}>
+                                  <div className={classes.bodyItem} style={{ width: '37%' }}>
+                                    {container.name}
+                                  </div>
+                                </Tooltip>
+                                <div className={classes.bodyItem} style={{ width: '20%' }}>
+                                  {container.createdBy?.name ?? EMPTY_VALUE}
+                                </div>
+                                <div className={classes.bodyItem} style={{ width: '12%' }}>
+                                  {fsd(container.created)}
+                                </div>
+                                <div className={classes.bodyItem} style={{ width: '15%' }}>
+                                  <ItemMarkings
+                                    variant="inList"
+                                    markingDefinitions={container.objectMarking ?? []}
+                                    limit={1}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          />
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                </>
+              );
+            }
+            return (
+              <div
+                style={{
+                  display: 'table',
+                  height: '100%',
+                  width: '100%',
+                  paddingTop: 15,
+                  paddingBottom: 15,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'table-cell',
+                    verticalAlign: 'middle',
+                    textAlign: 'center',
+                  }}
+                >
+                  {t_i18n('No containers about this entity.')}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <List>
+              {Array.from(Array(5), (e, i) => (
+                <ListItem
+                  key={i}
+                  dense={true}
+                  divider={true}
+
+                >
+                  <ListItemIcon classes={{ root: classes.itemIcon }}>
+                    <Skeleton
+                      animation="wave"
+                      variant="circular"
+                      width={30}
+                      height={30}
+                    />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={(
+                      <Skeleton
+                        animation="wave"
+                        variant="rectangular"
+                        width="90%"
+                        height={15}
+                        style={{ marginBottom: 10 }}
+                      />
+                    )}
+                    secondary={(
+                      <Skeleton
+                        animation="wave"
+                        variant="rectangular"
+                        width="90%"
+                        height={15}
+                      />
+                    )}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          );
+        }}
+      />
+    </Card>
+  );
+};
+
+export default StixCoreObjectOrStixRelationshipLastContainers;

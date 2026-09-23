@@ -1,0 +1,468 @@
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import Card from '@common/card/Card';
+import Dialog from '@common/dialog/Dialog';
+import { Add, BrushOutlined, Delete } from '@mui/icons-material';
+import DialogActions from '@mui/material/DialogActions';
+import Grid from '@mui/material/Grid';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/material/styles';
+import { Formik } from 'formik';
+import { InformationOutline } from 'mdi-material-ui';
+import * as PropTypes from 'prop-types';
+import { useState } from 'react';
+import ItemAssignees from '../../../../components/ItemAssignees';
+import ItemAuthor from '../../../../components/ItemAuthor';
+import ItemBoolean from '../../../../components/ItemBoolean';
+import ItemConfidence from '../../../../components/ItemConfidence';
+import ItemCopy from '../../../../components/ItemCopy';
+import ItemCreators from '../../../../components/ItemCreators';
+import ItemMarkings from '../../../../components/ItemMarkings';
+import ItemOpenVocab from '../../../../components/ItemOpenVocab';
+import ItemParticipants from '../../../../components/ItemParticipants';
+import ItemPatternType from '../../../../components/ItemPatternType';
+import ItemStatus from '../../../../components/ItemStatus';
+import Label from '../../../../components/common/label/Label';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation, MESSAGING$ } from '../../../../relay/environment';
+import Security from '../../../../utils/Security';
+import { fieldSpacingContainerStyle } from '../../../../utils/field';
+import { KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
+import StixCoreObjectOpinions from '../../analyses/opinions/StixCoreObjectOpinions';
+import ProcessingStatusOverview from '../../cases/case_rfis/ProcessingStatusOverview';
+import ObjectAssigneeField from '../form/ObjectAssigneeField';
+import ObjectParticipantField from '../form/ObjectParticipantField';
+import StixCoreObjectLabelsView from '../stix_core_objects/StixCoreObjectLabelsView';
+import { stixDomainObjectMutation } from './StixDomainObjectHeader';
+
+const StixDomainObjectOverview = ({
+  stixDomainObject,
+  withoutMarking = false,
+  withPattern = false,
+  displayAssignees = false,
+  displayParticipants = false,
+  displayConfidence = true,
+  displayReliability = true,
+  displayOpinions = true,
+}) => {
+  const theme = useTheme();
+  const { t_i18n, fldt } = useFormatter();
+  const [openStixIds, setOpenStixIds] = useState(false);
+  const [openAddAssignee, setOpenAddAssignee] = useState(false);
+  const [openAddParticipant, setOpenAddParticipant] = useState(false);
+
+  const handleToggleOpenStixIds = () => {
+    setOpenStixIds(!openStixIds);
+  };
+
+  const handleToggleAddAssignee = () => {
+    setOpenAddAssignee(!openAddAssignee);
+  };
+
+  const handleToggleAddParticipant = () => {
+    setOpenAddParticipant(!openAddParticipant);
+  };
+
+  const onSubmitAssignees = (values, { setSubmitting, resetForm }) => {
+    const currentAssigneesIds = stixDomainObject.objectAssignee.map((assignee) => assignee.id);
+    const valuesIds = values.objectAssignee.map((assignee) => assignee.value);
+    const allIds = [...new Set([...currentAssigneesIds, ...valuesIds])]; // 'new Set' to merge without duplicates
+    commitMutation({
+      mutation: stixDomainObjectMutation,
+      variables: {
+        id: stixDomainObject.id,
+        input: {
+          key: 'objectAssignee',
+          value: allIds,
+        },
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        handleToggleAddAssignee();
+      },
+    });
+  };
+
+  const onSubmitParticipant = (values, { setSubmitting, resetForm }) => {
+    const currentParticipantsIds = stixDomainObject.objectParticipant.map((participant) => participant.id);
+    const valuesIds = values.objectParticipant.map((participant) => participant.value);
+    const allIds = [...new Set([...currentParticipantsIds, ...valuesIds])]; // 'new Set' to merge without duplicates
+    commitMutation({
+      mutation: stixDomainObjectMutation,
+      variables: {
+        id: stixDomainObject.id,
+        input: {
+          key: 'objectParticipant',
+          value: allIds,
+        },
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        handleToggleAddParticipant();
+      },
+    });
+  };
+
+  const deleteStixId = (stixId) => {
+    const otherStixIds = stixDomainObject.x_opencti_stix_ids || [];
+    const stixIds = otherStixIds.filter((n) => n !== stixDomainObject.standard_id && n !== stixId);
+    commitMutation({
+      mutation: stixDomainObjectMutation,
+      variables: {
+        id: stixDomainObject.id,
+        input: {
+          key: 'x_opencti_stix_ids',
+          value: stixIds,
+        },
+      },
+      onCompleted: () => MESSAGING$.notifySuccess(t_i18n('The STIX ID has been removed')),
+    });
+  };
+
+  const otherStixIds = stixDomainObject.x_opencti_stix_ids || [];
+  const stixIds = otherStixIds.filter((n) => n !== stixDomainObject.standard_id);
+  const isReliabilityOfSource = !stixDomainObject.x_opencti_reliability;
+  const reliability = isReliabilityOfSource
+    ? stixDomainObject.createdBy?.x_opencti_reliability
+    : stixDomainObject.x_opencti_reliability;
+
+  const isRequestAccessRFI = stixDomainObject.x_opencti_request_access;
+
+  return (
+    <>
+      <Card title={t_i18n('Basic information')}>
+        <Grid container={false} spacing={3}>
+          {isRequestAccessRFI && (
+            <ProcessingStatusOverview data={stixDomainObject} />
+          )}
+        </Grid>
+        <Grid container={true} spacing={3}>
+          <Grid item xs={6}>
+            {stixDomainObject.objectMarking && (
+              <>
+                <Label>{t_i18n('Marking')}</Label>
+                <ItemMarkings
+                  markingDefinitions={stixDomainObject.objectMarking ?? []}
+                />
+              </>
+            )}
+            <div>
+              <Label sx={{
+                mt:
+                    withPattern
+                    || (!withoutMarking && stixDomainObject.objectMarking)
+                      ? 2
+                      : 0,
+              }}
+              >{t_i18n('Author')}
+              </Label>
+              <ItemAuthor
+                createdBy={stixDomainObject.createdBy ?? null}
+              />
+            </div>
+            {(displayConfidence || displayReliability) && (
+              <Grid container={true} columnSpacing={1}>
+                {displayReliability && (
+                  <Grid item xs={6}>
+                    <Label sx={{ mt: 2 }}>
+                      {t_i18n('Reliability')}
+                      {isReliabilityOfSource && (
+                        <span style={{ fontStyle: 'italic' }}>
+                          {' '}
+                          ({t_i18n('of author')})
+                        </span>
+                      )}
+                    </Label>
+                    <ItemOpenVocab
+                      displayMode="chip"
+                      type="reliability_ov"
+                      value={reliability?.toString()}
+                    />
+                  </Grid>
+                )}
+                {displayConfidence && (
+                  <Grid item xs={6}>
+                    <Label sx={{ marginTop: 2 }}>
+                      {t_i18n('Confidence level')}
+                    </Label>
+                    <ItemConfidence
+                      confidence={stixDomainObject.confidence}
+                      entityType={stixDomainObject.entity_type}
+                    />
+                  </Grid>
+                )}
+              </Grid>
+            )}
+            {displayOpinions && <StixCoreObjectOpinions stixCoreObjectId={stixDomainObject.id} />}
+            <Label sx={{ marginTop: 2 }}>
+              {t_i18n('Original creation date')}
+            </Label>
+            {fldt(stixDomainObject.created)}
+            <Label sx={{ marginTop: 2 }}>
+              {t_i18n('Modification date')}
+            </Label>
+            {fldt(stixDomainObject.modified)}
+          </Grid>
+          <Grid item xs={6}>
+            {withPattern && (
+              <>
+                <Label>
+                  {t_i18n('Pattern type')}
+                </Label>
+                <ItemPatternType label={stixDomainObject.pattern_type} />
+              </>
+            )}
+            {!isRequestAccessRFI && (
+              <>
+                <Label sx={{ marginTop: withPattern ? 2 : 0 }}>
+                  {t_i18n('Processing status')}
+                </Label>
+                <ItemStatus
+                  status={stixDomainObject.status}
+                  disabled={!stixDomainObject.workflowEnabled}
+                />
+              </>
+            )}
+            {displayAssignees && (
+              <div data-testid="sdo-overview-assignees">
+                <Label
+                  sx={{ marginTop: 2 }}
+                  action={(
+                    <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                      <IconButton
+                        variant="tertiary"
+                        size="small"
+                        aria-label={t_i18n('Add new assignees')}
+                        title={t_i18n('Add new assignees')}
+                        onClick={handleToggleAddAssignee}
+                      >
+                        <Add fontSize="small" />
+                      </IconButton>
+                    </Security>
+                  )}
+                >
+                  {t_i18n('Assignees')}
+                </Label>
+                <ItemAssignees
+                  assignees={stixDomainObject.objectAssignee ?? []}
+                  stixDomainObjectId={stixDomainObject.id}
+                />
+              </div>
+            )}
+            {displayParticipants && (
+              <div data-testid="sdo-overview-participants">
+                <Label
+                  sx={{ marginTop: 2 }}
+                  action={(
+                    <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                      <IconButton
+                        variant="tertiary"
+                        size="small"
+                        aria-label={t_i18n('Add new participants')}
+                        title={t_i18n('Add new participants')}
+                        onClick={handleToggleAddParticipant}
+                      >
+                        <Add fontSize="small" />
+                      </IconButton>
+                    </Security>
+                  )}
+                >
+                  {t_i18n('Participants')}
+                </Label>
+                <ItemParticipants
+                  participants={stixDomainObject.objectParticipant ?? []}
+                  stixDomainObjectId={stixDomainObject.id}
+                />
+              </div>
+            )}
+            <Label sx={{ marginTop: 2 }}>
+              {t_i18n('Revoked')}
+            </Label>
+            <ItemBoolean
+              status={stixDomainObject.revoked}
+              label={stixDomainObject.revoked ? t_i18n('Yes') : t_i18n('No')}
+              reverse={true}
+            />
+            <StixCoreObjectLabelsView
+              labels={stixDomainObject.objectLabel}
+              id={stixDomainObject.id}
+              sx={{ marginTop: 2 }}
+              entity_type={stixDomainObject.entity_type}
+            />
+            <Label sx={{ marginTop: 2 }}>
+              {t_i18n('Platform creation date')}
+            </Label>
+            {fldt(stixDomainObject.created_at)}
+            <div>
+              <Label sx={{ marginTop: 2 }}>
+                {t_i18n('Creators')}
+              </Label>
+              <ItemCreators creators={stixDomainObject.creators ?? []} />
+            </div>
+            <div style={{ marginTop: 20 }}>
+              <Label
+                sx={{ marginTop: 2 }}
+                action={(
+                  <>
+                    <Tooltip
+                      title={t_i18n(
+                        'In OpenCTI, a predictable STIX ID is generated based on one or multiple attributes of the entity.',
+                      )}
+                    >
+                      <InformationOutline fontSize="small" color="primary" />
+                    </Tooltip>
+                    <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                      <IconButton
+                        variant="tertiary"
+                        aria-label="Close"
+                        size="small"
+                        disabled={stixIds.length === 0}
+                        onClick={handleToggleOpenStixIds}
+                      >
+                        <BrushOutlined
+                          fontSize="small"
+                          color={stixIds.length === 0 ? 'inherit' : 'primary'}
+                        />
+                      </IconButton>
+                    </Security>
+                  </>
+                )}
+              >
+                {t_i18n('Standard STIX ID')}
+              </Label>
+              <div style={{
+                padding: '5px 5px 5px 10px',
+                fontFamily: 'Consolas, monaco, monospace',
+                fontSize: 11,
+                backgroundColor:
+                  theme.palette.mode === 'light'
+                    ? 'rgba(0, 0, 0, 0.02)'
+                    : 'rgba(255, 255, 255, 0.02)',
+                lineHeight: '18px',
+              }}
+              >
+                <ItemCopy content={stixDomainObject.standard_id} />
+              </div>
+            </div>
+          </Grid>
+        </Grid>
+      </Card>
+      <Dialog
+        open={openStixIds}
+        onClose={handleToggleOpenStixIds}
+        title={t_i18n('Other STIX IDs')}
+      >
+        <List>
+          {stixIds.map(
+            (stixId) => stixId.length > 0 && (
+              <ListItem
+                key={stixId}
+                disableGutters={true}
+                dense={true}
+                secondaryAction={(
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => deleteStixId(stixId)}
+                  >
+                    <Delete />
+                  </IconButton>
+                )}
+              >
+                <ListItemText primary={stixId} />
+              </ListItem>
+            ),
+          )}
+        </List>
+        <DialogActions>
+          <Button
+            onClick={handleToggleOpenStixIds}
+          >
+            {t_i18n('Close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Formik
+        initialValues={{ objectAssignee: [] }}
+        onSubmit={onSubmitAssignees}
+        onReset={handleToggleAddAssignee}
+      >
+        {({ submitForm, handleReset }) => (
+          <Dialog
+            open={openAddAssignee}
+            onClose={handleToggleAddAssignee}
+            title={t_i18n('Add new assignees')}
+          >
+            <ObjectAssigneeField
+              name="objectAssignee"
+              style={fieldSpacingContainerStyle}
+            />
+            <DialogActions>
+              <Button
+                variant="secondary"
+                onClick={handleReset}
+              >
+                {t_i18n('Close')}
+              </Button>
+              <Button
+                onClick={submitForm}
+              >
+                {t_i18n('Add')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </Formik>
+      <Formik
+        initialValues={{ objectParticipant: [] }}
+        onSubmit={onSubmitParticipant}
+        onReset={handleToggleAddParticipant}
+      >
+        {({ submitForm }) => (
+          <Dialog
+            open={openAddParticipant}
+            onClose={handleToggleAddParticipant}
+            title={t_i18n('Add new participants')}
+          >
+            <ObjectParticipantField
+              name="objectParticipant"
+              style={fieldSpacingContainerStyle}
+            />
+            <DialogActions>
+              <Button
+                variant="secondary"
+                onClick={handleToggleAddParticipant}
+              >
+                {t_i18n('Close')}
+              </Button>
+              <Button
+                onClick={submitForm}
+              >
+                {t_i18n('Add')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </Formik>
+    </>
+  );
+};
+
+StixDomainObjectOverview.propTypes = {
+  stixDomainObject: PropTypes.object,
+  classes: PropTypes.object,
+  t: PropTypes.func,
+  fldt: PropTypes.func,
+  withoutMarking: PropTypes.bool,
+  displayAssignees: PropTypes.bool,
+  displayParticipants: PropTypes.bool,
+  displayConfidence: PropTypes.bool,
+  displayReliability: PropTypes.bool,
+};
+
+export default StixDomainObjectOverview;

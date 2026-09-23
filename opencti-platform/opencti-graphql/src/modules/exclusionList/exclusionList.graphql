@@ -1,0 +1,66 @@
+type ExclusionList implements InternalObject & BasicObject {
+  id: ID!
+  name: String!
+  description: String
+  standard_id: String!
+  entity_type: String!
+  representative: Representative!
+  parent_types: [String!]!
+  metrics:[Metric]
+  created_at: DateTime!
+  enabled: Boolean!
+  exclusion_list_entity_types: [String!]!
+  exclusion_list_values_count: Int
+  file_id: String!
+  exclusion_list_file_size: Int
+}
+
+type ExclusionListConnection {
+  pageInfo: PageInfo!
+  edges: [ExclusionListEdge!]
+}
+
+type ExclusionListEdge {
+  cursor: String!
+  node: ExclusionList!
+}
+
+type ExclusionListCacheStatus {
+  refreshVersion: String!
+  cacheVersion: String!
+  isCacheRebuildInProgress: Boolean!
+}
+
+enum ExclusionListOrdering {
+  name
+  created_at
+  enabled
+  exclusion_list_values_count
+  _score
+}
+
+input ExclusionListFileAddInput {
+  name: String!
+  description: String
+  exclusion_list_entity_types: [String!]!
+  file: Upload!
+}
+
+type Query {
+  exclusionList(id: String!): ExclusionList @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  exclusionLists(
+    first: Int
+    after: ID
+    orderBy: ExclusionListOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+  ): ExclusionListConnection @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  exclusionListCacheStatus: ExclusionListCacheStatus @auth(for: [SETTINGS_SETCUSTOMIZATION])
+}
+
+type Mutation {
+  exclusionListFileAdd(input: ExclusionListFileAddInput!): ExclusionList @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  exclusionListFieldPatch(id: ID!, input: [EditInput!], file: Upload): ExclusionList @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  exclusionListDelete(id: ID!): ID @auth(for: [SETTINGS_SETCUSTOMIZATION])
+}

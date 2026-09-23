@@ -1,0 +1,712 @@
+version: 2.1
+orbs:
+  slack: circleci/slack@6.1.3
+jobs:
+# Client-python steps
+
+  build_pycti:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - run:
+          name: cd client-python && install dependencies
+          command: >
+            cd client-python && pip3 install --user -r requirements.txt -r test-requirements.txt
+      - run:
+          name: check version
+          command: |
+            set -x
+            cd client-python
+            package_version="$(
+                python3 -c 'import pycti; print(pycti.__version__)'
+            )"
+            # Transform tag version to expected PEP 440 package version:
+            #   7.260309.0          -> 7.260309.0    (standard release)
+            #   7.260309.0-lts.1    -> 7.260309.0.1  (lts bug fix 1)
+            #   7.260309.0-lts.N    -> 7.260309.0.N  (lts bug fix N)
+            expected_version="$(
+                echo "${CIRCLE_TAG}" \
+                  | sed 's/-lts\.\([0-9]\+\)$/.\1/'
+            )"
+            if [ "${expected_version}" != "${package_version}" ]; then
+              printf "Version mismatch: tag %s (expected package %s) is not equal to package version %s\n" \
+                "${CIRCLE_TAG}" "${expected_version}" "${package_version}"
+              exit 1
+            fi
+      - run:
+          name: build
+          command: >
+            cd client-python &&  SOURCE_DATE_EPOCH="$(git log -1 --pretty=%ct)" python3 -m build
+      - slack/notify:
+          branch_pattern: master
+          event: fail
+          template: basic_fail_1
+      - persist_to_workspace:
+          root: ~/repo/client-python
+          paths:
+            - dist
+  deploy_pycti:
+    working_directory: ~/repo
+    docker:
+      - image: cimg/python:3.13
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/repo/client-python
+      - run:
+          name: install dependencies
+          command: cd client-python && pip3 install -r requirements.txt --user
+      - run:
+          name: install twine
+          command: cd client-python && pip3 install twine
+      - run:
+          name: init .pypirc
+          command: |
+            cd client-python
+            printf "[pypi]\nusername = __token__\npassword = %s\n" "${PYPI_PASSWORD}" >> ~/.pypirc
+      - run:
+          name: upload to pypi
+          command: cd client-python && twine upload dist/*
+      - slack/notify:
+          branch_pattern: master
+          event: fail
+          template: basic_fail_1
+# opencti steps
+  build_frontend:
+    working_directory: ~/opencti
+    docker:
+      - image: nikolaik/python-nodejs:python3.11-nodejs22
+    resource_class: large
+    steps:
+      - run:
+          command: apt-get update --allow-insecure-repositories --allow-unauthenticated && apt-get install -y build-essential libffi-dev curl
+      - checkout
+      - run:
+          working_directory: ~/opencti/opencti-platform/opencti-front
+          command: yarn install
+      - run:
+          working_directory: ~/opencti/opencti-platform/opencti-front
+          command: yarn build
+          no_output_timeout: 30m
+      - run:
+          working_directory: ~/
+          command: cp -a opencti opencti_docker && cp -a opencti opencti_musl
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - opencti
+            - opencti_docker
+            - opencti_musl
+
+  wait_for_connector_release:
+    working_directory: ~/opencti
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - run:
+          command: ./scripts/ci/wait-for-url-200.sh https://raw.githubusercontent.com/OpenCTI-Platform/connectors/refs/tags/${CIRCLE_TAG}/manifest.json 900 30
+
+
+  build_platform:
+    working_directory: ~/opencti
+    docker:
+      - image: nikolaik/python-nodejs:python3.11-nodejs22
+    resource_class: medium+
+    steps:  
+      - run:
+          command: apt-get update --allow-insecure-repositories --allow-unauthenticated && apt-get install -y build-essential libffi-dev curl g++ make python3 python3-dev
+      - run:
+          command: npm install -g node-gyp
+      - attach_workspace:
+          at: ~/
+      - run:
+          working_directory: ~/opencti/opencti-platform/opencti-graphql
+          command: yarn install
+      - run:
+          working_directory: ~/opencti/opencti-platform/opencti-graphql
+          command: TAG_VERSION=${CIRCLE_TAG} yarn build
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - opencti
+
+  build_platform_musl:
+    working_directory: ~/opencti_musl
+    docker:
+      - image: nikolaik/python-nodejs:python3.11-nodejs22-alpine
+    resource_class: medium+
+    steps:
+      - run:
+          command: apk update && apk upgrade && apk --no-cache add git tini gcc g++ make musl-dev python3 python3-dev postfix postfix-pcre build-base libffi-dev curl
+      - run:
+          command: npm install -g node-gyp
+      - attach_workspace:
+          at: ~/
+      - run:
+          working_directory: ~/opencti_musl/opencti-platform/opencti-graphql
+          command: yarn install
+      - run:
+          working_directory: ~/opencti_musl/opencti-platform/opencti-graphql
+          command: yarn build
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - opencti_musl
+
+  build_platform_musl_rolling:
+    working_directory: ~/opencti_musl
+    docker:
+      - image: nikolaik/python-nodejs:python3.11-nodejs22-alpine
+    resource_class: medium+
+    steps:
+      - run:
+          command: apk update && apk upgrade && apk --no-cache add git tini gcc g++ make musl-dev python3 python3-dev postfix postfix-pcre build-base libffi-dev curl
+      - run:
+          command: npm install -g node-gyp
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Replace pycti requirement of stable version with latest master branch code
+          command: find . -name requirements.txt -exec sed 's|^pycti==.*$|pycti @ git+https://github.com/OpenCTI-Platform/opencti.git@master#subdirectory=client-python|' -i {} \;          
+      - run:
+          working_directory: ~/opencti_musl/opencti-platform/opencti-graphql
+          command: yarn install
+      - run:
+          working_directory: ~/opencti_musl/opencti-platform/opencti-graphql
+          command: yarn build
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - opencti_musl
+
+  tag_package:
+    working_directory: ~/opencti
+    docker:
+      - image: cimg/node:22.23.2
+    resource_class: medium+
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run: mkdir release
+      - run: rm -Rf ./opencti-platform/opencti-graphql/.yarn/cache
+      - run: cp -a ./opencti-platform/opencti-graphql release/opencti
+      - run: cp -a ./opencti-platform/.yarnrc.yml release/opencti/
+      - run: cp -a ./opencti-worker/src release/opencti/worker
+      - run: cd release/opencti && git clone --single-branch --branch ${CIRCLE_TAG} https://github.com/OpenCTI-Platform/connectors
+      - run:
+          working_directory: ~/opencti/release
+          command: tar -zcvf "opencti-${CIRCLE_TAG}.tar.gz" opencti
+      - run:
+          working_directory: ~/opencti/release
+          command: curl -usamuel.hassine@filigran.io:$JFROG_TOKEN -T opencti-${CIRCLE_TAG}.tar.gz "https://filigran.jfrog.io/artifactory/opencti/opencti-${CIRCLE_TAG}.tar.gz"
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  package_rolling_musl:
+    working_directory: ~/opencti_musl
+    docker:
+      - image: cimg/node:22.23.2
+    resource_class: medium+
+    steps:
+      - attach_workspace:
+          at: ~/
+      - add_ssh_keys
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run: mkdir release
+      - run: rm -Rf ./opencti-platform/opencti-graphql/.yarn/cache
+      - run: cp -a ./opencti-platform/opencti-graphql release/opencti
+      - run: cp -a ./opencti-platform/.yarnrc.yml release/opencti/
+      - run: cp -a ./opencti-worker/src release/opencti/worker
+      - run: cd release/opencti && git clone https://github.com/OpenCTI-Platform/docker
+      - run: cd release/opencti && git clone https://github.com/OpenCTI-Platform/connectors
+      - run:
+          working_directory: ~/opencti_musl/release
+          command: tar -zcvf "opencti-$(date '+%Y%m%d')_musl.tar.gz" opencti
+      - run:
+          working_directory: ~/opencti_musl/release
+          command: curl -usamuel.hassine@filigran.io:$JFROG_TOKEN -T opencti-$(date '+%Y%m%d')_musl.tar.gz "https://filigran.jfrog.io/artifactory/opencti/opencti-$(date '+%Y%m%d')_musl.tar.gz"
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  tag_package_musl:
+    working_directory: ~/opencti_musl
+    docker:
+      - image: cimg/node:22.23.2
+    resource_class: medium+
+    steps:
+      - attach_workspace:
+          at: ~/
+      - add_ssh_keys
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run: mkdir release
+      - run: rm -Rf ./opencti-platform/opencti-graphql/.yarn/cache
+      - run: cp -a ./opencti-platform/opencti-graphql release/opencti
+      - run: cp -a ./opencti-platform/.yarnrc.yml release/opencti/
+      - run: cp -a ./opencti-worker/src release/opencti/worker
+      - run: cd release/opencti && git clone --single-branch --branch ${CIRCLE_TAG} https://github.com/OpenCTI-Platform/connectors
+      - run:
+          working_directory: ~/opencti_musl/release
+          command: tar -zcvf "opencti-${CIRCLE_TAG}_musl.tar.gz" opencti
+      - run:
+          working_directory: ~/opencti_musl/release
+          command: curl -usamuel.hassine@filigran.io:$JFROG_TOKEN -T opencti-${CIRCLE_TAG}_musl.tar.gz "https://filigran.jfrog.io/artifactory/opencti/opencti-${CIRCLE_TAG}_musl.tar.gz"
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  docker_build_platform:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-platform
+          name: Build Docker image opencti/platform
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/platform:${CIRCLE_TAG}"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/platform:latest"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-to=type=local,dest=.cache -f Dockerfile $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/platform:${CIRCLE_TAG}"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/platform:latest"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-from=type=local,src=.cache -f Dockerfile $GHCR_TAGS --push .
+          no_output_timeout: 30m
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  docker_build_worker:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-worker
+          name: Build Docker image opencti/worker
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/worker:${CIRCLE_TAG}"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/worker:latest"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/worker:${CIRCLE_TAG}"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/worker:latest"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS $GHCR_TAGS --push .
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  docker_build_platform_fips:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-platform
+          name: Build Docker image opencti/platform
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/platform:${CIRCLE_TAG}-fips"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/platform:latest-fips"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-to=type=local,dest=.cache -f Dockerfile_fips $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/platform:${CIRCLE_TAG}-fips"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/platform:latest-fips"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-from=type=local,src=.cache -f Dockerfile_fips $GHCR_TAGS --push .
+          no_output_timeout: 30m
+      - slack/notify:
+          event: fail
+          template: basic_fail_1      
+
+  docker_build_worker_fips:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-worker
+          name: Build Docker image opencti/worker
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/worker:${CIRCLE_TAG}-fips"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/worker:latest-fips"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS --cache-to=type=local,dest=.cache -f Dockerfile_fips $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/worker:${CIRCLE_TAG}-fips"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/worker:latest-fips"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS --cache-from=type=local,src=.cache -f Dockerfile_fips $GHCR_TAGS --push .
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  docker_build_platform_ubi9:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-platform
+          name: Build Docker image opencti/platform (UBI9)
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/platform:${CIRCLE_TAG}-ubi9"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/platform:latest-ubi9"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-to=type=local,dest=.cache -f Dockerfile_ubi9 $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/platform:${CIRCLE_TAG}-ubi9"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/platform:latest-ubi9"
+            docker buildx build --pull --progress=plain --build-arg TAG_VERSION=${CIRCLE_TAG} --platform $BUILDX_PLATFORMS --cache-from=type=local,src=.cache -f Dockerfile_ubi9 $GHCR_TAGS --push .
+          no_output_timeout: 30m
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  docker_build_worker_ubi9:
+    working_directory: ~/opencti_docker
+    machine:
+      image: ubuntu-2004:202111-02
+      resource_class: large
+    environment:
+      DOCKER_BUILDKIT: 1
+      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.8.2/buildx-v0.8.2.linux-amd64"
+            curl --output docker-buildx \
+              --silent --show-error --location --fail --retry 3 \
+              "$BUILDX_BINARY_URL"
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            # Run binfmt
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            docker buildx create --name mybuilder --use
+      - run:
+          name: Login to docker hub
+          command: |
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$GHCR_PASS" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+      - run:
+          working_directory: ~/opencti_docker/opencti-worker
+          name: Build Docker image opencti/worker (UBI9)
+          command: |
+            LATEST_SEMANTIC_VERSION=$(git tag --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+            DOCKER_TAGS="-t opencti/worker:${CIRCLE_TAG}-ubi9"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && DOCKER_TAGS="$DOCKER_TAGS -t opencti/worker:latest-ubi9"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS --cache-to=type=local,dest=.cache -f Dockerfile_ubi9 $DOCKER_TAGS --push .
+            GHCR_TAGS="-t ghcr.io/opencti-platform/opencti/worker:${CIRCLE_TAG}-ubi9"
+            [ "$CIRCLE_TAG" = "$LATEST_SEMANTIC_VERSION" ] && GHCR_TAGS="$GHCR_TAGS -t ghcr.io/opencti-platform/opencti/worker:latest-ubi9"
+            docker buildx build --pull --progress=plain --platform $BUILDX_PLATFORMS --cache-from=type=local,src=.cache -f Dockerfile_ubi9 $GHCR_TAGS --push .
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  notify:
+    docker:
+      - image: "cimg/base:stable"
+    steps:
+      - run: sudo apt-get update -qq && sudo apt install curl
+      - slack/notify:
+          event: pass
+          template: basic_success_1
+
+workflows:
+  opencti:
+    jobs:
+# Prepare and deploy client-python before building opencti
+      - build_pycti:
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - deploy_pycti:
+          requires:
+            - build_pycti
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+# Build opencti
+      - build_frontend:
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only:
+                - master
+      - wait_for_connector_release:
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - build_platform:
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+          requires:
+            - build_frontend
+            - build_pycti
+            - wait_for_connector_release
+      - build_platform_musl:
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+      - build_platform_musl_rolling:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - build_frontend
+      - package_rolling_musl:
+          requires:
+            - build_platform_musl_rolling
+          filters:
+            branches:
+              only:
+                - master                
+      - tag_package:
+          requires:
+            - build_platform
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - tag_package_musl:
+          requires:
+            - build_platform_musl
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+
+      - docker_build_platform:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - docker_build_worker:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - docker_build_platform_fips:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - docker_build_worker_fips:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - docker_build_platform_ubi9:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+      - docker_build_worker_ubi9:
+          requires:
+            - build_frontend
+            - wait_for_connector_release
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/
+
+      - notify:
+          requires:
+            - docker_build_platform
+            - docker_build_worker
+            - docker_build_platform_fips
+            - docker_build_worker_fips
+            - docker_build_platform_ubi9
+            - docker_build_worker_ubi9
+          filters:
+            tags:
+              only: /^[0-9]+\.[0-9]+\.[0-9]+(-lts\.[0-9]+)?$/
+            branches:
+              ignore: /.*/

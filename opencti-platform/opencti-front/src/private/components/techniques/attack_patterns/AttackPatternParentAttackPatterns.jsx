@@ -1,0 +1,78 @@
+import React, { Component } from 'react';
+import * as PropTypes from 'prop-types';
+import { compose } from 'ramda';
+import List from '@mui/material/List';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import { Link } from 'react-router';
+import { LockPattern } from 'mdi-material-ui';
+import { graphql, createFragmentContainer } from 'react-relay';
+import { ListItemButton } from '@mui/material';
+import inject18n from '../../../../components/i18n';
+import Label from '../../../../components/common/label/Label';
+
+class AttackPatternParentAttackPatternsComponent extends Component {
+  render() {
+    const { t, attackPattern } = this.props;
+    return (
+      <div>
+        <Label>
+          {t('Parent attack patterns')}
+        </Label>
+        <List>
+          {attackPattern.parentAttackPatterns.edges.map(
+            (parentAttackPatternEdge) => {
+              const parentAttackPattern = parentAttackPatternEdge.node;
+              return (
+                <ListItemButton
+                  key={parentAttackPattern.id}
+                  dense={true}
+                  divider={true}
+                  component={Link}
+                  to={`/dashboard/techniques/attack_patterns/${parentAttackPattern.id}`}
+                >
+                  <ListItemIcon>
+                    <LockPattern color="primary" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`[${parentAttackPattern.x_mitre_id}] ${parentAttackPattern.name}`}
+                  />
+                </ListItemButton>
+              );
+            },
+          )}
+        </List>
+      </div>
+    );
+  }
+}
+
+AttackPatternParentAttackPatternsComponent.propTypes = {
+  classes: PropTypes.object,
+  t: PropTypes.func,
+  fld: PropTypes.func,
+  attackPattern: PropTypes.object,
+};
+
+const AttackPatternParentAttackPatterns = createFragmentContainer(
+  AttackPatternParentAttackPatternsComponent,
+  {
+    attackPattern: graphql`
+      fragment AttackPatternParentAttackPatterns_attackPattern on AttackPattern {
+        id
+        parentAttackPatterns {
+          edges {
+            node {
+              id
+              name
+              description
+              x_mitre_id
+            }
+          }
+        }
+      }
+    `,
+  },
+);
+
+export default compose(inject18n)(AttackPatternParentAttackPatterns);

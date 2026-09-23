@@ -1,0 +1,26 @@
+import { styled } from '@mui/material/styles';
+import MuiAccordion from '@mui/material/Accordion';
+import MuiAccordionSummary from '@mui/material/AccordionSummary';
+import ArrowForwardIosSharpIcon from '@mui/icons-material/ArrowForwardIosSharp';
+import React from 'react';
+
+export const Accordion = styled((props) => (<MuiAccordion disableGutters elevation={0} square {...props} />))(() => ({
+  border: '1px solid var(--border-elevation-subtle)',
+  '&:before': {
+    display: 'none',
+  },
+  borderRadius: '4px',
+  backgroundColor: 'rgba(255, 255, 255, 0)',
+}));
+
+export const AccordionSummary = styled((props) => (
+  <MuiAccordionSummary expandIcon={<ArrowForwardIosSharpIcon sx={{ fontSize: '0.9rem' }} />} {...props} />
+))(({ theme }) => ({
+  flexDirection: 'row-reverse',
+  '& .MuiAccordionSummary-expandIconWrapper.Mui-expanded': {
+    transform: 'rotate(90deg)',
+  },
+  '& .MuiAccordionSummary-content': {
+    marginLeft: theme.spacing(1),
+  },
+}));

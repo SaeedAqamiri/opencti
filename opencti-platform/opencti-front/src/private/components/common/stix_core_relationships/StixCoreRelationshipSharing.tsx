@@ -1,0 +1,215 @@
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import Dialog from '@common/dialog/Dialog';
+import EEChip from '@components/common/entreprise_edition/EEChip';
+import EETooltip from '@components/common/entreprise_edition/EETooltip';
+import { AccountBalanceOutlined } from '@mui/icons-material';
+import DialogActions from '@mui/material/DialogActions';
+import Tooltip from '@mui/material/Tooltip';
+import { Form, Formik } from 'formik';
+import type { FormikHelpers } from 'formik/dist/types';
+import { BankPlus } from 'mdi-material-ui';
+import React, { FunctionComponent, useState } from 'react';
+import { graphql } from 'react-relay';
+import Label from '../../../../components/common/label/Label';
+import Tag from '../../../../components/common/tag/Tag';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation, QueryRenderer } from '../../../../relay/environment';
+import { truncate } from '../../../../utils/String';
+import useDraftContext from '../../../../utils/hooks/useDraftContext';
+import useEnterpriseEdition from '../../../../utils/hooks/useEnterpriseEdition';
+import useGranted, { KNOWLEDGE_KNUPDATE_KNORGARESTRICT } from '../../../../utils/hooks/useGranted';
+import ObjectOrganizationField from '../form/ObjectOrganizationField';
+import { StixCoreRelationshipSharingQuery$data } from './__generated__/StixCoreRelationshipSharingQuery.graphql';
+
+// region types
+interface ContainerHeaderSharedProps {
+  elementId: string;
+}
+
+interface OrganizationForm {
+  objectOrganization: { value: string; label: string };
+}
+
+// endregion
+
+const containerHeaderSharedQuery = graphql`
+  query StixCoreRelationshipSharingQuery($id: String!) {
+    stixCoreRelationship(id: $id) {
+      objectOrganization {
+        id
+        name
+      }
+    }
+  }
+`;
+
+const containerHeaderSharedQueryGroupDeleteMutation = graphql`
+  mutation StixCoreRelationshipSharingGroupDeleteMutation(
+    $id: ID!
+    $organizationId: [ID!]!
+  ) {
+    stixCoreRelationshipEdit(id: $id) {
+      restrictionOrganizationDelete(organizationId: $organizationId) {
+        id
+        objectOrganization {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+const containerHeaderSharedGroupAddMutation = graphql`
+  mutation StixCoreRelationshipSharingGroupAddMutation(
+    $id: ID!
+    $organizationId: [ID!]!
+  ) {
+    stixCoreRelationshipEdit(id: $id) {
+      restrictionOrganizationAdd(organizationId: $organizationId) {
+        id
+        objectOrganization {
+          id
+          name
+        }
+      }
+    }
+  }
+`;
+
+const StixCoreRelationshipSharing: FunctionComponent<
+  ContainerHeaderSharedProps
+> = ({ elementId }) => {
+  const { t_i18n } = useFormatter();
+  const draftContext = useDraftContext();
+  const disabledInDraft = !!draftContext;
+  const [displaySharing, setDisplaySharing] = useState(false);
+  const isEnterpriseEdition = useEnterpriseEdition();
+  const userIsOrganizationEditor = useGranted([
+    KNOWLEDGE_KNUPDATE_KNORGARESTRICT,
+  ]);
+  if (!userIsOrganizationEditor) {
+    return <div style={{ marginTop: -20 }} />;
+  }
+  const handleOpenSharing = () => setDisplaySharing(true);
+  const handleCloseSharing = () => setDisplaySharing(false);
+  const removeOrganization = (organizationId: string) => {
+    commitMutation({
+      mutation: containerHeaderSharedQueryGroupDeleteMutation,
+      variables: { id: elementId, organizationId },
+      onCompleted: undefined,
+      updater: undefined,
+      optimisticUpdater: undefined,
+      optimisticResponse: undefined,
+      onError: undefined,
+      setSubmitting: undefined,
+    });
+  };
+  const onSubmitOrganizations = (
+    values: OrganizationForm,
+    { setSubmitting, resetForm }: FormikHelpers<OrganizationForm>,
+  ) => {
+    const { objectOrganization } = values;
+    if (objectOrganization.value) {
+      commitMutation({
+        mutation: containerHeaderSharedGroupAddMutation,
+        variables: { id: elementId, organizationId: objectOrganization.value },
+        onCompleted: () => {
+          setSubmitting(false);
+          resetForm();
+          setDisplaySharing(false);
+        },
+        updater: undefined,
+        optimisticUpdater: undefined,
+        optimisticResponse: undefined,
+        onError: undefined,
+        setSubmitting: undefined,
+      });
+    }
+  };
+  const render = ({
+    stixCoreRelationship,
+  }: StixCoreRelationshipSharingQuery$data) => {
+    const edges = stixCoreRelationship?.objectOrganization ?? [];
+    return (
+      <React.Fragment>
+        <Label action={(
+          <>
+            <EETooltip title={disabledInDraft ? t_i18n('Not available in draft') : t_i18n('Share with an organization')}>
+              <IconButton
+                color="primary"
+                aria-label="Label"
+                onClick={isEnterpriseEdition && !disabledInDraft ? handleOpenSharing : () => {}}
+                size="small"
+              >
+                <BankPlus fontSize="small" color={isEnterpriseEdition && !disabledInDraft ? 'primary' : 'disabled'} />
+              </IconButton>
+            </EETooltip>
+            {!isEnterpriseEdition && <EEChip />}
+          </>
+        )}
+        >
+          {t_i18n('Organizations sharing')}
+        </Label>
+        {edges.map((edge) => (
+          <Tooltip key={edge.id} title={edge.name}>
+            <Tag
+              icon={<AccountBalanceOutlined fontSize="small" />}
+              label={truncate(edge.name, 15)}
+              deleteLabel={`${t_i18n('Remove')} ${edge.name}`}
+              onDelete={() => removeOrganization(edge.id)}
+            />
+          </Tooltip>
+        ))}
+        <Formik
+          initialValues={{ objectOrganization: { value: '', label: '' } }}
+          onSubmit={onSubmitOrganizations}
+          onReset={handleCloseSharing}
+        >
+          {({ submitForm, handleReset, isSubmitting }) => (
+            <Dialog
+              open={displaySharing}
+              onClose={() => handleReset()}
+              title={t_i18n('Share with an organization')}
+            >
+              <Form>
+                <ObjectOrganizationField
+                  name="objectOrganization"
+                  style={{ width: '100%' }}
+                  label={t_i18n('Organization')}
+                  multiple={false}
+                />
+              </Form>
+              <DialogActions>
+                <Button variant="secondary" onClick={handleReset} disabled={isSubmitting}>
+                  {t_i18n('Close')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Share')}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          )}
+        </Formik>
+      </React.Fragment>
+    );
+  };
+  return (
+    <QueryRenderer
+      query={containerHeaderSharedQuery}
+      variables={{ id: elementId }}
+      render={(result: { props: StixCoreRelationshipSharingQuery$data }) => {
+        if (result.props) {
+          return render(result.props);
+        }
+        return <div />;
+      }}
+    />
+  );
+};
+
+export default StixCoreRelationshipSharing;

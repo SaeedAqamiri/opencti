@@ -1,0 +1,419 @@
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import Dialog from '@common/dialog/Dialog';
+import FiligranIcon from '@components/common/FiligranIcon';
+import { TextFieldAskAIChangeToneMutation, TextFieldAskAIChangeToneMutation$data } from '@components/common/form/__generated__/TextFieldAskAIChangeToneMutation.graphql';
+import { TextFieldAskAIExplainMutation, TextFieldAskAIExplainMutation$data } from '@components/common/form/__generated__/TextFieldAskAIExplainMutation.graphql';
+import { TextFieldAskAIFixSpellingMutation, TextFieldAskAIFixSpellingMutation$data } from '@components/common/form/__generated__/TextFieldAskAIFixSpellingMutation.graphql';
+import { TextFieldAskAIMakeLongerMutation, TextFieldAskAIMakeLongerMutation$data } from '@components/common/form/__generated__/TextFieldAskAIMakeLongerMutation.graphql';
+import { TextFieldAskAIMakeShorterMutation, TextFieldAskAIMakeShorterMutation$data } from '@components/common/form/__generated__/TextFieldAskAIMakeShorterMutation.graphql';
+import { TextFieldAskAISummarizeMutation, TextFieldAskAISummarizeMutation$data } from '@components/common/form/__generated__/TextFieldAskAISummarizeMutation.graphql';
+import DialogActions from '@mui/material/DialogActions';
+import InputAdornment from '@mui/material/InputAdornment';
+import Menu from '@mui/material/Menu';
+import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@filigran/design-system';
+import MenuItem from '@mui/material/MenuItem';
+import { useTheme } from '@mui/styles';
+import { LogoXtmOneIcon } from 'filigran-icon';
+import React, { CSSProperties, FunctionComponent, useRef, useState } from 'react';
+import { graphql } from 'react-relay';
+import { v4 as uuid } from 'uuid';
+import { useFormatter } from '../../../../components/i18n';
+import EETooltip from '../entreprise_edition/EETooltip';
+import ValidateTermsOfUseDialog from '../../settings/ValidateTermsOfUseDialog';
+import useGranted, { SETTINGS_SETPARAMETERS } from '../../../../utils/hooks/useGranted';
+
+import type { Theme } from '../../../../components/Theme';
+import ResponseDialog from '../../../../utils/ai/ResponseDialog';
+import useAI from '../../../../utils/hooks/useAI';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import useEnterpriseEdition from '../../../../utils/hooks/useEnterpriseEdition';
+import { useChatbot } from '../../chatbox/ChatbotContext';
+
+// region types
+export type AgentAction = 'spelling' | 'shorter' | 'longer' | 'tone' | 'summarize' | 'explain';
+
+export interface AgentMode {
+  intent: string;
+  action: AgentAction;
+  inputContent: string;
+  format: string;
+}
+
+interface TextFieldAskAiProps {
+  currentValue: string;
+  setFieldValue: (value: string) => void;
+  format: 'text' | 'html' | 'markdown';
+  variant?: 'markdown' | 'html' | 'text' | null;
+  disabled?: boolean;
+  style?: CSSProperties;
+}
+
+// Legacy GraphQL mutations (used when XTM One is NOT configured)
+const textFieldAskAIFixSpellingMutation = graphql`
+  mutation TextFieldAskAIFixSpellingMutation($id: ID!, $content: String!, $format: Format) {
+    aiFixSpelling(id: $id, content: $content, format: $format)
+  }
+`;
+
+const textFieldAskAIMakeShorterMutation = graphql`
+  mutation TextFieldAskAIMakeShorterMutation($id: ID!, $content: String!, $format: Format) {
+    aiMakeShorter(id: $id, content: $content, format: $format)
+  }
+`;
+
+const textFieldAskAIMakeLongerMutation = graphql`
+  mutation TextFieldAskAIMakeLongerMutation($id: ID!, $content: String!, $format: Format) {
+    aiMakeLonger(id: $id, content: $content, format: $format)
+  }
+`;
+
+const textFieldAskAIChangeToneMutation = graphql`
+  mutation TextFieldAskAIChangeToneMutation($id: ID!, $content: String!, $format: Format, $tone: Tone) {
+    aiChangeTone(id: $id, content: $content, format: $format, tone: $tone)
+  }
+`;
+
+const textFieldAskAISummarizeMutation = graphql`
+  mutation TextFieldAskAISummarizeMutation($id: ID!, $content: String!, $format: Format) {
+    aiSummarize(id: $id, content: $content, format: $format)
+  }
+`;
+
+const textFieldAskAIExplainMutation = graphql`
+  mutation TextFieldAskAIExplainMutation($id: ID!, $content: String!) {
+    aiExplain(id: $id, content: $content)
+  }
+`;
+
+const TextFieldAskAI: FunctionComponent<TextFieldAskAiProps> = ({
+  currentValue,
+  setFieldValue,
+  variant,
+  format = 'text',
+  disabled,
+  style,
+}) => {
+  const theme = useTheme<Theme>();
+  const { t_i18n } = useFormatter();
+  const isEnterpriseEdition = useEnterpriseEdition();
+  const { fullyActive, enabled } = useAI();
+  const { xtmOneConfigured } = useChatbot();
+  const useXtmOne = xtmOneConfigured === true;
+
+  const [content, setContent] = useState('');
+  const menuId = useRef(`ask-ai-menu-${uuid()}`).current;
+  const [menuOpen, setMenuOpen] = useState<{ open: boolean; anchorEl: HTMLButtonElement | null }>({ open: false, anchorEl: null });
+  const [busId, setBusId] = useState<string | null>(null);
+  const [displayAskAI, setDisplayAskAI] = useState(false);
+
+  // XTM One agent mode state (new path)
+  const [agentMode, setAgentMode] = useState<AgentMode | null>(null);
+
+  const isAdmin = useGranted([SETTINGS_SETPARAMETERS]);
+  const [displayCGUDialog, setDisplayCGUDialog] = useState(false);
+  const isCGUStatusPending = useXtmOne && !fullyActive;
+
+  // Show the AI button when:
+  // - EE is not active (so user can click and get the EE upgrade prompt)
+  // - OR AI feature is fully active (EE + configured + enabled)
+  // - OR XTM One is enabled (even if fullyActive is false due to pending CGU)
+  const showAIButton = !isEnterpriseEdition || fullyActive || (useXtmOne && enabled);
+
+  // Legacy GraphQL state
+  const [disableResponse, setDisableResponse] = useState(false);
+  const [openToneOptions, setOpenToneOptions] = useState(false);
+  const [tone, setTone] = useState<'tactical' | 'operational' | 'strategic'>('tactical');
+  const [isAcceptable, setIsAcceptable] = useState(true);
+
+  // Legacy GraphQL mutation hooks (always declared to satisfy React hook rules)
+  const [commitMutationFixSpelling] = useApiMutation<TextFieldAskAIFixSpellingMutation>(textFieldAskAIFixSpellingMutation);
+  const [commitMutationMakeShorter] = useApiMutation<TextFieldAskAIMakeShorterMutation>(textFieldAskAIMakeShorterMutation);
+  const [commitMutationMakeLonger] = useApiMutation<TextFieldAskAIMakeLongerMutation>(textFieldAskAIMakeLongerMutation);
+  const [commitMutationChangeTone] = useApiMutation<TextFieldAskAIChangeToneMutation>(textFieldAskAIChangeToneMutation);
+  const [commitMutationSummarize] = useApiMutation<TextFieldAskAISummarizeMutation>(textFieldAskAISummarizeMutation);
+  const [commitMutationExplain] = useApiMutation<TextFieldAskAIExplainMutation>(textFieldAskAIExplainMutation);
+
+  const handleOpenMenu = (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (isEnterpriseEdition) {
+      event.preventDefault();
+      if (isCGUStatusPending) {
+        setDisplayCGUDialog(true);
+      } else {
+        setMenuOpen({ open: true, anchorEl: event.currentTarget });
+      }
+    }
+  };
+  const handleCloseMenu = () => {
+    setMenuOpen({ open: false, anchorEl: null });
+  };
+  const handleCloseAskAI = () => {
+    setContent('');
+    setDisplayAskAI(false);
+    setAgentMode(null);
+    setBusId(null);
+  };
+
+  // ── XTM One (new) path ────────────────────────────────────────────────
+
+  const intentForAction: Record<AgentAction, string> = {
+    spelling: 'global.fix_spelling',
+    shorter: 'global.make_it_shorter',
+    longer: 'global.make_it_longer',
+    tone: 'global.change_tone',
+    summarize: 'global.summarize',
+    explain: 'global.explain',
+  };
+
+  const handleAgentAction = (action: AgentAction) => {
+    handleCloseMenu();
+    const id = uuid();
+    setBusId(id);
+    setContent('');
+    setAgentMode({
+      intent: intentForAction[action],
+      action,
+      inputContent: currentValue,
+      format,
+    });
+    setDisplayAskAI(true);
+  };
+
+  // ── Legacy GraphQL path ───────────────────────────────────────────────
+
+  const handleOpenToneOptions = () => {
+    handleCloseMenu();
+    setOpenToneOptions(true);
+  };
+  const handleCloseToneOptions = () => setOpenToneOptions(false);
+
+  const handleLegacyAskAi = (action: string, canBeAccepted = true) => {
+    setDisableResponse(true);
+    handleCloseMenu();
+    const id = uuid();
+    setBusId(id);
+    setIsAcceptable(canBeAccepted);
+    setDisplayAskAI(true);
+    switch (action) {
+      case 'spelling':
+        commitMutationFixSpelling({
+          variables: { id, content: currentValue, format },
+          onCompleted: (response: TextFieldAskAIFixSpellingMutation$data) => {
+            setContent(response?.aiFixSpelling ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'shorter':
+        commitMutationMakeShorter({
+          variables: { id, content: currentValue, format },
+          onCompleted: (response: TextFieldAskAIMakeShorterMutation$data) => {
+            setContent(response?.aiMakeShorter ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'longer':
+        commitMutationMakeLonger({
+          variables: { id, content: currentValue, format },
+          onCompleted: (response: TextFieldAskAIMakeLongerMutation$data) => {
+            setContent(response?.aiMakeLonger ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'tone':
+        commitMutationChangeTone({
+          variables: { id, content: currentValue, format, tone },
+          onCompleted: (response: TextFieldAskAIChangeToneMutation$data) => {
+            setContent(response?.aiChangeTone ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'summarize':
+        commitMutationSummarize({
+          variables: { id, content: currentValue, format },
+          onCompleted: (response: TextFieldAskAISummarizeMutation$data) => {
+            setContent(response?.aiSummarize ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      case 'explain':
+        commitMutationExplain({
+          variables: { id, content: currentValue },
+          onCompleted: (response: TextFieldAskAIExplainMutation$data) => {
+            setContent(response?.aiExplain ?? '');
+            setDisableResponse(false);
+          },
+          onError: (error: Error) => {
+            setContent(t_i18n(`An unknown error occurred, please ask your platform administrator: ${error.toString()}`));
+            setDisableResponse(false);
+          },
+        });
+        break;
+      default:
+        break;
+    }
+  };
+
+  // ── Rendering ─────────────────────────────────────────────────────────
+
+  const minContentLength = useXtmOne ? 2 : 10;
+  const isContentTooShort = currentValue.length < minContentLength;
+  const isButtonDisabled = disabled || isContentTooShort || (isCGUStatusPending && !isAdmin);
+  let tooltipTitle = isContentTooShort
+    ? t_i18n('Add more content before using AI')
+    : t_i18n('Ask AI');
+  if (isCGUStatusPending && !isAdmin) {
+    tooltipTitle = t_i18n('Ask Ariane isn\'t activated yet. Please reach out to your administrator to enable this feature.');
+  }
+
+  const renderButton = () => {
+    return (
+      <>
+        <EETooltip forAi={true} title={tooltipTitle}>
+          <span style={{ display: 'inline-flex' }}>
+            <IconButton
+              aria-label={t_i18n('Open menu')}
+              aria-haspopup={isButtonDisabled ? undefined : true}
+              size="small"
+              onClick={(event) => handleOpenMenu(event)}
+              disabled={isButtonDisabled}
+              style={{ color: isButtonDisabled ? (theme.palette.action?.disabled ?? 'rgba(255,255,255,0.3)') : theme.palette.ai.main }}
+            >
+              <FiligranIcon icon={LogoXtmOneIcon} size="small" />
+            </IconButton>
+          </span>
+        </EETooltip>
+        <Menu
+          id={menuId}
+          anchorEl={menuOpen.anchorEl}
+          open={menuOpen.open}
+          onClose={handleCloseMenu}
+        >
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('spelling') : handleLegacyAskAi('spelling'))}>
+            {t_i18n('Fix spelling & grammar')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('shorter') : handleLegacyAskAi('shorter'))}>
+            {t_i18n('Make it shorter')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('longer') : handleLegacyAskAi('longer'))}>
+            {t_i18n('Make it longer')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('tone') : handleOpenToneOptions())}>
+            {t_i18n('Change tone')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('summarize') : handleLegacyAskAi('summarize'))}>
+            {t_i18n('Summarize')}
+          </MenuItem>
+          <MenuItem onClick={() => (useXtmOne ? handleAgentAction('explain') : handleLegacyAskAi('explain', false))}>
+            {t_i18n('Explain')}
+          </MenuItem>
+        </Menu>
+        {busId && (
+          <ResponseDialog
+            id={busId}
+            isDisabled={useXtmOne ? false : disableResponse}
+            isOpen={displayAskAI}
+            handleClose={handleCloseAskAI}
+            content={content}
+            setContent={setContent}
+            handleAccept={(value) => {
+              setFieldValue(value);
+              handleCloseAskAI();
+            }}
+            handleFollowUp={handleCloseAskAI}
+            followUpActions={useXtmOne ? [] : [{ key: 'retry', label: t_i18n('Retry') }]}
+            format={format}
+            isAcceptable={useXtmOne ? true : isAcceptable}
+            agentMode={useXtmOne ? agentMode : null}
+          />
+        )}
+        {/* Legacy tone selection dialog (only used when XTM One is NOT configured) */}
+        {!useXtmOne && (
+          <Dialog
+            open={openToneOptions}
+            onClose={handleCloseToneOptions}
+            title={t_i18n('Select options')}
+          >
+            <Select
+              value={tone}
+              onValueChange={(value) => setTone(value as 'tactical' | 'operational' | 'strategic')}
+            >
+              <SelectLabel>{t_i18n('Tone')}</SelectLabel>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent aria-label={t_i18n('Tone')}>
+                <SelectItem value="tactical">{t_i18n('Tactical')}</SelectItem>
+                <SelectItem value="operational">{t_i18n('Operational')}</SelectItem>
+                <SelectItem value="strategic">{t_i18n('Strategic')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <DialogActions>
+              <Button variant="secondary" onClick={handleCloseToneOptions}>
+                {t_i18n('Cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  handleCloseToneOptions();
+                  handleLegacyAskAi('tone');
+                }}
+              >
+                {t_i18n('Generate')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+        {displayCGUDialog && (
+          <ValidateTermsOfUseDialog open={displayCGUDialog} onClose={() => setDisplayCGUDialog(false)} />
+        )}
+      </>
+    );
+  };
+
+  if (variant === 'markdown') {
+    return (
+      <div style={style || { position: 'absolute', top: 30, right: 10, paddingTop: 4 }}>
+        {showAIButton && renderButton()}
+      </div>
+    );
+  }
+  if (variant === 'html') {
+    return (
+      <div style={style || { position: 'absolute', top: -12, right: 30, paddingTop: 4 }}>
+        {showAIButton && renderButton()}
+      </div>
+    );
+  }
+
+  return (
+    <InputAdornment position="end" style={{ position: 'absolute', right: 10 }}>
+      {showAIButton && renderButton()}
+    </InputAdornment>
+  );
+};
+
+export default TextFieldAskAI;

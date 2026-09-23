@@ -1,0 +1,17 @@
+import { Page } from '@playwright/test';
+
+export default class ArtifactImportPage {
+  constructor(private page: Page) {}
+
+  getFileInput() {
+    return this.page.getByLabel('file');
+  }
+
+  getCreateArtifactImportButton() {
+    return this.page.getByRole('button', { name: 'Create' });
+  }
+
+  getErrorMessage() {
+    return this.page.getByText('A file or a URL must be provided');
+  }
+}

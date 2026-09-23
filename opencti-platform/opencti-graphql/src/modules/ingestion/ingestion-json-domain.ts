@@ -1,0 +1,497 @@
+/*
+Copyright (c) 2021-2025 Filigran SAS
+
+This file is part of the OpenCTI Enterprise Edition ("EE") and is
+licensed under the OpenCTI Enterprise Edition License (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+https://github.com/OpenCTI-Platform/opencti/blob/master/LICENSE
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*/
+
+import * as JSONPath from 'jsonpath-plus';
+import type { FileHandle } from 'fs/promises';
+import type { AuthContext, AuthUser } from '../../types/user';
+import { fullEntitiesList, pageEntitiesConnection, storeLoadById } from '../../database/middleware-loader';
+import { type BasicStoreEntityIngestionJson, type DataParam, ENTITY_TYPE_INGESTION_JSON, type StoreEntityIngestionJson } from './ingestion-types';
+import { addAuthenticationCredentials, verifyIngestionAuthenticationContent, verifyIngestionUri } from './ingestion-common';
+import { createEntity, deleteElementById, patchAttribute, updateAttribute } from '../../database/middleware';
+import { connectorIdFromIngestId, registerConnectorForIngestion, unregisterConnectorForIngestion } from '../../domain/connector';
+import { publishUserAction } from '../../listener/UserActionListener';
+import { type BasicStoreEntityJsonMapper, ENTITY_TYPE_JSON_MAPPER, type JsonMapperParsed, type JsonMapperRepresentation } from '../internal/jsonMapper/jsonMapper-types';
+import { type EditInput, FilterMode, IngestionAuthType, type IngestionJsonAddInput, type JsonMapperTestResult } from '../../generated/graphql';
+import { notify } from '../../database/redis';
+import conf, { BUS_TOPICS, logApp, PLATFORM_VERSION } from '../../config/conf';
+import { ABSTRACT_INTERNAL_OBJECT } from '../../schema/general';
+import { getHttpClient, type GetHttpClient, OpenCTIHeaders } from '../../utils/http-client';
+import { isEmptyField, isNotEmptyField, wait } from '../../database/utils';
+import { createJsonMapperFromConfiguration, findById as findJsonMapperById } from '../internal/jsonMapper/jsonMapper-domain';
+import { SYSTEM_USER } from '../../utils/access';
+import jsonMappingExecution from '../../parser/json-mapper';
+import type { StixObject } from '../../types/stix-2-1-common';
+import { getEntitiesMapFromCache } from '../../database/cache';
+import { ENTITY_TYPE_CONNECTOR, ENTITY_TYPE_USER } from '../../schema/internalObject';
+import { encryptIngestionCredential, decryptIngestionCredential } from './ingestion-common';
+import { extractContentFrom } from '../../utils/fileToContent';
+import { isCompatibleVersionWithMinimal } from '../../utils/version';
+import { FunctionalError } from '../../config/errors';
+import { convertRepresentationsIds } from '../internal/mapper-utils';
+
+const MINIMAL_JSON_FEED_COMPATIBLE_VERSION = '7.260722.0';
+
+interface JsonQueryFetchOpts {
+  maxResults?: number;
+  timeout?: number;
+}
+
+const DEFAULT_FEED_REQUEST_TIMEOUT = conf.get('ingestion_manager:feed:request_timeout') || 300000;
+
+const getValueFromPath = (path: string, json: any) => {
+  return JSONPath.JSONPath({ path, json, wrap: false, flatten: true });
+};
+const buildQueryObject = (queryParamsAttributes: Array<DataParam> | undefined, requestData: Record<string, any>, withDefault = true) => {
+  const params: Record<string, object | string> = {};
+  if (queryParamsAttributes) {
+    for (let attrIndex = 0; attrIndex < queryParamsAttributes.length; attrIndex += 1) {
+      const queryParamsAttribute = queryParamsAttributes[attrIndex];
+      let attrValue;
+      if (queryParamsAttribute.type === 'data') {
+        let valueFromPath = getValueFromPath(queryParamsAttribute.from, requestData);
+        if (queryParamsAttribute.data_operation === 'count' && valueFromPath) {
+          valueFromPath = Array.isArray(valueFromPath) ? valueFromPath.length : 1;
+        }
+        attrValue = valueFromPath;
+      } else {
+        attrValue = requestData[queryParamsAttribute.from];
+      }
+      if (isNotEmptyField(attrValue)) {
+        params[queryParamsAttribute.to] = attrValue;
+      } else if (isNotEmptyField(queryParamsAttribute.default) && withDefault) {
+        params[queryParamsAttribute.to] = queryParamsAttribute.default;
+      }
+    }
+  }
+  return params;
+};
+
+/**
+ * Normalises the result of getValueFromPath (typed as any) to a string or null.
+ * JSONPath can return an array — in that case the first element is used.
+ * Non-string, non-array values (objects, numbers, …) are rejected (return null).
+ */
+const toUrlString = (value: unknown): string | null => {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return typeof candidate === 'string' ? candidate : null;
+};
+
+const replaceVariables = (body: string | undefined | null, variables: Record<string, object | string>) => {
+  if (body == null) return '';
+  const regex = /\$\w+/g;
+  return body.replace(regex, (match) => {
+    const variableName = match.substring(1);
+    if (Object.prototype.hasOwnProperty.call(variables, variableName)) {
+      // If found, return the corresponding value
+      // Ensure the returned value is converted to a string if it's not already
+      return String(variables[variableName]);
+    }
+    return match;
+  });
+};
+
+const filterVariablesForAttributes = (attributes: Array<DataParam>, variables: Record<string, object | string>, exposed: 'body' | 'query_param' | 'header') => {
+  const params: Record<string, object | string> = {};
+  const paramAttributes = attributes.filter((query) => query.exposed === exposed);
+  for (let attrIndex = 0; attrIndex < paramAttributes.length; attrIndex += 1) {
+    const queryParamsAttribute = paramAttributes[attrIndex];
+    params[queryParamsAttribute.to] = variables[queryParamsAttribute.to];
+  }
+  return params;
+};
+
+export const executeJsonQuery = async (context: AuthContext, ingestion: BasicStoreEntityIngestionJson, opts: JsonQueryFetchOpts = {}) => {
+  const { maxResults = 0, timeout = DEFAULT_FEED_REQUEST_TIMEOUT } = opts;
+  let certificates;
+  const headers = new OpenCTIHeaders();
+  headers.Accept = 'application/json';
+  const headerOptions = ingestion.headers ?? [];
+  for (let index = 0; index < headerOptions.length; index += 1) {
+    const h = headerOptions[index];
+    headers[h.name] = h.value;
+  }
+  // Prepare headers
+  const variables = isEmptyField(ingestion.ingestion_json_state) ? buildQueryObject(ingestion.query_attributes, {}) : ingestion.ingestion_json_state;
+  const headerVariables = filterVariablesForAttributes(ingestion.query_attributes ?? [], variables, 'header');
+  Object.entries(headerVariables).forEach(([k, v]) => {
+    headers[k] = String(v);
+  });
+  const decryptedAuthValue = await decryptIngestionCredential(ingestion.authentication_value);
+  if (ingestion.authentication_type === IngestionAuthType.Basic) {
+    const basicAuthenticationValue = decryptedAuthValue as string;
+    const auth = Buffer.from(basicAuthenticationValue, 'utf-8').toString('base64');
+    headers.Authorization = `Basic ${auth}`;
+  }
+  if (ingestion.authentication_type === IngestionAuthType.Bearer) {
+    headers.Authorization = `Bearer ${decryptedAuthValue}`;
+  }
+  if (ingestion.authentication_type === IngestionAuthType.Certificate) {
+    const certificateAuthenticationValue = decryptedAuthValue as string;
+    certificates = {
+      cert: certificateAuthenticationValue.split(':')[0],
+      key: certificateAuthenticationValue.split(':')[1],
+      ca: certificateAuthenticationValue.split(':')[2],
+    };
+  }
+  const httpClientOptions: GetHttpClient = {
+    headers,
+    rejectUnauthorized: ingestion.ssl_verify ?? false,
+    timeout,
+    responseType: 'json',
+    certificates,
+    beforeRedirect: (options) => {
+      // axios delegates redirect handling to the `follow-redirects` package, which enriches
+      // the options object with a `href` field (in addition to protocol/hostname/port/path)
+      // before invoking beforeRedirect. See follow-redirects `preservedUrlFields` / `spreadUrlObject`.
+      if (typeof options.href === 'string') {
+        verifyIngestionUri(options.href);
+      }
+    },
+  };
+  const httpClient = getHttpClient(httpClientOptions);
+  // Prepare query params
+  const queryVariables = filterVariablesForAttributes(ingestion.query_attributes ?? [], variables, 'query_param');
+  const parsedUri = replaceVariables(ingestion.uri, queryVariables);
+  // Re-validate after variable substitution to prevent placeholder bypass of deny list
+  verifyIngestionUri(parsedUri);
+  // Prepare body
+  const bodyVariables = filterVariablesForAttributes(ingestion.query_attributes ?? [], variables, 'body');
+  const parsedBody = replaceVariables(ingestion.body, bodyVariables);
+  // Execute the http query
+  logApp.info(`> Main query: ${parsedUri}`, { body: parsedBody });
+  const { data: requestData, headers: responseHeaders } = await httpClient.call({
+    method: ingestion.verb,
+    url: parsedUri,
+    data: parsedBody,
+  });
+  const jsonMapper = await findJsonMapperById(context, SYSTEM_USER, ingestion.json_mapper_id);
+  const jsonMapperParsed: JsonMapperParsed = {
+    ...jsonMapper,
+    representations: JSON.parse(jsonMapper.representations),
+    variables: jsonMapper.variables ? JSON.parse(jsonMapper.variables) : [],
+  };
+  const platformUsers = await getEntitiesMapFromCache<AuthUser>(context, SYSTEM_USER, ENTITY_TYPE_USER);
+  const ingestionUser = ingestion.user_id ? platformUsers.get(ingestion.user_id) : null;
+  let objects = await jsonMappingExecution(context, ingestionUser || SYSTEM_USER, requestData, jsonMapperParsed, maxResults);
+  let nextExecutionState = buildQueryObject(ingestion.query_attributes, { ...requestData, ...responseHeaders }, false);
+  // region Try to paginate with next page style
+  if (ingestion.pagination_with_sub_page && isNotEmptyField(ingestion.pagination_with_sub_page_attribute_path)) {
+    let url = toUrlString(getValueFromPath(ingestion.pagination_with_sub_page_attribute_path, requestData));
+    while (isNotEmptyField(url) && (maxResults === 0 || objects.length < maxResults)) {
+      verifyIngestionUri(url);
+      logApp.info(`> Sub query: ${url}`);
+      await wait(100); // Wait 100 ms between 2 calls
+      const { data: paginationData } = await httpClient.call({
+        method: ingestion.pagination_with_sub_page_query_verb ?? ingestion.verb,
+        url,
+        data: ingestion.body,
+      });
+      const paginationVariables = buildQueryObject(ingestion.query_attributes, { ...paginationData, ...responseHeaders }, false);
+      nextExecutionState = { ...nextExecutionState, ...paginationVariables };
+      const maxObjects = maxResults === 0 ? 0 : maxResults - objects.length;
+      const paginationObjects = await jsonMappingExecution(context, ingestionUser || SYSTEM_USER, paginationData, jsonMapperParsed, maxObjects);
+      if (paginationObjects.length > 0) {
+        objects = objects.concat(paginationObjects);
+      }
+      url = toUrlString(getValueFromPath(ingestion.pagination_with_sub_page_attribute_path, paginationData));
+    }
+  }
+  // endregion
+  // In case of limitation, ensure to not return too many elements
+  if (maxResults > 0) {
+    objects = objects.slice(0, maxResults);
+  }
+  return { objects, variables, nextExecutionState };
+};
+
+export const findById = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  return storeLoadById<BasicStoreEntityIngestionJson>(context, user, ingestionId, ENTITY_TYPE_INGESTION_JSON);
+};
+
+export const findJsonIngestionPaginated = async (context: AuthContext, user: AuthUser, opts = {}) => {
+  return pageEntitiesConnection<BasicStoreEntityIngestionJson>(context, user, [ENTITY_TYPE_INGESTION_JSON], opts);
+};
+
+export const findAllJsonIngestion = async (context: AuthContext, user: AuthUser, opts = {}) => {
+  return fullEntitiesList<BasicStoreEntityIngestionJson>(context, user, [ENTITY_TYPE_INGESTION_JSON], opts);
+};
+
+export const findJsonMapperForIngestionById = (context: AuthContext, user: AuthUser, jsonMapperId: string) => {
+  return storeLoadById<BasicStoreEntityJsonMapper>(context, user, jsonMapperId, ENTITY_TYPE_JSON_MAPPER);
+};
+
+export const deleteIngestionJson = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  const deleted = await deleteElementById<StoreEntityIngestionJson>(context, user, ingestionId, ENTITY_TYPE_INGESTION_JSON);
+  await unregisterConnectorForIngestion(context, deleted.id);
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'delete',
+    event_access: 'administration',
+    message: `deletes json ingestion \`${deleted.name}\``,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_JSON, input: deleted },
+  });
+  return ingestionId;
+};
+
+// Header values commonly carry credentials (Authorization, API keys, cookies):
+// like authentication_value, sensitive ones are blanked in the export and must
+// be set again at import time.
+const SENSITIVE_HEADER_NAME = /authorization|token|key|secret|password|cookie|credential/i;
+export const sanitizeExportedHeaders = (headers: { name: string; value: string }[] | undefined) => {
+  return headers?.map((header) => (SENSITIVE_HEADER_NAME.test(header.name) ? { ...header, value: '' } : header));
+};
+
+// Exports the feed configuration with the JSON mapper embedded (a JSON feed
+// references its mapper, so the export must be self-contained). Credentials,
+// user and markings are platform-specific and are set again at import time.
+export const jsonFeedExport = async (context: AuthContext, user: AuthUser, ingestionJson: BasicStoreEntityIngestionJson) => {
+  const jsonMapper = await findJsonMapperById(context, user, ingestionJson.json_mapper_id);
+  const parsedRepresentations: JsonMapperRepresentation[] = JSON.parse(jsonMapper.representations);
+  await convertRepresentationsIds(context, user, parsedRepresentations, 'internal');
+  const {
+    name,
+    description,
+    scheduling_period,
+    uri,
+    verb,
+    body,
+    pagination_with_sub_page,
+    pagination_with_sub_page_attribute_path,
+    pagination_with_sub_page_query_verb,
+    headers,
+    query_attributes,
+    authentication_type,
+    ssl_verify,
+  } = ingestionJson;
+  return JSON.stringify({
+    openCTI_version: PLATFORM_VERSION,
+    type: 'jsonFeeds',
+    configuration: {
+      name,
+      description,
+      scheduling_period,
+      uri,
+      verb,
+      body,
+      pagination_with_sub_page,
+      pagination_with_sub_page_attribute_path,
+      pagination_with_sub_page_query_verb,
+      headers: sanitizeExportedHeaders(headers),
+      query_attributes,
+      authentication_type,
+      authentication_value: '',
+      ssl_verify,
+      json_mapper: {
+        name: jsonMapper.name,
+        variables: jsonMapper.variables ? JSON.parse(jsonMapper.variables) : [],
+        representations: parsedRepresentations,
+      },
+    },
+  });
+};
+
+export const jsonFeedAddInputFromImport = async (context: AuthContext, user: AuthUser, file: Promise<FileHandle>) => {
+  const parsedData = await extractContentFrom(file);
+
+  // check platform version compatibility
+  if (!isCompatibleVersionWithMinimal(parsedData.openCTI_version, MINIMAL_JSON_FEED_COMPATIBLE_VERSION)) {
+    throw FunctionalError(
+      `Invalid version of the platform. Please upgrade your OpenCTI. Minimal version required: ${MINIMAL_JSON_FEED_COMPATIBLE_VERSION}`,
+      { reason: parsedData.openCTI_version },
+    );
+  }
+
+  const { json_mapper: jsonMapperConfiguration, ...configuration } = parsedData.configuration;
+  if (isEmptyField(jsonMapperConfiguration?.name)) {
+    throw FunctionalError('Invalid JSON feed configuration: missing embedded JSON mapper', {});
+  }
+
+  // Reuse an existing mapper with the same name, otherwise create it from the
+  // embedded configuration (this is why the import is a mutation).
+  const sameNameOpts = {
+    filters: {
+      mode: FilterMode.And,
+      filterGroups: [],
+      filters: [{ key: ['name'], values: [jsonMapperConfiguration.name] }],
+    },
+  };
+  const existingMappers = await fullEntitiesList<BasicStoreEntityJsonMapper>(context, user, [ENTITY_TYPE_JSON_MAPPER], sameNameOpts);
+  const jsonMapper = existingMappers.length > 0
+    ? existingMappers[0]
+    : await createJsonMapperFromConfiguration(context, user, jsonMapperConfiguration);
+
+  return {
+    ...configuration,
+    jsonMapper: { id: jsonMapper.id, name: jsonMapper.name },
+  };
+};
+
+export const addIngestionJson = async (context: AuthContext, user: AuthUser, input: IngestionJsonAddInput) => {
+  verifyIngestionUri(input.uri);
+  if (input.authentication_value) {
+    verifyIngestionAuthenticationContent(input.authentication_type, input.authentication_value);
+  }
+  const inputToCreate = { ...input };
+  if (inputToCreate.authentication_value) {
+    inputToCreate.authentication_value = await encryptIngestionCredential(inputToCreate.authentication_value);
+  }
+  const { element, isCreation } = await createEntity(context, user, inputToCreate, ENTITY_TYPE_INGESTION_JSON, { complete: true });
+  if (isCreation) {
+    await registerConnectorForIngestion(context, {
+      id: element.id,
+      type: 'JSON',
+      name: element.name,
+      is_running: element.ingestion_running ?? false,
+      connector_user_id: input.user_id,
+    });
+    await publishUserAction({
+      user,
+      event_type: 'mutation',
+      event_scope: 'create',
+      event_access: 'administration',
+      message: `creates json ingestion \`${input.name}\``,
+      context_data: { id: element.id, entity_type: ENTITY_TYPE_INGESTION_JSON, input },
+    });
+  }
+  return element;
+};
+
+export const editIngestionJson = async (context: AuthContext, user: AuthUser, id: string, input: IngestionJsonAddInput) => {
+  if (input.uri) {
+    verifyIngestionUri(input.uri);
+  }
+  let authenticationValue = input.authentication_value;
+  if (authenticationValue && input.authentication_type) {
+    const { authentication_value: encrypted_value } = await findById(context, user, id);
+    const authentication_value = await decryptIngestionCredential(encrypted_value);
+    verifyIngestionAuthenticationContent(input.authentication_type, authenticationValue);
+    authenticationValue = addAuthenticationCredentials(
+      authentication_value,
+      authenticationValue,
+      input.authentication_type,
+    );
+  }
+  const encryptedAuthenticationValue = await encryptIngestionCredential(authenticationValue);
+
+  const { element } = await patchAttribute<StoreEntityIngestionJson>(context, user, id, ENTITY_TYPE_INGESTION_JSON, {
+    ...input,
+    authentication_value: encryptedAuthenticationValue,
+  });
+  return element;
+};
+
+export const ingestionJsonEditField = async (context: AuthContext, user: AuthUser, ingestionId: string, input: EditInput[]) => {
+  const uriField = input.find((editInput) => editInput.key === 'uri');
+  if (uriField && uriField.value[0]) {
+    verifyIngestionUri(uriField.value[0]);
+  }
+
+  const patchInput = [...input];
+
+  if (input.some((editInput) => editInput.key === 'authentication_value')) {
+    const { authentication_value: encrypted_value, authentication_type } = await findById(context, user, ingestionId);
+    const authentication_value = await decryptIngestionCredential(encrypted_value);
+    const authenticationValueField = input.find((editInput) => editInput.key === 'authentication_value');
+    if (authenticationValueField?.value[0]) {
+      verifyIngestionAuthenticationContent(authentication_type, authenticationValueField?.value[0]);
+    }
+    const updatedAuthenticationValue = addAuthenticationCredentials(
+      authentication_value,
+      authenticationValueField?.value[0],
+      authentication_type,
+    );
+    const encryptedAuthenticationValue = await encryptIngestionCredential(updatedAuthenticationValue);
+
+    const updatedInput = patchInput.map((editInput) => {
+      if (editInput.key === 'authentication_value') {
+        return {
+          ...editInput,
+          value: [encryptedAuthenticationValue],
+        };
+      }
+      return editInput;
+    });
+
+    patchInput.splice(0, patchInput.length, ...updatedInput);
+  }
+
+  // Reset `authentication_value` on `authentication_type` change
+  if (input.some((editInput) => editInput.key === 'authentication_type')) {
+    const resetAuthenticationValue: EditInput = {
+      key: 'authentication_value',
+      value: [''],
+    };
+    patchInput.push(resetAuthenticationValue);
+  }
+
+  const { element } = await updateAttribute<StoreEntityIngestionJson>(context, user, ingestionId, ENTITY_TYPE_INGESTION_JSON, patchInput);
+  await registerConnectorForIngestion(context, {
+    id: element.id,
+    type: 'JSON',
+    name: element.name,
+    is_running: element.ingestion_running ?? false,
+    connector_user_id: element.user_id,
+  });
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `updates \`${input.map((i) => i.key).join(', ')}\` for json ingestion \`${element.name}\``,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_JSON, input },
+  });
+
+  return notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, element, user);
+};
+
+export const patchJsonIngestion = async (context: AuthContext, user: AuthUser, id: string, patch: object) => {
+  const patched = await patchAttribute(context, user, id, ENTITY_TYPE_INGESTION_JSON, patch);
+  return patched.element;
+};
+
+export const ingestionJsonResetState = async (context: AuthContext, user: AuthUser, ingestionId: string) => {
+  await patchJsonIngestion(context, user, ingestionId, { ingestion_json_state: null });
+  const ingestion = await findById(context, user, ingestionId);
+  const connectorId = connectorIdFromIngestId(ingestion.id);
+  await patchAttribute(context, SYSTEM_USER, connectorId, ENTITY_TYPE_CONNECTOR, { connector_state: null });
+  await publishUserAction({
+    user,
+    event_type: 'mutation',
+    event_scope: 'update',
+    event_access: 'administration',
+    message: `reset state of json ingestion ${ingestion.name}`,
+    context_data: { id: ingestionId, entity_type: ENTITY_TYPE_INGESTION_JSON, input: ingestion },
+  });
+  return notify(BUS_TOPICS[ABSTRACT_INTERNAL_OBJECT].EDIT_TOPIC, ingestion, user);
+};
+
+export const testJsonIngestionMapping = async (context: AuthContext, _user: AuthUser, input: IngestionJsonAddInput): Promise<JsonMapperTestResult> => {
+  verifyIngestionUri(input.uri);
+  if (input.authentication_value) {
+    verifyIngestionAuthenticationContent(input.authentication_type, input.authentication_value);
+  }
+  const inputToTest = {
+    ...input,
+    authentication_value: input.authentication_value ? await encryptIngestionCredential(input.authentication_value) : input.authentication_value,
+  } as BasicStoreEntityIngestionJson;
+  const { objects, nextExecutionState } = await executeJsonQuery(context, inputToTest, { maxResults: 50 });
+  return {
+    objects: JSON.stringify(objects, null, 2),
+    nbRelationships: objects.filter((object: StixObject) => object.type === 'relationship').length,
+    nbEntities: objects.filter((object: StixObject) => object.type !== 'relationship').length,
+    state: JSON.stringify(nextExecutionState),
+  };
+};

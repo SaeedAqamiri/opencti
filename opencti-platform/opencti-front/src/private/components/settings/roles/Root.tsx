@@ -1,0 +1,163 @@
+import React, { FunctionComponent, useState } from 'react';
+import { Route, Routes, useParams } from 'react-router';
+import { graphql, PreloadedQuery, useLazyLoadQuery, usePreloadedQuery } from 'react-relay';
+import { Box, Stack } from '@mui/material';
+import MenuItem from '@mui/material/MenuItem';
+import RoleDeletionDialog from '@components/settings/roles/RoleDeletionDialog';
+import RoleEdition from '@components/settings/roles/RoleEdition';
+import { useTheme } from '@mui/styles';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import Role from './Role';
+import { groupsSearchQuery } from '../Groups';
+import { RootRoleQuery } from './__generated__/RootRoleQuery.graphql';
+import { GroupsSearchQuery } from '../__generated__/GroupsSearchQuery.graphql';
+import useGranted, { SETTINGS_SETACCESSES, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import Security from '../../../../utils/Security';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import useSensitiveModifications from '../../../../utils/hooks/useSensitiveModifications';
+import PopoverMenu from '../../../../components/PopoverMenu';
+import type { Theme } from '../../../../components/Theme';
+import TitleMainEntity from '../../../../components/common/typography/TitleMainEntity';
+import { RootRoleEditionQuery } from './__generated__/RootRoleEditionQuery.graphql';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+
+const roleQuery = graphql`
+  query RootRoleQuery($id: String!) {
+    role(id: $id) {
+      id
+      standard_id
+      name
+      ...Role_role
+      ...RoleEdition_role
+    }
+  }
+`;
+
+const roleEditionQuery = graphql`
+  query RootRoleEditionQuery($id: String!) {
+    role(id: $id) {
+      ...RoleEdition_role
+    }
+  }
+`;
+
+interface RootRoleComponentProps {
+  queryRef: PreloadedQuery<RootRoleQuery>;
+  roleId: string;
+}
+
+const RootRoleComponent: FunctionComponent<RootRoleComponentProps> = ({ queryRef, roleId }) => {
+  const data = usePreloadedQuery(roleQuery, queryRef);
+  const { role } = data;
+  const { t_i18n } = useFormatter();
+  const canDelete = useGranted([KNOWLEDGE_KNUPDATE_KNDELETE]);
+  const theme = useTheme<Theme>();
+  const [openDelete, setOpenDelete] = useState(false);
+
+  const handleOpenDelete = () => setOpenDelete(true);
+  const handleCloseDelete = () => setOpenDelete(false);
+
+  const { isAllowed, isSensitive } = useSensitiveModifications('roles', role?.standard_id);
+  const roleEditionData = useLazyLoadQuery<RootRoleEditionQuery>(
+    roleEditionQuery,
+    { id: roleId },
+  );
+
+  const groupsQueryRef = useQueryLoading<GroupsSearchQuery>(
+    groupsSearchQuery,
+    {
+      groupsOrderBy: 'name',
+      groupsOrderMode: 'asc',
+    },
+  );
+
+  return (
+    <Security needs={[SETTINGS_SETACCESSES]}>
+      {role ? (
+        <>
+          <Breadcrumbs
+            isSensitive={isSensitive}
+            elements={[
+              { label: t_i18n('Settings') },
+              { label: t_i18n('Security') },
+              { label: t_i18n('Roles'), link: '/dashboard/settings/accesses/roles' },
+              { label: role.name, current: true },
+            ]}
+          />
+          <Stack direction="row" alignItems="center" paddingRight="200px" marginBottom={3}>
+            <TitleMainEntity sx={{ flex: 1 }}>
+              {role.name}
+            </TitleMainEntity>
+            <div style={{ marginRight: theme.spacing(0.5) }}>
+              {canDelete && (
+                <PopoverMenu>
+                  {({ closeMenu }) => (
+                    <Box>
+                      <MenuItem
+                        disabled={!isAllowed && isSensitive}
+                        onClick={() => {
+                          handleOpenDelete();
+                          closeMenu();
+                        }}
+                      >
+                        {t_i18n('Delete')}
+                      </MenuItem>
+                    </Box>
+                  )}
+                </PopoverMenu>
+              )}
+            </div>
+            <RoleDeletionDialog
+              roleId={role.id}
+              isOpen={openDelete}
+              handleClose={handleCloseDelete}
+            />
+            <RoleEdition
+              roleEditionData={roleEditionData}
+              disabled={!isAllowed && isSensitive}
+            />
+          </Stack>
+          <>
+            {groupsQueryRef ? (
+              <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={(
+                      <Role roleData={role} groupsQueryRef={groupsQueryRef} />
+                    )}
+                  />
+                </Routes>
+              </React.Suspense>
+            ) : (
+              <Loader variant={LoaderVariant.inElement} />
+            )
+            }
+          </>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </Security>
+  );
+};
+
+const RootRole = () => {
+  const { roleId } = useParams() as { roleId: string };
+  const queryRef = useQueryLoading<RootRoleQuery>(roleQuery, { id: roleId });
+  return (
+    <div>
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <RootRoleComponent queryRef={queryRef} roleId={roleId} />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </div>
+  );
+};
+
+export default RootRole;

@@ -1,0 +1,117 @@
+import React from 'react';
+import { filter } from 'ramda';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import { Link } from 'react-router';
+import IconButton from '@common/button/IconButton';
+import { Delete } from '@mui/icons-material';
+import { createFragmentContainer, graphql } from 'react-relay';
+import { ListItemButton, Tooltip } from '@mui/material';
+import AddCoursesOfAction from './AddCoursesOfAction';
+import { addCoursesOfActionMutationRelationDelete } from './AddCoursesOfActionLines';
+import { commitMutation } from '../../../../relay/environment';
+import { useFormatter } from '../../../../components/i18n';
+import FieldOrEmpty from '../../../../components/FieldOrEmpty';
+import Label from '../../../../components/common/label/Label';
+
+const AttackPatternCoursesOfActionComponent = ({ attackPattern }) => {
+  const { t_i18n } = useFormatter();
+
+  const removeCourseOfAction = (courseOfActionEdge) => {
+    commitMutation({
+      mutation: addCoursesOfActionMutationRelationDelete,
+      variables: {
+        fromId: courseOfActionEdge.node.id,
+        toId: attackPattern.id,
+        relationship_type: 'mitigates',
+      },
+      updater: (store) => {
+        const node = store.get(attackPattern.id);
+        const coursesOfAction = node.getLinkedRecord('coursesOfAction');
+        const edges = coursesOfAction.getLinkedRecords('edges');
+        const newEdges = filter(
+          (n) => n.getLinkedRecord('node').getValue('id')
+            !== courseOfActionEdge.node.id,
+          edges,
+        );
+        coursesOfAction.setLinkedRecords(newEdges, 'edges');
+      },
+    });
+  };
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', flexDirection: 'row' }}>
+        <Label action={(
+          <AddCoursesOfAction
+            attackPattern={attackPattern}
+            attackPatternCoursesOfAction={attackPattern.coursesOfAction.edges}
+          />
+        )}
+        >
+          {t_i18n('Courses of action')}
+        </Label>
+      </div>
+      <List>
+        <FieldOrEmpty source={attackPattern.coursesOfAction.edges}>
+          {attackPattern.coursesOfAction.edges.map((courseOfActionEdge) => {
+            const courseOfAction = courseOfActionEdge.node;
+            return (
+              <ListItem
+                key={courseOfAction.id}
+                dense={true}
+                divider={true}
+                disablePadding={true}
+                secondaryAction={(
+                  <Tooltip title={t_i18n('Delete relationship')}>
+                    <IconButton
+                      onClick={() => removeCourseOfAction(courseOfActionEdge)}
+                      aria-label={t_i18n('Delete relationship')}
+                    >
+                      <Delete />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              >
+                <ListItemButton
+                  component={Link}
+                  to={`/dashboard/techniques/courses_of_action/${courseOfAction.id}`}
+                  sx={{ paddingLeft: 0 }}
+                >
+                  <ListItemText primary={courseOfAction.name} />
+                </ListItemButton>
+              </ListItem>
+            );
+          })}
+        </FieldOrEmpty>
+      </List>
+    </div>
+  );
+};
+
+const AttackPatternCoursesOfAction = createFragmentContainer(
+  AttackPatternCoursesOfActionComponent,
+  {
+    attackPattern: graphql`
+      fragment AttackPatternCoursesOfAction_attackPattern on AttackPattern {
+        id
+        name
+        parent_types
+        entity_type
+        coursesOfAction {
+          edges {
+            node {
+              id
+              parent_types
+              name
+              description
+            }
+          }
+        }
+      }
+    `,
+  },
+);
+
+export default AttackPatternCoursesOfAction;

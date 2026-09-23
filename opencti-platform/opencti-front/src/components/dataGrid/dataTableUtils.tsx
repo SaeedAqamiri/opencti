@@ -1,0 +1,1656 @@
+import React, { ReactNode } from 'react';
+import { Chip } from '@filigran/design-system';
+import StixCoreObjectLabels from '@components/common/stix_core_objects/StixCoreObjectLabels';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/styles';
+import { DraftChip, DraftStatusChip } from '@components/common/draft/DraftChip';
+import { HorizontalRule, Security } from '@mui/icons-material';
+import { Pirs_PirFragment$data } from '@components/pir/__generated__/Pirs_PirFragment.graphql';
+import SecurityCoverageScores from '@components/analyses/security_coverages/SecurityCoverageScores';
+import ItemCvssScore from '../ItemCvssScore';
+import type { DataTableColumn } from './dataTableTypes';
+import { DataTableProps } from './dataTableTypes';
+import ItemMarkings from '../ItemMarkings';
+import ItemStatus from '../ItemStatus';
+import ItemPriority from '../ItemPriority';
+import RatingField from '../fields/RatingField';
+import ItemConfidence from '../ItemConfidence';
+import ItemPatternType from '../ItemPatternType';
+import type { Theme } from '../Theme';
+import { getMainRepresentative } from '../../utils/defaultRepresentatives';
+import ItemEntityType from '../ItemEntityType';
+import ItemScore from '../ItemScore';
+import ItemOpenVocab from '../ItemOpenVocab';
+import ItemBoolean from '../ItemBoolean';
+import ItemSeverity from '../ItemSeverity';
+import ItemOperations from '../ItemOperations';
+import ItemDueDate from '../ItemDueDate';
+import { findFlagUrl } from '../../utils/flags';
+import FieldOrEmpty from '../FieldOrEmpty';
+import ItemHistory from '../ItemHistory';
+import { useFormatter } from '../i18n';
+import Tag from '../common/tag/Tag';
+import { resolveLink } from '../../utils/Entity';
+import { typesWithNoAnalysesTab } from '../../utils/hooks/useAttributes';
+import { useNavigate } from 'react-router';
+import TagsOverflow from '../common/tag/TagsOverflow';
+import { VocabularyDefinition } from '../../utils/hooks/useVocabularyCategory';
+import { EMPTY_VALUE } from '../../utils/String';
+import { Box, Stack } from '@mui/material';
+
+export const Truncate = ({ children }: { children: ReactNode }) => (
+  <div
+    style={{
+      textOverflow: 'ellipsis',
+      overflow: 'hidden',
+      whiteSpace: 'nowrap',
+    }}
+  >
+    {children}
+  </div>
+);
+
+export const defaultRender: NonNullable<DataTableColumn['render']> = (
+  data,
+  displayDraftChip = false,
+) => {
+  const displayedData = Array.isArray(data) ? data.join(', ') : data;
+  return (
+    <FieldOrEmpty source={data}>
+      <Tooltip title={displayedData}>
+        <Stack
+          direction="row"
+          gap={1}
+          alignItems="center"
+          sx={{ maxWidth: '100%' }}
+        >
+          <Truncate>{displayedData}</Truncate>
+          {displayDraftChip && <DraftChip />}
+        </Stack>
+      </Tooltip>
+    </FieldOrEmpty>
+  );
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const renderObservableValue = (observable: any, theme: Theme) => {
+  switch (observable.entity_type) {
+    case 'IPv4-Addr':
+    case 'IPv6-Addr': {
+      const country = observable.countries?.edges?.[0]?.node;
+      if (country) {
+        const flagUrl = findFlagUrl(country.x_opencti_aliases);
+        if (flagUrl) {
+          return (
+            <div
+              style={{
+                display: 'flex',
+                gap: theme.spacing(1),
+                alignItems: 'center',
+              }}
+            >
+              <Tooltip title={country.name}>
+                <img
+                  style={{ width: 20 }}
+                  src={flagUrl}
+                  alt={country.name}
+                />
+              </Tooltip>
+              <div>
+                {defaultRender(
+                  observable.observable_value,
+                  observable.draftVersion,
+                )}
+              </div>
+            </div>
+          );
+        }
+      }
+      return defaultRender(
+        observable.observable_value,
+        observable.draftVersion,
+      );
+    }
+    default:
+      return defaultRender(
+        observable.observable_value,
+        observable.draftVersion,
+      );
+  }
+};
+
+const defaultColumns: DataTableProps['dataColumns'] = {
+  aliases: {
+    id: 'aliases',
+    label: 'Aliases',
+    percentWidth: 10,
+    render: ({ aliases }) => {
+      return (
+        <FieldOrEmpty source={aliases}>
+          <TagsOverflow
+            items={aliases}
+            getKey={(alias: string) => alias}
+            renderTag={(alias: string) => (<Tag label={alias} />)}
+          >
+          </TagsOverflow>
+        </FieldOrEmpty>
+      );
+    },
+  },
+  allowed_markings: {
+    id: 'allowed_markings',
+    percentWidth: 16,
+    label: 'Allowed markings',
+    isSortable: false,
+    render: ({ allowed_markings }) => (
+      <ItemMarkings markingDefinitions={allowed_markings ?? []} limit={2} />
+    ),
+  },
+  analyses: {
+    id: 'analyses',
+    label: 'Analyses',
+    percentWidth: 8,
+    isSortable: false,
+    render: ({ id, entity_type, containersNumber }) => {
+      const { n } = useFormatter();
+      const navigate = useNavigate();
+      const analysesNumber = containersNumber?.total;
+      const link = `${resolveLink(entity_type)}/${id}`;
+      const linkAnalyses = `${link}/analyses`;
+      return (
+        <Box
+          component="span"
+          sx={{
+            display: 'inline-flex',
+            '& button:hover::before': {
+              backgroundColor: 'color-mix(in srgb, var(--color-feedback-neutral-secondary) 55%, transparent) !important',
+            },
+          }}
+        >
+          {typesWithNoAnalysesTab.includes(entity_type) ? (
+            <Tag label={n(analysesNumber)} disableTooltip />
+          ) : (
+            <Tag
+              label={n(analysesNumber)}
+              disableTooltip
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate(linkAnalyses);
+              }}
+            />
+          )}
+        </Box>
+      );
+    },
+  },
+  authorized_members_activation_date: {
+    id: 'authorized_members_activation_date',
+    label: 'Restriction Date',
+    isSortable: true,
+    render: ({ authorized_members_activation_date }, helpers) =>
+      defaultRender(helpers.fd(authorized_members_activation_date)),
+  },
+  attribute_abstract: {
+    id: 'attribute_abstract',
+    label: 'Abstract',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ attribute_abstract, content, draftVersion }) => {
+      return defaultRender(attribute_abstract || content, draftVersion);
+    },
+  },
+  attribute_count: {
+    id: 'attribute_count',
+    label: 'Nb.',
+    percentWidth: 4,
+    isSortable: true,
+    render: ({ attribute_count }) => defaultRender(String(attribute_count)),
+  },
+  channel_types: {
+    id: 'channel_types',
+    label: 'Types',
+    percentWidth: 20,
+    isSortable: true,
+    render: ({ channel_types }) => {
+      return defaultRender(channel_types);
+    },
+  },
+  color: {
+    id: 'color',
+    label: 'Color',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ color }) => (
+      <Tooltip title={color}>
+        <>
+          <div
+            style={{
+              backgroundColor: color,
+              height: 20,
+              width: 20,
+              display: 'inline-flex',
+              borderRadius: 20,
+              marginRight: 5,
+            }}
+          />
+          <Truncate>{color}</Truncate>
+        </>
+      </Tooltip>
+    ),
+  },
+  confidence: {
+    id: 'confidence',
+    label: 'Confidence',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ confidence, entity_type }) => (
+      <ItemConfidence confidence={confidence} entityType={entity_type} />
+    ),
+  },
+  context: {
+    id: 'context',
+    label: 'Context',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ context }) => {
+      return <Tag label={context} />;
+    },
+  },
+  coverage_last_result: {
+    id: 'coverage_last_result',
+    label: 'Last result',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ coverage_last_result }, { fndt }) => fndt(coverage_last_result),
+  },
+  created: {
+    id: 'created',
+    label: 'Original creation date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ created }, helpers) => defaultRender(helpers.fd(created)),
+  },
+  created_at: {
+    id: 'created_at',
+    label: 'Platform creation date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ created_at }, helpers) => defaultRender(helpers.fd(created_at)),
+  },
+  createdBy: {
+    id: 'createdBy',
+    label: 'Author',
+    percentWidth: 12,
+    render: ({ createdBy }) => defaultRender(createdBy?.name),
+  },
+  creator: {
+    id: 'creator',
+    label: 'Creators',
+    percentWidth: 12,
+    render: ({ creators }) => {
+      const value = creators?.map((c: { name: string }) => c.name);
+      return defaultRender(value);
+    },
+  },
+  creators: {
+    id: 'creators',
+    label: 'Creators',
+    percentWidth: 12,
+    render: ({ creators }) => {
+      const value = creators?.map((c: { name: string }) => c.name);
+      return defaultRender(value);
+    },
+  },
+  coverage_information: {
+    label: 'Coverage',
+    percentWidth: 12,
+    isSortable: false,
+    render: ({ coverage_information }) => {
+      return (
+        <SecurityCoverageScores
+          coverage_information={coverage_information}
+        />
+      );
+    },
+  },
+  definition: {
+    id: 'definition',
+    label: 'Definition',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ definition }) => defaultRender(definition),
+  },
+  definition_type: {
+    id: 'definition_type',
+    label: 'Type',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ definition_type }) => defaultRender(definition_type),
+  },
+  description: {
+    id: 'description',
+    label: 'Description',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ description }) => defaultRender(description),
+  },
+  draftVersion: {
+    id: 'draftVersion',
+    label: 'Operation',
+    percentWidth: 10,
+    isSortable: false,
+    render: ({ draftVersion }) => (
+      <ItemOperations draftOperation={draftVersion?.draft_operation} />
+    ),
+  },
+  draft_status: {
+    id: 'draft_status',
+    label: 'Processing status',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ draft_status }) => <DraftStatusChip draftStatus={draft_status} />,
+  },
+  due_date: {
+    id: 'due_date',
+    label: 'Due Date',
+    percentWidth: 15,
+    render: ({ due_date }) => (
+      <ItemDueDate due_date={due_date} variant="inList" />
+    ),
+  },
+  effective_confidence_level: {
+    id: 'effective_confidence_level',
+    label: 'Max Confidence',
+    percentWidth: 10,
+    isSortable: false,
+    render: ({ effective_confidence_level }) =>
+      defaultRender(effective_confidence_level?.max_confidence),
+  },
+  event_scope: {
+    id: 'event_scope',
+    label: 'Activity',
+    percentWidth: 50,
+    isSortable: false,
+    render: ({ user, context_data }) => (
+      <ItemHistory username={user.name} message={context_data.message} />
+    ),
+  },
+  entity_type: {
+    id: 'entity_type',
+    label: 'Type',
+    percentWidth: 10,
+    isSortable: false,
+    render: (data) => <ItemEntityType showIcon entityType={data.entity_type} />,
+  },
+  entity_types: {
+    id: 'entity_types',
+    label: 'Used in',
+    percentWidth: 20,
+    isSortable: false,
+    render: (data: { category: VocabularyDefinition }, { t_i18n }) => (
+      <TagsOverflow
+        items={data.category.entity_types || []}
+        getKey={(entityType) => entityType}
+        getLabel={(entityType) => t_i18n(`entity_${entityType}`)}
+        renderTag={(entityType) => (
+          <Tag label={t_i18n(`entity_${entityType}`)} />
+        )}
+      />
+    ),
+  },
+  event_types: {
+    id: 'event_types',
+    label: 'Types',
+    percentWidth: 20,
+    isSortable: true,
+    render: ({ event_types }) => {
+      return defaultRender(event_types);
+    },
+  },
+  external_id: {
+    id: 'external_id',
+    label: 'External ID',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ external_id }) => defaultRender(external_id),
+  },
+  file_name: {
+    id: 'file_name',
+    label: 'File name',
+    percentWidth: 12,
+    isSortable: false,
+    render: (data) => {
+      const file
+        = data.importFiles?.edges && data.importFiles.edges.length > 0
+          ? data.importFiles.edges[0]?.node
+          : { name: 'N/A', metaData: { mimetype: 'N/A' }, size: 0 };
+      return (
+        <Tooltip title={file?.name}>
+          <Truncate>{file?.name}</Truncate>
+        </Tooltip>
+      );
+    },
+  },
+  file_mime_type: {
+    id: 'file_mime_type',
+    label: 'Mime/Type',
+    percentWidth: 8,
+    isSortable: false,
+    render: (data) => {
+      const file
+        = data.importFiles?.edges && data.importFiles.edges.length > 0
+          ? data.importFiles.edges[0]?.node
+          : { name: 'N/A', metaData: { mimetype: 'N/A' }, size: 0 };
+      return (
+        <Tooltip title={file?.metaData?.mimetype}>
+          <Truncate>{file?.metaData.mimetype}</Truncate>
+        </Tooltip>
+      );
+    },
+  },
+  file_size: {
+    id: 'file_size',
+    label: 'File size',
+    percentWidth: 8,
+    isSortable: false,
+    render: (data, { b }) => {
+      const file
+        = data.importFiles?.edges && data.importFiles.edges.length > 0
+          ? data.importFiles.edges[0]?.node
+          : { name: 'N/A', metaData: { mimetype: 'N/A' }, size: 0 };
+      return (
+        <Tooltip title={file?.metaData?.mimetype}>
+          <>{b(file?.size)}</>
+        </Tooltip>
+      );
+    },
+  },
+  firstname: {
+    id: 'firstname',
+    label: 'Firstname',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ firstname }) => defaultRender(firstname),
+  },
+  first_observed: {
+    id: 'first_observed',
+    label: 'First obs.',
+    percentWidth: 14,
+    isSortable: true,
+    render: ({ first_observed }, { nsdt }) => nsdt(first_observed),
+  },
+  first_seen: {
+    id: 'first_seen',
+    label: 'First obs.',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ first_seen }, { nsdt }) => nsdt(first_seen),
+  },
+  fromName: {
+    id: 'fromName',
+    label: 'From name',
+    percentWidth: 18,
+    isSortable: false,
+    render: ({ from }, helpers) => {
+      const value = from
+        ? getMainRepresentative(from)
+        : helpers.t_i18n('Restricted');
+      const displayDraftChip = !!from?.draftVersion;
+      return defaultRender(value, displayDraftChip);
+    },
+  },
+  fromType: {
+    id: 'fromType',
+    label: 'From type',
+    percentWidth: 10,
+    isSortable: false,
+    render: (node) => (
+      <ItemEntityType
+        showIcon
+        entityType={node.from?.entity_type}
+        isRestricted={!node.from}
+      />
+    ),
+  },
+  from_created_at: {
+    id: 'from_created_at',
+    label: 'Platform creation date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ from }, helpers) => {
+      const { created_at } = from;
+      return defaultRender(helpers.fd(created_at));
+    },
+  },
+  from_creator: {
+    id: 'from_creator',
+    label: 'Source Creators',
+    percentWidth: 12,
+    render: ({ from }) => {
+      const { creators } = from;
+      const value = creators.map((c: { name: string }) => c.name);
+      return defaultRender(value);
+    },
+  },
+  from_entity_type: {
+    id: 'from_entity_type',
+    label: 'Source type',
+    percentWidth: 10,
+    render: ({ from }) => (
+      <ItemEntityType showIcon entityType={from?.entity_type} />
+    ),
+  },
+  from_objectLabel: {
+    id: 'from_objectLabel',
+    label: 'Source Labels',
+    percentWidth: 15,
+    isSortable: false,
+    render: ({ from }) => {
+      return <StixCoreObjectLabels variant="inList" labels={from?.objectLabel} />;
+    },
+  },
+  from_objectMarking: {
+    id: 'from_objectMarking',
+    label: 'Marking',
+    percentWidth: 8,
+    isSortable: true,
+    render: ({ from }, { storageHelpers: { handleAddFilter } }) => {
+      return (
+        <ItemMarkings
+          markingDefinitions={from?.objectMarking ?? []}
+          limit={1}
+          onClick={(m) => handleAddFilter('objectMarking', m.id, 'eq')}
+        />
+      );
+    },
+  },
+  from_relationship_type: {
+    id: 'from_relationship_type',
+    label: 'Source name',
+    percentWidth: 10,
+    render: ({ from }, helpers) => {
+      const value = from
+        ? getMainRepresentative(from)
+        : helpers.t_i18n('Restricted');
+      return defaultRender(value);
+    },
+  },
+  incident_type: {
+    id: 'incident_type',
+    label: 'Incident type',
+    percentWidth: 9,
+    isSortable: true,
+    render: (
+      { incident_type },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={incident_type}>
+          <Tag
+            label={incident_type}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter('incident_type', incident_type ?? null, 'eq');
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  information_types: {
+    id: 'information_types',
+    label: 'Request for information types',
+    percentWidth: 9,
+    isSortable: true,
+    render: (
+      { information_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={information_types}>
+          <Tag
+            label={information_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter(
+                'information_types',
+                information_types?.at(0) ?? null,
+                'eq',
+              );
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  infrastructure_types: {
+    id: 'infrastructure_types',
+    label: 'Type',
+    percentWidth: 8,
+    isSortable: true,
+    render: (
+      { infrastructure_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={infrastructure_types}>
+          <Tag
+            label={infrastructure_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter(
+                'infrastructure_types',
+                infrastructure_types?.at(0) ?? null,
+                'eq',
+              );
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  is_family: {
+    id: 'is_family',
+    label: 'Is family',
+    percentWidth: 8,
+    isSortable: true,
+    render: ({ is_family }, { t_i18n }) => (
+      <ItemBoolean
+        status={is_family}
+        label={is_family ? t_i18n('Yes') : t_i18n('No')}
+      />
+    ),
+  },
+  isShared: {
+    id: 'isShared',
+    label: 'Publicly shared',
+    percentWidth: 8,
+    isSortable: false,
+    render: ({ isShared }, { t_i18n }) => (
+      <ItemBoolean
+        status={isShared}
+        label={isShared ? t_i18n('Yes') : t_i18n('No')}
+      />
+    ),
+  },
+  killChainPhase: {
+    id: 'killChainPhase',
+    label: 'Kill chain phase',
+    percentWidth: 15,
+    isSortable: false,
+    render: ({ killChainPhases }) => {
+      const formattedKillChainPhase
+        = killChainPhases && killChainPhases.length > 0
+          ? `[${killChainPhases[0].kill_chain_name}] ${killChainPhases[0].phase_name}`
+          : EMPTY_VALUE;
+      return defaultRender(formattedKillChainPhase);
+    },
+  },
+  kill_chain_name: {
+    id: 'kill_chain_name',
+    label: 'Kill chain name',
+    percentWidth: 40,
+    isSortable: true,
+    render: ({ kill_chain_name }) => defaultRender(kill_chain_name),
+  },
+  lastname: {
+    id: 'lastname',
+    label: 'Lastname',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ lastname }) => defaultRender(lastname),
+  },
+  last_observed: {
+    id: 'last_observed',
+    label: 'Last obs.',
+    percentWidth: 14,
+    isSortable: true,
+    render: ({ last_observed }, { nsdt }) => nsdt(last_observed),
+  },
+  last_seen: {
+    id: 'last_seen',
+    label: 'Last obs.',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ last_seen }, { nsdt }) => nsdt(last_seen),
+  },
+  malware_types: {
+    id: 'malware_types',
+    label: 'Malware types',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ malware_types }) => {
+      return defaultRender(malware_types);
+    },
+  },
+  modified: {
+    id: 'modified',
+    label: 'Modification date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ modified }, { fd }) => fd(modified),
+  },
+  name: {
+    id: 'name',
+    label: 'Name',
+    percentWidth: 25,
+    isSortable: true,
+    render: (data) => {
+      const displayDraftChip = !!data.draftVersion;
+      return defaultRender(getMainRepresentative(data), displayDraftChip);
+    },
+  },
+  note_types: {
+    id: 'note_types',
+    label: 'Type',
+    percentWidth: 10,
+    isSortable: true,
+    render: (
+      { note_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={note_types}>
+          <Tag
+            label={note_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter('note_types', note_types?.at(0) ?? null, 'eq');
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  number_observed: {
+    id: 'number_observed',
+    label: 'Nb.',
+    percentWidth: 8,
+    isSortable: true,
+    render: ({ number_observed }, { n }) => (
+      <Tooltip title={number_observed}>
+        <>{n(number_observed)}</>
+      </Tooltip>
+    ),
+  },
+  objectAssignee: {
+    id: 'objectAssignee',
+    label: 'Assignees',
+    percentWidth: 10,
+    isSortable: false,
+    render: ({ objectAssignee }) => {
+      const value = objectAssignee?.map((c: { name: string }) => c.name);
+      return defaultRender(value);
+    },
+  },
+  objectLabel: {
+    id: 'objectLabel',
+    label: 'Labels',
+    percentWidth: 15,
+    isSortable: false,
+    render: ({ objectLabel }, { storageHelpers: { handleAddFilter } }) => {
+      return (
+        <StixCoreObjectLabels
+          variant="inList"
+          labels={objectLabel}
+          onClick={handleAddFilter}
+        />
+      );
+    },
+  },
+  objectMarking: {
+    id: 'objectMarking',
+    label: 'Marking',
+    percentWidth: 8,
+    isSortable: true,
+    render: ({ objectMarking }, { storageHelpers: { handleAddFilter } }) => (
+      <ItemMarkings
+        markingDefinitions={objectMarking ?? []}
+        limit={1}
+        onClick={(m) => handleAddFilter('objectMarking', m.id, 'eq')}
+      />
+    ),
+  },
+  objectParticipant: {
+    id: 'objectParticipant',
+    label: 'Participant',
+    percentWidth: 10,
+    render: ({ objectParticipant }) => {
+      const value = objectParticipant?.map((c: { name: string }) => c.name);
+      return defaultRender(value);
+    },
+  },
+  observable_value: {
+    id: 'observable_value',
+    label: 'Value',
+    percentWidth: 20,
+    isSortable: false,
+    render: (observable) => {
+      const theme = useTheme<Theme>();
+      return renderObservableValue(observable, theme);
+    },
+  },
+  operatingSystem: {
+    id: 'operatingSystem',
+    label: 'Operating System',
+    percentWidth: 15,
+    isSortable: false,
+    render: ({ operatingSystem }) => (
+      <Tooltip title={operatingSystem?.name}>
+        <>{operatingSystem?.name ?? EMPTY_VALUE}</>
+      </Tooltip>
+    ),
+  },
+  opinions_metrics_mean: {
+    id: 'opinions_metrics_mean',
+    label: 'Opinions mean',
+    percentWidth: 10,
+    render: ({ opinions_metrics }) => (
+      <span style={{ fontWeight: 700, fontSize: 15 }}>
+        {opinions_metrics?.mean ?? EMPTY_VALUE}
+      </span>
+    ),
+  },
+  order: {
+    id: 'order',
+    label: 'Order',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ order }, { n }) => defaultRender(n(order)),
+  },
+  otp: {
+    id: 'otp',
+    label: '2FA',
+    percentWidth: 5,
+    isSortable: false,
+    render: (user) => (
+      <>
+        {user.otp_activated ? (
+          <Security fontSize="small" color="secondary" />
+        ) : (
+          <HorizontalRule fontSize="small" color="primary" />
+        )}
+      </>
+    ),
+  },
+  owner: {
+    id: 'owner',
+    label: 'Owner',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ owner }) => defaultRender(owner.name),
+  },
+  pattern_type: {
+    id: 'pattern_type',
+    label: 'Pattern type',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ pattern_type }) => <ItemPatternType label={pattern_type} />,
+  },
+  phase_name: {
+    id: 'phase_name',
+    label: 'Phase name',
+    percentWidth: 35,
+    isSortable: true,
+    render: ({ phase_name }) => defaultRender(phase_name),
+  },
+  pir_type: {
+    percentWidth: 12,
+    id: 'pir_type',
+    label: 'Type',
+    render: ({ pir_type }: Pirs_PirFragment$data) => {
+      const { t_i18n } = useFormatter();
+      return <Tag label={t_i18n(pir_type)} />;
+    },
+  },
+  primary_motivation: {
+    id: 'primary_motivation',
+    label: 'Primary motivation',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ primary_motivation }) => (
+      <ItemOpenVocab type="attack-motivation-ov" value={primary_motivation} />
+    ),
+  },
+  priority: {
+    id: 'priority',
+    label: 'Priority',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ priority }) => (
+      <ItemPriority
+        variant="inList"
+        priority={priority}
+        label={priority}
+      />
+    ),
+  },
+  product: {
+    id: 'product',
+    label: 'Product',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ product }) => defaultRender(product),
+  },
+  published: {
+    id: 'published',
+    label: 'Date',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ published }, { fd }) => fd(published),
+  },
+  rating: {
+    id: 'rating',
+    label: 'Rating',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ rating }) => (
+      <RatingField
+        rating={rating}
+        size="tiny"
+        readOnly
+        style={{ paddingTop: 2 }}
+      />
+    ),
+  },
+  relationship_type: {
+    id: 'relationship_type',
+    label: 'Type',
+    percentWidth: 7,
+    isSortable: true,
+    render: (
+      { relationship_type },
+      { t_i18n, storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <Tag
+          label={
+            t_i18n(`relationship_${relationship_type}`) ?? t_i18n('Unknown')
+          }
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleAddFilter(
+              'relationship_type',
+              relationship_type ?? null,
+              'eq',
+            );
+          }}
+        />
+      );
+    },
+  },
+  report_types: {
+    id: 'report_types',
+    label: 'Type',
+    percentWidth: 10,
+    isSortable: true,
+    render: (
+      { report_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={report_types}>
+          <Tag
+            label={report_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter('report_types', report_types?.at(0) ?? null, 'eq');
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  resource_level: {
+    id: 'resource_level',
+    label: 'Resource level',
+    percentWidth: 10,
+    isSortable: true,
+    render: (threatActorGroup) => (
+      <ItemOpenVocab
+        type="attack-resource-level-ov"
+        value={threatActorGroup.resource_level}
+      />
+    ),
+  },
+  response_types: {
+    id: 'response_types',
+    label: 'Response type',
+    percentWidth: 9,
+    isSortable: true,
+    render: (
+      { response_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={response_types}>
+          <Tag
+            label={response_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter(
+                'response_types',
+                response_types?.at(0) ?? null,
+                'eq',
+              );
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  result_name: {
+    id: 'result_name',
+    label: 'Result name',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ result_name, draftVersion }) =>
+      defaultRender(result_name, draftVersion),
+  },
+  secondary_motivations: {
+    id: 'secondary_motivations',
+    label: 'Secondary motivations',
+    percentWidth: 10,
+    isSortable: false,
+    render: ({ secondary_motivations }) => {
+      return defaultRender(secondary_motivations);
+    },
+  },
+  security_platform_type: {
+    id: 'security_platform_type',
+    label: 'Type',
+    percentWidth: 20,
+    isSortable: true,
+    render: ({ security_platform_type }) => {
+      return defaultRender(security_platform_type);
+    },
+  },
+  severity: {
+    id: 'severity',
+    label: 'Severity',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ severity }) => (
+      <ItemSeverity
+        variant="inList"
+        severity={severity}
+        label={severity}
+      />
+    ),
+  },
+  sophistication: {
+    id: 'sophistication',
+    label: 'Sophistication',
+    percentWidth: 10,
+    isSortable: true,
+    render: (threatActorGroup) => (
+      <ItemOpenVocab
+        type="threat-actor-group-sophistication-ov"
+        value={threatActorGroup.sophistication}
+      />
+    ),
+  },
+  source_name: {
+    id: 'source_name',
+    label: 'Source name',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ source_name, draftVersion }) =>
+      defaultRender(source_name, draftVersion),
+  },
+  start_date: {
+    id: 'start_date',
+    label: 'Start date',
+    percentWidth: 25,
+    isSortable: true,
+    render: ({ start_date }, { fd }) => fd(start_date),
+  },
+  start_time: {
+    id: 'start_time',
+    label: 'Start date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ start_time }, { fd }) => fd(start_time),
+  },
+  stop_time: {
+    id: 'stop_time',
+    label: 'End date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ stop_time }, { fd }) => fd(stop_time),
+  },
+  submitted: {
+    id: 'submitted',
+    label: 'Submission date',
+    percentWidth: 12,
+    isSortable: true,
+    render: ({ submitted }, { fd }) => fd(submitted),
+  },
+  takedown_types: {
+    id: 'takedown_types',
+    label: 'Request for takedown types',
+    percentWidth: 9,
+    isSortable: true,
+    render: (
+      { takedown_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={takedown_types}>
+          <Tag
+            label={takedown_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter(
+                'takedown_types',
+                takedown_types?.at(0) ?? null,
+                'eq',
+              );
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  tags: {
+    id: 'tags',
+    label: 'Tags',
+    percentWidth: 15,
+    isSortable: false,
+    render: ({ tags }) => {
+      if (!tags || tags.length === 0) return EMPTY_VALUE;
+      return (
+        <Tooltip
+          title={(
+            <div style={{ display: 'flex', flexWrap: 'wrap', rowGap: '4px' }}>
+              {tags.map((tag: string) => (
+                <Chip key={tag} label={tag} style={{ marginRight: 7 }} />
+              ))}
+            </div>
+          )}
+        >
+          <div>
+            <Chip label={tags[0]} style={{ marginRight: 7 }} />
+            {tags.length > 1 && (
+              <Chip label="..." style={{ marginRight: 7 }} />
+            )}
+          </div>
+        </Tooltip>
+      );
+    },
+  },
+  threat_actor_types: {
+    id: 'threat_actor_types',
+    label: 'Types',
+    percentWidth: 20,
+    isSortable: true,
+    render: ({ threat_actor_types }) => {
+      return defaultRender(threat_actor_types);
+    },
+  },
+  timestamp: {
+    id: 'timestamp',
+    label: 'Timestamp',
+    percentWidth: 50,
+    isSortable: true,
+    render: ({ timestamp }, { nsdt }) => defaultRender(nsdt(timestamp)),
+  },
+  toName: {
+    id: 'toName',
+    label: 'To name',
+    percentWidth: 18,
+    isSortable: false,
+    render: ({ to }, helpers) => {
+      const value = to
+        ? getMainRepresentative(to)
+        : helpers.t_i18n('Restricted');
+      const displayDraftChip = !!to?.draftVersion;
+      return defaultRender(value, displayDraftChip);
+    },
+  },
+  tool_types: {
+    id: 'tool_types',
+    label: 'Type',
+    percentWidth: 10,
+    isSortable: true,
+    render: (
+      { tool_types },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={tool_types}>
+          <Tag
+            label={tool_types?.at(0)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter('tool_types', tool_types?.at(0) ?? null, 'eq');
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  toType: {
+    id: 'toType',
+    label: 'To type',
+    percentWidth: 10,
+    isSortable: false,
+    render: (node) => (
+      <ItemEntityType
+        showIcon
+        entityType={node.to?.entity_type}
+        isRestricted={!node.to}
+      />
+    ),
+  },
+  to_entity_type: {
+    id: 'to_entity_type',
+    label: 'Target type',
+    percentWidth: 10,
+    render: ({ to }) => (
+      <ItemEntityType showIcon entityType={to?.entity_type} />
+    ),
+  },
+  to_relationship_type: {
+    id: 'to_relationship_type',
+    label: 'Target name',
+    percentWidth: 10,
+    render: ({ to }, helpers) => {
+      const value = to
+        ? getMainRepresentative(to)
+        : helpers.t_i18n('Restricted');
+      return defaultRender(value);
+    },
+  },
+  to_object_label: {
+    id: 'to_object_label',
+    label: 'Labels',
+    percentWidth: 20,
+    isSortable: false,
+    render: ({ to }) => (
+      <StixCoreObjectLabels
+        variant="inList"
+        labels={to?.objectLabel}
+      />
+    ),
+  },
+  to_object_marking: {
+    id: 'to_object_marking',
+    label: 'Markings',
+    percentWidth: 20,
+    isSortable: false,
+    render: ({ to }) => (
+      <ItemMarkings
+        markingDefinitions={to?.objectMarking ?? []}
+        limit={1}
+      />
+    ),
+  },
+  updated_at: {
+    id: 'updated_at',
+    label: 'Modification date',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ updated_at }, { fd }) => fd(updated_at),
+  },
+  url: {
+    id: 'url',
+    label: 'URL',
+    percentWidth: 45,
+    isSortable: true,
+    render: ({ url }) => defaultRender(url),
+  },
+  usages: {
+    id: 'usages',
+    label: 'Usages',
+    percentWidth: 20,
+    isSortable: false,
+    render: ({ usages }) => {
+      return defaultRender(usages);
+    },
+  },
+  user_email: {
+    id: 'user_email',
+    label: 'Email',
+    percentWidth: 50,
+    isSortable: false,
+    render: ({ user_email }) => defaultRender(user_email),
+  },
+  valid_until: {
+    id: 'valid_until',
+    label: 'Valid until',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ valid_until }, { nsdt }) => (
+      <Tooltip title={nsdt(valid_until)}>{nsdt(valid_until)}</Tooltip>
+    ),
+  },
+  valid_from: {
+    id: 'valid_from',
+    label: 'Valid from',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ valid_from }, { nsdt }) => (
+      <Tooltip title={nsdt(valid_from)}>{nsdt(valid_from)}</Tooltip>
+    ),
+  },
+  value: {
+    id: 'value',
+    label: 'Value',
+    percentWidth: 22,
+    isSortable: false,
+    render: (node) => {
+      const value = getMainRepresentative(node);
+      const displayDraftChip = !!node.draftVersion;
+      return defaultRender(value, displayDraftChip);
+    },
+  },
+  x_mitre_id: {
+    id: 'x_mitre_id',
+    label: 'ID',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ x_mitre_id }) => (
+      <FieldOrEmpty source={x_mitre_id}>
+        <code>{x_mitre_id}</code>
+      </FieldOrEmpty>
+    ),
+  },
+  x_opencti_color: {
+    id: 'x_opencti_color',
+    label: 'Color',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ x_opencti_color }) => (
+      <Tooltip title={x_opencti_color}>
+        <>
+          <div
+            style={{
+              backgroundColor: x_opencti_color,
+              height: 20,
+              width: 20,
+              display: 'inline-flex',
+              borderRadius: 20,
+              marginRight: 5,
+            }}
+          />
+          <Truncate>{x_opencti_color}</Truncate>
+        </>
+      </Tooltip>
+    ),
+  },
+  x_opencti_order: {
+    id: 'x_opencti_order',
+    label: 'Order',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ x_opencti_order }) => defaultRender(x_opencti_order.toString()),
+  },
+  x_opencti_negative: {
+    id: 'x_opencti_negative',
+    label: 'Qualification',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ x_opencti_negative }, { t_i18n }) => {
+      const theme = useTheme<Theme>();
+      return (
+        <Tag
+          label={
+            x_opencti_negative
+              ? t_i18n('False positive')
+              : t_i18n('True positive')
+          }
+          color={
+            x_opencti_negative
+              ? theme.palette.severity.low
+              : theme.palette.severity.critical
+          }
+        />
+      );
+    },
+  },
+  x_opencti_cvss_base_score: {
+    id: 'x_opencti_cvss_base_score',
+    label: 'CVSS3 - Score',
+    percentWidth: 15,
+    render: ({ x_opencti_cvss_base_score }) => {
+      const value = x_opencti_cvss_base_score
+        ? Math.trunc(x_opencti_cvss_base_score * 10) / 10
+        : null;
+      return <ItemCvssScore score={value} />;
+    },
+  },
+  x_opencti_cvss_v4_base_score: {
+    id: 'x_opencti_cvss_v4_base_score',
+    label: 'CVSS4 - Score',
+    percentWidth: 15,
+    render: ({ x_opencti_cvss_v4_base_score }) => {
+      const value = x_opencti_cvss_v4_base_score
+        ? Math.trunc(x_opencti_cvss_v4_base_score * 10) / 10
+        : null;
+      return <ItemCvssScore score={value} />;
+    },
+  },
+  x_opencti_cisa_kev: {
+    id: 'x_opencti_cisa_kev',
+    label: 'CISA KEV',
+    percentWidth: 15,
+    render: ({ x_opencti_cisa_kev }, { t_i18n }) => (
+      <ItemBoolean
+        status={x_opencti_cisa_kev}
+        label={x_opencti_cisa_kev ? t_i18n('Yes') : t_i18n('No')}
+      />
+    ),
+  },
+  x_opencti_epss_score: {
+    id: 'x_opencti_epss_score',
+    label: 'EPSS Score',
+    percentWidth: 15,
+    render: ({ x_opencti_epss_score }) => {
+      const value = x_opencti_epss_score
+        ? Math.trunc(x_opencti_epss_score * 100000) / 100000
+        : undefined;
+      return defaultRender(value);
+    },
+  },
+  x_opencti_epss_percentile: {
+    id: 'x_opencti_epss_percentile',
+    label: 'EPSS Percentile',
+    percentWidth: 15,
+    render: ({ x_opencti_epss_percentile }) => {
+      const value = x_opencti_epss_percentile
+        ? Math.trunc(x_opencti_epss_percentile * 100000) / 100000
+        : undefined;
+      return defaultRender(value);
+    },
+  },
+  x_opencti_cvss_base_severity: {
+    id: 'x_opencti_cvss_base_severity',
+    label: 'CVSS3 - Severity',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ x_opencti_cvss_base_severity }) => (
+      <ItemSeverity
+        severity={x_opencti_cvss_base_severity}
+        label={x_opencti_cvss_base_severity}
+      />
+    ),
+  },
+  x_opencti_cvss_v4_base_severity: {
+    id: 'x_opencti_cvss_v4_base_severity',
+    label: 'CVSS4 - Severity',
+    percentWidth: 15,
+    isSortable: true,
+    render: ({ x_opencti_cvss_v4_base_severity }) => (
+      <ItemSeverity
+        severity={x_opencti_cvss_v4_base_severity}
+        label={x_opencti_cvss_v4_base_severity}
+      />
+    ),
+  },
+  x_opencti_organization_type: {
+    id: 'x_opencti_organization_type',
+    label: 'Type',
+    percentWidth: 15,
+    isSortable: true,
+    render: (
+      { x_opencti_organization_type },
+      { storageHelpers: { handleAddFilter } },
+    ) => {
+      return (
+        <FieldOrEmpty source={x_opencti_organization_type}>
+          <Tag
+            label={x_opencti_organization_type}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleAddFilter(
+                'x_opencti_organization_type',
+                x_opencti_organization_type ?? null,
+                'eq',
+              );
+            }}
+          />
+        </FieldOrEmpty>
+      );
+    },
+  },
+  x_opencti_workflow_id: {
+    id: 'x_opencti_workflow_id',
+    label: 'Processing status',
+    percentWidth: 8,
+    isSortable: true,
+    render: (
+      { status, workflowEnabled },
+      { storageHelpers: { handleAddFilter } },
+    ) => (
+      <ItemStatus
+        status={status}
+        disabled={!workflowEnabled}
+        onClick={handleAddFilter}
+      />
+    ),
+  },
+  x_opencti_aliases: {
+    id: 'x_opencti_aliases',
+    label: 'Aliases',
+    percentWidth: 10,
+    render: ({ x_opencti_aliases, entity_type }) => {
+      const theme = useTheme<Theme>();
+
+      if (!x_opencti_aliases) {
+        return defaultRender(EMPTY_VALUE);
+      }
+      if (entity_type === 'Country') {
+        const flagUrl = findFlagUrl(x_opencti_aliases);
+        if (flagUrl) {
+          return (
+            <div
+              style={{
+                display: 'flex',
+                gap: theme.spacing(1),
+                alignItems: 'center',
+              }}
+            >
+              <Tooltip title={x_opencti_aliases}>
+                <img
+                  style={{ width: 20 }}
+                  src={flagUrl}
+                  alt={x_opencti_aliases}
+                />
+              </Tooltip>
+              <div>{x_opencti_aliases[0]}</div>
+            </div>
+          );
+        }
+      }
+
+      return (
+        <Tooltip title={x_opencti_aliases.join(', ')}>
+          <div
+            style={{
+              maxWidth: '100%',
+              display: 'flex',
+              gap: theme.spacing(0.5),
+            }}
+          >
+            {x_opencti_aliases.map((value: string) => (
+              <Chip key={value} label={value} />
+            ))}
+          </div>
+        </Tooltip>
+      );
+    },
+  },
+  x_opencti_score: {
+    id: 'x_opencti_score',
+    label: 'Score',
+    percentWidth: 10,
+    isSortable: true,
+    render: ({ x_opencti_score }) => <ItemScore score={x_opencti_score} />,
+  },
+};
+
+type MetricConf = {
+  attribute: string;
+  name: string;
+};
+
+export type MetricsDefinition = {
+  readonly entity_type: string;
+  readonly metrics: readonly MetricConf[] | null | undefined;
+};
+
+export type Metric = {
+  readonly name: string;
+  readonly value: string;
+};
+
+export const buildMetricsColumns = (
+  entityType: string | undefined,
+  metricsDefinition: readonly MetricsDefinition[],
+): DataTableProps['dataColumns'] => {
+  if (!entityType || !metricsDefinition) return {};
+  const metricsForEntity = metricsDefinition.find(
+    (m) => m.entity_type === entityType.toLowerCase(),
+  );
+  if (!metricsForEntity?.metrics) return {};
+
+  const metricsColumns: DataTableProps['dataColumns'] = {};
+
+  for (const metricDefinition of metricsForEntity.metrics) {
+    metricsColumns[metricDefinition.attribute] = {
+      id: metricDefinition.attribute,
+      label: metricDefinition.name,
+      percentWidth: 12,
+      isSortable: false,
+      render: (data) => {
+        if (Array.isArray(data.metrics)) {
+          const metricFound = data.metrics.find(
+            (m: Metric) => m.name === metricDefinition.attribute,
+          );
+          if (metricFound) {
+            return defaultRender(metricFound.value);
+          }
+        }
+        return defaultRender(EMPTY_VALUE);
+      },
+    };
+  }
+
+  return metricsColumns;
+};
+
+export const defaultColumnsMap = new Map<string, Partial<DataTableColumn>>(
+  Object.entries(defaultColumns),
+);

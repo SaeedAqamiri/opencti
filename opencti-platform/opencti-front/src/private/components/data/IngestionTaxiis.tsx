@@ -1,0 +1,160 @@
+import React, { useContext } from 'react';
+import Alert from '@mui/material/Alert';
+import makeStyles from '@mui/styles/makeStyles';
+import { QueryRenderer } from '../../../relay/environment';
+import ListLines from '../../../components/list_lines/ListLines';
+import IngestionTaxiiLines, { IngestionTaxiiLinesQuery } from './ingestionTaxii/IngestionTaxiiLines';
+import IngestionTaxiiCreation from './ingestionTaxii/IngestionTaxiiCreation';
+import { usePaginationLocalStorage } from '../../../utils/hooks/useLocalStorage';
+import useAuth, { UserContext } from '../../../utils/hooks/useAuth';
+import { useFormatter } from '../../../components/i18n';
+import { INGESTION_MANAGER } from '../../../utils/platformModulesHelper';
+import Breadcrumbs from '../../../components/Breadcrumbs';
+import Security from '../../../utils/Security';
+import { INGESTION_SETINGESTIONS } from '../../../utils/hooks/useGranted';
+import useConnectedDocumentModifier from '../../../utils/hooks/useConnectedDocumentModifier';
+import IngestionTaxiiImport from '@components/data/ingestionTaxii/IngestionTaxiiImport';
+import { isNotEmptyField } from '../../../utils/utils';
+import { PaginationOptions } from '../../../components/list_lines';
+import { IngestionTaxiiLinesPaginationQuery } from '@components/data/ingestionTaxii/__generated__/IngestionTaxiiLinesPaginationQuery.graphql';
+import Button from '../../../components/common/button/Button';
+
+const LOCAL_STORAGE_KEY = 'ingestionTaxii';
+
+const useStyles = makeStyles(() => ({
+  container: {
+    margin: 0,
+    padding: '0 0 50px 0',
+  },
+}));
+
+const IngestionTaxii = () => {
+  const classes = useStyles();
+  const { t_i18n } = useFormatter();
+  const { settings, isXTMHubAccessible } = useContext(UserContext);
+  const { setTitle } = useConnectedDocumentModifier();
+
+  setTitle(t_i18n('TAXII Feeds | Ingestion | Data'));
+
+  const { platformModuleHelpers } = useAuth();
+
+  const importFromHubUrl = isNotEmptyField(settings?.platform_xtmhub_url)
+    ? `${settings.platform_xtmhub_url}/redirect/opencti_integrations?platform_id=${settings.id}&integrationType=taxii_feed`
+    : '';
+
+  const {
+    viewStorage,
+    paginationOptions,
+    helpers: storageHelpers,
+  } = usePaginationLocalStorage<PaginationOptions>(LOCAL_STORAGE_KEY, {
+    sortBy: 'name',
+    orderAsc: false,
+    searchTerm: '',
+  });
+
+  const dataColumns = {
+    name: {
+      label: 'Name',
+      width: '20%',
+      isSortable: true,
+    },
+    uri: {
+      label: 'URL',
+      width: '25%',
+      isSortable: true,
+    },
+    ingestion_running: {
+      label: 'Status',
+      width: '20%',
+      isSortable: false,
+    },
+    last_execution_date: {
+      label: 'Last run',
+      width: '15%',
+      isSortable: false,
+    },
+    added_after_start: {
+      label: 'Added after date',
+      width: '10%',
+      isSortable: false,
+    },
+    current_state_cursor: {
+      label: 'Next cursor',
+      width: '10%',
+      isSortable: false,
+    },
+  };
+
+  if (!platformModuleHelpers.isIngestionManagerEnable()) {
+    return (
+      <div className={classes.container}>
+        <Alert severity="info">
+          {t_i18n(
+            platformModuleHelpers.generateDisableMessage(INGESTION_MANAGER),
+          )}
+        </Alert>
+      </div>
+    );
+  }
+
+  return (
+    <div className={classes.container} data-testid="taxii-feeds-page">
+      <Breadcrumbs
+        elements={[
+          { label: t_i18n('Integrations') },
+          { label: t_i18n('Deployed'), link: '/dashboard/integrations/deployed?kind=taxii' },
+          { label: t_i18n('TAXII feeds'), current: true },
+        ]}
+      />
+      <ListLines
+        helpers={storageHelpers}
+        sortBy={viewStorage.sortBy}
+        orderAsc={viewStorage.orderAsc}
+        dataColumns={dataColumns}
+        handleSort={storageHelpers.handleSort}
+        handleSearch={storageHelpers.handleSearch}
+        displayImport={false}
+        secondaryAction
+        keyword={viewStorage.searchTerm}
+        createButton={(
+          <Security needs={[INGESTION_SETINGESTIONS]}>
+            <>
+              <IngestionTaxiiImport paginationOptions={paginationOptions} />
+              {isXTMHubAccessible && isNotEmptyField(importFromHubUrl) && (
+                <Button
+                  gradient
+                  sx={{ marginLeft: 1 }}
+                  href={importFromHubUrl}
+                  target="_blank"
+                  title={t_i18n('Import from Hub')}
+                >
+                  {t_i18n('Import from Hub')}
+                </Button>
+              )}
+              <IngestionTaxiiCreation paginationOptions={paginationOptions} />
+            </>
+          </Security>
+        )}
+        iconExtension
+      >
+        <QueryRenderer
+          query={IngestionTaxiiLinesQuery}
+          variables={{ count: 200, ...paginationOptions }}
+          render={({ props }: {
+            props: IngestionTaxiiLinesPaginationQuery['response'] | null;
+          }) => (
+            <IngestionTaxiiLines
+              data={props}
+              paginationOptions={paginationOptions}
+              refetchPaginationOptions={{ count: 200, ...paginationOptions }}
+              dataColumns={dataColumns}
+              initialLoading={props === null}
+            />
+          )}
+        />
+      </ListLines>
+    </div>
+  );
+};
+
+export default IngestionTaxii;

@@ -1,0 +1,79 @@
+import {
+  type AttributeDefinition,
+  baseType,
+  createdAt,
+  creators,
+  draftChange,
+  draftIds,
+  entityType,
+  iAttributes,
+  id,
+  type IdAttribute,
+  internalId,
+  parentTypes,
+  refreshedAt,
+  relationshipType,
+  standardId,
+  updatedAt,
+} from '../../schema/attribute-definition';
+import { schemaAttributesDefinition } from '../../schema/schema-attributes';
+import { ABSTRACT_BASIC_RELATIONSHIP, ABSTRACT_STIX_CORE_OBJECT } from '../../schema/general';
+import {
+  INSTANCE_RELATION_TYPES_FILTER,
+  INSTANCE_RELATION_FILTER,
+  RELATION_FROM_FILTER,
+  RELATION_FROM_TYPES_FILTER,
+  RELATION_TO_FILTER,
+  RELATION_TO_TYPES_FILTER,
+  RELATION_DYNAMIC_FROM_FILTER,
+  RELATION_DYNAMIC_TO_FILTER,
+} from '../../utils/filtering/filtering-constants';
+
+export const connections: AttributeDefinition = {
+  name: 'connections',
+  label: 'Relations connections',
+  type: 'object',
+  format: 'nested',
+  editDefault: false,
+  mandatoryType: 'internal',
+  multiple: true,
+  upsert: false,
+  update: false,
+  isFilterable: false,
+  mappings: [
+    { ...internalId as IdAttribute,
+      isFilterable: true,
+      entityTypes: [ABSTRACT_STIX_CORE_OBJECT],
+      associatedFilterKeys: [
+        { key: RELATION_FROM_FILTER, label: 'Source entity' },
+        { key: RELATION_DYNAMIC_FROM_FILTER, label: 'Dynamic source' },
+        { key: RELATION_TO_FILTER, label: 'Target entity' },
+        { key: RELATION_DYNAMIC_TO_FILTER, label: 'Dynamic target' },
+        { key: INSTANCE_RELATION_FILTER, label: 'Related entity' },
+      ],
+    },
+    { name: 'name', label: 'Name', type: 'string', format: 'short', editDefault: false, mandatoryType: 'no', multiple: true, upsert: true, isFilterable: false },
+    { name: 'role', label: 'Role', type: 'string', format: 'short', editDefault: false, mandatoryType: 'no', multiple: true, upsert: true, isFilterable: false },
+    { name: 'types', label: 'Types', type: 'string', format: 'short', editDefault: false, mandatoryType: 'no', multiple: true, upsert: true, isFilterable: true, associatedFilterKeys: [{ key: RELATION_FROM_TYPES_FILTER, label: 'Source type' }, { key: RELATION_TO_TYPES_FILTER, label: 'Target type' }, { key: INSTANCE_RELATION_TYPES_FILTER, label: 'Related type' }] },
+  ],
+};
+
+const basicRelationshipAttributes: Array<AttributeDefinition> = [
+  id,
+  internalId,
+  standardId,
+  draftIds,
+  draftChange,
+  iAttributes,
+  parentTypes,
+  baseType,
+  { ...relationshipType, isFilterable: false },
+  entityType,
+  createdAt,
+  updatedAt,
+  refreshedAt,
+  creators,
+  { name: 'i_inference_weight', label: 'Inference weight', type: 'numeric', precision: 'integer', update: false, editDefault: false, mandatoryType: 'no', multiple: false, upsert: false, isFilterable: false },
+  connections,
+];
+schemaAttributesDefinition.registerAttributes(ABSTRACT_BASIC_RELATIONSHIP, basicRelationshipAttributes);

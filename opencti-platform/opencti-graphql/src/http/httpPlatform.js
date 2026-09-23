@@ -1,0 +1,672 @@
+import { URL } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import express from 'express';
+import passport from 'passport';
+import bodyParser from 'body-parser';
+import compression, { filter as compressionFilter } from 'compression';
+import helmet from 'helmet';
+import nconf from 'nconf';
+import { marked } from 'marked';
+import validator from 'validator';
+import ZipEncrypted from 'archiver-zip-encrypted';
+import { create as createContentDisposition } from 'content-disposition';
+import { printSchema } from 'graphql';
+import { basePath, DEV_MODE, ENABLED_UI, logApp, OPENCTI_SESSION, PLATFORM_VERSION, AUTH_PAYLOAD_BODY_SIZE, getBaseUrl } from '../config/conf';
+import { sessionAuthenticateUser, userWithOrigin } from '../domain/user';
+import { checkIpWhitelistForRequest } from './ipWhitelistMiddleware';
+import { getXtmJwks } from '../domain/xtm-auth';
+import { downloadFile, downloadFileRange, downloadLocalFileRange, getFileContent, isStorageAlive } from '../database/raw-file-storage';
+import { loadFile } from '../database/file-storage';
+import { DEFAULT_INVALID_CONF_VALUE, executionContext, SYSTEM_USER } from '../utils/access';
+import { ENTITY_TYPE_SETTINGS } from '../schema/internalObject';
+import { getEntityFromCache } from '../database/cache';
+import { isEmptyField, isNotEmptyField } from '../database/utils';
+import { buildContextDataForFile, publishUserAction } from '../listener/UserActionListener';
+import { internalLoadById } from '../database/middleware-loader';
+import { delUserContext, redisIsAlive } from '../database/redis';
+import { rabbitMQIsAlive } from '../database/rabbitmq';
+import { isEngineAlive } from '../database/engine';
+import createSseMiddleware from '../graphql/sseMiddleware';
+import initTaxiiApi from './httpTaxii';
+import initHttpRollingFeeds from './httpRollingFeed';
+import { createAuthenticatedContext } from './httpAuthenticatedContext';
+import { extractRefererPathFromReq, setCookieError, decodeOidcState } from './httpUtils';
+import {
+  getChatbotConfig,
+  getChatbotAgents,
+  postChatbotSession,
+  getChatbotSessions,
+  deleteChatbotSession,
+  postChatbotMessage,
+  postChatbotMessageSteer,
+  postChatbotUpload,
+  getChatbotFileDownload,
+  postAgentMessage,
+  postAgentMessageStream,
+  getLegacyChatbotProxy,
+  postChatbotMessageApprove,
+  getChatbotPendingApprovals,
+} from './httpChatbotProxy';
+import { PROVIDERS } from '../modules/authenticationProvider/providers-configuration';
+import { CERT_PROVIDER } from '../modules/authenticationProvider/provider-cert';
+import { HEADERS_PROVIDER } from '../modules/authenticationProvider/provider-headers';
+import { AuthenticationProviderError } from '../modules/authenticationProvider/providers-logger';
+import { buildDefaultHelmetParameters, buildPublicHelmetParameters } from './httpUtils';
+
+const publicDir = DEV_MODE ? '../opencti-front/dist' : 'public';
+
+export const sanitizeReferer = (refererToSanitize) => {
+  // NOTE: basePath will be configured, if the site is hosted behind a reverseProxy otherwise '/' should be accurate
+  // Ternary Operator (?): Defaults if basePath is undefined, null, "" (empty string), 0, etc (falsy values).
+  // basePath is trimmed in '../config/conf.js' to prevent a user from setting it to something like '       '
+  // NOTE: Do NOT use Nullish Coalescing (??): Would only default if basePath is undefined or null.
+  // It might be set to an empty string and would fail to set properly in base2return var in next line
+  const base2return = basePath ? basePath : '/';
+  // In some odd configurations refererToSanitize will be the string('undefined') versus value(undefined)
+  if (!refererToSanitize || refererToSanitize === 'undefined') return base2return;
+  const base = getBaseUrl();
+  const resolvedUrl = new URL(refererToSanitize, base).toString();
+  if (resolvedUrl === base || resolvedUrl.startsWith(`${base}/`)) {
+    // same domain URL accept the redirection
+    if (refererToSanitize.startsWith('/') && !refererToSanitize.startsWith('//')) {
+      // in case of relative URL, keep relative.
+      return refererToSanitize;
+    }
+    return resolvedUrl;
+  }
+  logApp.info('Error auth provider callback : url has been altered', { url: refererToSanitize });
+  return base2return;
+};
+
+const publishFileDownload = async (executeContext, auth, file) => {
+  const { filename, entity_id } = file.metaData;
+  const entity = entity_id ? await internalLoadById(executeContext, auth, entity_id) : undefined;
+  const data = buildContextDataForFile(entity, file.id, filename);
+  await publishUserAction({
+    user: auth,
+    event_type: 'file',
+    event_access: 'extended',
+    event_scope: 'download',
+    context_data: data,
+  });
+};
+
+const publishFileRead = async (executeContext, auth, file) => {
+  const { filename, entity_id } = file.metaData;
+  const entity = entity_id ? await internalLoadById(executeContext, auth, entity_id) : undefined;
+  const data = buildContextDataForFile(entity, file.id, filename);
+  await publishUserAction({
+    user: auth,
+    event_type: 'file',
+    event_access: 'extended',
+    event_scope: 'read',
+    context_data: data,
+  });
+};
+
+export const decodeStoragePath = (fileParts = []) => fileParts
+  .map((part) => {
+    try {
+      return decodeURIComponent(part);
+    } catch {
+      return part;
+    }
+  })
+  .join('/');
+
+const createApp = async (app, schema) => {
+  // Init the http server
+  const defaultTrustedProxies = ['loopback', 'linklocal', 'uniquelocal'];
+  const extraProxies = nconf.get('trust_proxy_addresses') || [];
+  const trustedProxies = [...defaultTrustedProxies, ...extraProxies];
+  app.set('trust proxy', trustedProxies);
+  if (DEV_MODE) {
+    app.set('json spaces', 2);
+  }
+
+  // Configure server security
+  const publicSecurityMiddleware = helmet(buildPublicHelmetParameters());
+  const defaultSecurityMiddleware = helmet(buildDefaultHelmetParameters());
+
+  app.use((req, res, next) => {
+    const urlString = req.url;
+    if (urlString && (urlString.startsWith(`${basePath}/public`))) {
+      publicSecurityMiddleware(req, res, next);
+    } else {
+      defaultSecurityMiddleware(req, res, next);
+    }
+  });
+
+  // -- robots.txt: disallow all crawlers on every path
+  app.get(`${basePath}/robots.txt`, (_req, res) => {
+    res.type('text/plain');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send('User-agent: *\nDisallow: /\n');
+  });
+
+  // complement the <meta name="robots" tag in index.html
+  app.use((_req, res, next) => {
+    res.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    next();
+  });
+
+  app.use(compression({
+    filter: (req, res) => res.getHeader('Content-Type') !== 'text/event-stream' && compressionFilter(req, res),
+  }));
+
+  if (ENABLED_UI) {
+    // -- Serves frontend assets resources generated by Vite
+    app.use(`${basePath}/assets`, express.static(`${publicDir}/assets`));
+
+    // -- Map file serving with Range request support
+    const BUNDLED_MAP_FILE_PATH = nconf.get('app:map_bundled_file_path');
+    app.get(`${basePath}/maps/world.pmtiles`, async (req, res) => {
+      try {
+        // Map file contain no sensitive data and must remain reachable from public dashboards
+        // and export contexts where no authenticated session is available.
+        const rangeHeader = req.headers.range;
+
+        // The custom (S3-backed) file always takes priority when present; otherwise fall
+        // back to the bundled file. There is no separate "mode" setting to keep in sync.
+        const customResult = await downloadFileRange('maps/world.pmtiles', rangeHeader);
+        const usedCustom = !!customResult;
+        const result = customResult ?? await downloadLocalFileRange(BUNDLED_MAP_FILE_PATH, rangeHeader);
+
+        if (!result) {
+          res.sendStatus(404);
+          return;
+        }
+
+        if (result.rangeNotSatisfiable) {
+          res.set('Content-Range', `bytes */${result.totalSize}`);
+          res.sendStatus(416);
+          return;
+        }
+
+        // ETag ensures browser invalidates cached byte ranges when the file changes
+        const etag = result.etag ?? `"${usedCustom ? 'custom' : 'bundled'}-${result.totalSize}"`;
+        const ifNoneMatch = req.headers['if-none-match'];
+        if (ifNoneMatch && ifNoneMatch === etag) {
+          res.sendStatus(304);
+          return;
+        }
+
+        res.set('Content-Type', 'application/octet-stream');
+        res.set('Accept-Ranges', 'bytes');
+        res.set('Cache-Control', 'public, max-age=86400');
+        res.set('ETag', etag);
+        res.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, ETag');
+        if (result.contentRange) {
+          res.status(206);
+          res.set('Content-Range', result.contentRange);
+          res.set('Content-Length', result.contentLength);
+        } else {
+          res.status(200);
+          res.set('Content-Length', result.totalSize);
+        }
+        result.stream.pipe(res);
+      } catch (e) {
+        logApp.error('Error serving map file', { cause: e });
+        res.status(503).send({ status: 'error', error: e.message });
+      }
+    });
+  }
+
+  const requestSizeLimit = nconf.get('app:max_payload_body_size') || '50mb';
+  app.use(express.json({ limit: requestSizeLimit }));
+
+  const sseMiddleware = createSseMiddleware();
+  sseMiddleware.applyMiddleware({ app });
+
+  // -- Init Taxii rest api
+  initTaxiiApi(app);
+
+  // -- Init rolling feeds rest api
+  initHttpRollingFeeds(app);
+
+  // -- Init XTM cross-platform auth api (JWKS endpoint, public, no authentication required)
+  app.get(`${basePath}/xtm/auth/jwks`, async (_req, res) => {
+    try {
+      const jwks = await getXtmJwks();
+      res.set('Content-Type', 'application/json');
+      res.set('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+      res.json(jwks);
+    } catch (e) {
+      logApp.error('[XTM_AUTH] Error serving JWKS', { cause: e });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  // -- API schema
+  app.get(`${basePath}/schema`, async (req, res) => {
+    const context = await createAuthenticatedContext(req, res, 'schema_get');
+    if (!context.user) {
+      res.sendStatus(403);
+      return;
+    }
+    res.set('Cache-Control', 'public, max-age=3600'); // 1 hour cache
+    res.set('Vary', 'X-OPENCTI-SCHEMA-VARY-CACHE'); // Way for client to invalidate cache
+    res.json({ version: PLATFORM_VERSION, schema: printSchema(schema) });
+  });
+
+  // -- File download
+  app.get(`${basePath}/storage/get/*file`, async (req, res) => {
+    try {
+      const context = await createAuthenticatedContext(req, res, 'storage_get');
+      if (!context.user) {
+        res.sendStatus(403);
+        return;
+      }
+      const file = decodeStoragePath(req.params.file);
+      const data = await loadFile(context, context.user, file);
+      // If file is attach to a specific instance, we need to contr
+      await publishFileDownload(context, context.user, data);
+      const stream = await downloadFile(data.id);
+      res.attachment(file);
+      stream.pipe(res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error getting storage get file', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- File view
+  app.get(`${basePath}/storage/view/*file`, async (req, res) => {
+    try {
+      const context = await createAuthenticatedContext(req, res, 'storage_view');
+      if (!context.user) {
+        res.sendStatus(403);
+        return;
+      }
+      const file = decodeStoragePath(req.params.file);
+      const data = await loadFile(context, context.user, file);
+      await publishFileRead(context, context.user, data);
+      res.set('Content-disposition', createContentDisposition(data.name, { type: 'inline' }));
+      res.set({ 'Content-Security-Policy': 'sandbox' });
+      res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.set({ Pragma: 'no-cache' });
+      if (data.metaData.mimetype === 'text/html') {
+        res.set({ 'Content-type': 'text/html; charset=utf-8' });
+      } else {
+        res.set('Content-type', data.metaData.mimetype);
+      }
+      const stream = await downloadFile(data.id);
+      stream.pipe(res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error getting storage view file', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- embedded loader
+  const uuidPattern = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+  const embeddedFileGetPath = new RegExp(`${basePath}/(.*)/(${uuidPattern})/(.*)embedded/(.*)$`, 'i');
+  app.get(embeddedFileGetPath, async (req, res) => {
+    try {
+      const [_, id, __, rawFilename] = Object.values(req.params);
+
+      // Embedded markdown links can carry percent-encoded filenames (spaces, parentheses, etc.).
+      let filename = rawFilename;
+      try {
+        filename = decodeURIComponent(rawFilename);
+      } catch {
+        // keep raw filename
+      }
+
+      const context = await createAuthenticatedContext(req, res, 'storage_view_embedded');
+      if (!context.user) {
+        res.sendStatus(403);
+        return;
+      }
+      const element = await internalLoadById(context, context.user, id);
+
+      const file = `embedded/${element.entity_type}/${id}/${filename}`;
+      const data = await loadFile(context, context.user, file);
+      await publishFileRead(context, context.user, data);
+      res.set('Content-disposition', createContentDisposition(data.name, { type: 'inline' }));
+      res.set({ 'Content-Security-Policy': 'sandbox' });
+      res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.set({ Pragma: 'no-cache' });
+      if (data.metaData.mimetype === 'text/html') {
+        res.set({ 'Content-type': 'text/html; charset=utf-8' });
+      } else {
+        res.set('Content-type', data.metaData.mimetype);
+      }
+
+      const stream = await downloadFile(data.id);
+      stream.pipe(res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error getting storage view file', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Pdf view
+  app.get(`${basePath}/storage/html/*file`, async (req, res) => {
+    try {
+      const context = await createAuthenticatedContext(req, res, 'storage_html');
+      if (!context.user) {
+        res.sendStatus(403);
+        return;
+      }
+      const file = decodeStoragePath(req.params.file);
+      const data = await loadFile(context, context.user, file);
+      const { mimetype } = data.metaData;
+      if (mimetype === 'text/markdown') {
+        const markDownData = await getFileContent(file);
+        const html = marked(markDownData);
+        await publishFileRead(context, context.user, data);
+        res.set({ 'Content-Security-Policy': 'sandbox' });
+        res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+        res.send(html);
+      } else {
+        res.send('Unsupported file type');
+      }
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error getting html file', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Encrypted view
+  app.get(`${basePath}/storage/encrypted/*file`, async (req, res) => {
+    try {
+      const context = await createAuthenticatedContext(req, res, 'storage_encrypted');
+      if (!context.user) {
+        res.sendStatus(403);
+        return;
+      }
+      const file = decodeStoragePath(req.params.file);
+      const data = await loadFile(context, context.user, file);
+      const { metaData: { filename } } = data;
+      await publishFileDownload(context, context.user, data);
+      const archive = ZipEncrypted({ zlib: { level: 8 }, encryptionMethod: 'aes256', password: nconf.get('app:artifact_zip_password') });
+      archive.append(await downloadFile(file), { name: filename });
+      await archive.finalize();
+      res.attachment(`${filename}.zip`);
+      archive.pipe(res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error getting encrypted file', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Client HTTPS Cert login custom strategy
+  app.get(`${basePath}/auth/cert`, async (req, res) => {
+    try {
+      await CERT_PROVIDER.reqLoginHandler(req, res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error auth by cert', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Client HEADERS Cert login custom strategy
+  app.get(`${basePath}/auth/headers`, async (req, res) => {
+    try {
+      await HEADERS_PROVIDER.reqLoginHandler(req, res);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error auth by headers', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // Logout
+  app.get(`${basePath}/logout`, async (req, res) => {
+    try {
+      const referer = extractRefererPathFromReq(req) ?? (basePath || '/');
+      const provider = req.session.session_provider;
+      const { user } = req.session;
+      if (user) {
+        const withOrigin = userWithOrigin(req, user);
+        await publishUserAction({
+          user: withOrigin,
+          event_type: 'authentication',
+          event_access: 'administration',
+          event_scope: 'logout',
+          context_data: undefined,
+        });
+        await delUserContext(user);
+        res.clearCookie(OPENCTI_SESSION);
+        let providerCache = PROVIDERS.find((conf) => conf.provider === provider);
+        logApp.debug(`[LOGOUT] checking remote logout for ${provider}`, { providerCache });
+        req.session.destroy(() => {
+          const strategy = passport._strategy(provider);
+          if (strategy && providerCache) {
+            if (providerCache.logout_remote === true) {
+              if (strategy.logout) {
+                logApp.debug('[LOGOUT] requesting remote logout using authentication strategy parameters.');
+                req.user = user; // Needed for passport
+                strategy.logout(req, (error, request) => {
+                  // When logout is implemented for strategy
+                  if (error) {
+                    setCookieError(res, 'Error generating logout uri');
+                    res.status(503).send({ status: 'error', error: error.message });
+                  } else {
+                    logApp.debug('[LOGOUT] Remote logout ok');
+                    res.redirect(request);
+                  }
+                });
+              } else {
+                logApp.info('[LOGOUT] No remote logout implementation found in strategy.');
+                res.redirect(referer);
+              }
+            } else {
+              logApp.debug('[LOGOUT] OpenCTI logout only, remote logout on IDP not requested.');
+              res.redirect(referer);
+            }
+          } else if (HEADERS_PROVIDER && provider === HEADERS_PROVIDER.provider) {
+            res.redirect(HEADERS_PROVIDER.logout_uri ?? referer);
+          } else {
+            res.redirect(referer);
+          }
+        });
+      } else {
+        res.redirect(referer);
+      }
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error logout', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Passport login
+  app.get(`${basePath}/auth/:provider`, (req, res, next) => {
+    try {
+      const { provider } = req.params;
+      const strategy = passport._strategy(provider);
+      if (!strategy) {
+        setCookieError(res, `Unknown authentication provider '${provider}'`);
+        logApp.info('Unknown authentication provider', { provider });
+        res.status(503).send({ status: 'error' });
+        return;
+      }
+
+      const referer = extractRefererPathFromReq(req);
+
+      const isSaml = strategy._saml;
+
+      if (!isSaml) {
+        // For openid / oauth, session is required so we can use it
+        req.session.referer = referer;
+      }
+
+      // For SAML, no session is required, referer will be send back through RelayState
+      return passport.authenticate(
+        provider,
+        isSaml ? { additionalParams: { RelayState: referer } } : {},
+        (err) => {
+          if (err) {
+            const authLogger = strategy.logger;
+            if (authLogger) {
+              authLogger.error('Callback processing error', { err }, err);
+            }
+          }
+          setCookieError(res, err?.message);
+          next(err);
+        },
+      )(req, res, next);
+    } catch (e) {
+      setCookieError(res, e.message);
+      logApp.error('Error auth provider', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Passport callback
+  // -- Default limit is '100kb' based on https://expressjs.com/en/resources/middleware/body-parser.html
+  const urlencodedParser = AUTH_PAYLOAD_BODY_SIZE ? bodyParser.urlencoded({ extended: true, limit: AUTH_PAYLOAD_BODY_SIZE }) : bodyParser.urlencoded({ extended: true });
+  app.all(`${basePath}/auth/:provider/callback`, urlencodedParser, async (req, res, next) => {
+    const { provider } = req.params;
+    const strategy = passport._strategy(provider);
+
+    const callbackLogin = () => new Promise((accept, reject) => {
+      passport.authenticate(
+        provider,
+        {},
+        (err, user) => {
+          if (err || !user) {
+            const authLogger = strategy.logger;
+            if (authLogger) {
+              authLogger.error('Callback login error', { err }, err);
+            } else {
+              logApp.error('Error auth provider login', { cause: err, provider });
+            }
+            reject(err);
+          } else {
+            accept(user);
+          }
+        })(req, res, next);
+    });
+
+    try {
+      const context = executionContext(`${provider}_strategy`);
+      const logged = await callbackLogin();
+      await sessionAuthenticateUser(context, req, logged, provider);
+      // Check IP whitelist after successful auth
+      const ipBlocked = await checkIpWhitelistForRequest(req, logged.id);
+      if (ipBlocked) {
+        req.session.destroy(() => {});
+        setCookieError(res, 'Your IP address is not allowed to access this platform');
+      }
+    } catch (err) {
+      if (err instanceof AuthenticationProviderError) {
+        setCookieError(res, err.message);
+      } else {
+        setCookieError(res, 'Invalid authentication, please ask your administrator');
+      }
+    } finally {
+      // Retrieve the application state (referer) relayed through the auth flow:
+      // 1. SAML: RelayState is sent as a body parameter
+      // 2. OIDC (v6): referer is encoded in the OAuth state query parameter
+      // 3. Fallback: session-based referer (backward compatibility)
+      const referer = req.body?.RelayState ?? decodeOidcState(req.query?.state)?.referer ?? req.session.referer;
+      const sanitizedReferer = sanitizeReferer(referer) ?? (basePath || '/');
+      res.redirect(sanitizedReferer);
+    }
+  });
+
+  // -- Healthcheck
+  const healthCheckTimeout = async (promise, message) => {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(message)), 15000); // 15 seconds timeout
+    });
+    return Promise.race([promise, timeoutPromise]);
+  };
+  app.get(`${basePath}/health`, async (req, res) => {
+    try {
+      res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      const configAccessKey = nconf.get('app:health_access_key');
+      if (configAccessKey === DEFAULT_INVALID_CONF_VALUE || isEmptyField(configAccessKey)) {
+        res.status(401).send({ status: 'unauthorized' });
+      } else {
+        const { health_access_key: access_key } = req.query;
+        if (configAccessKey === 'public' || configAccessKey === access_key) {
+          const engineAlive = healthCheckTimeout(isEngineAlive(), 'Timeout checking elastic/opensearch health');
+          const storageAlive = healthCheckTimeout(isStorageAlive(), 'Timeout checking storage health');
+          const rabbitMQAlive = healthCheckTimeout(rabbitMQIsAlive(), 'Timeout checking rabbitmq health');
+          const redisAlive = healthCheckTimeout(redisIsAlive(), 'Timeout checking redis health');
+          await Promise.all([engineAlive, storageAlive, rabbitMQAlive, redisAlive]);
+          res.status(200).send({ status: 'success' });
+        } else {
+          res.status(401).send({ status: 'unauthorized' });
+        }
+      }
+    } catch (e) {
+      logApp.error('Error in health check', { cause: e });
+      res.status(503).send({ status: 'error', error: e.message });
+    }
+  });
+
+  // -- Chatbot Proxy
+  // Config endpoint is always available (frontend uses it to detect mode)
+  app.get(`${basePath}/chatbot/config`, getChatbotConfig);
+  // XTM One Platform Chat API routes (used when xtm_one_token is set)
+  app.get(`${basePath}/chatbot/agents`, getChatbotAgents);
+  app.post(`${basePath}/chatbot/sessions`, postChatbotSession);
+  app.get(`${basePath}/chatbot/sessions`, getChatbotSessions);
+  app.delete(`${basePath}/chatbot/sessions/:conversationId`, deleteChatbotSession);
+  app.post(`${basePath}/chatbot/messages`, postChatbotMessage);
+  app.post(`${basePath}/chatbot/messages/steer`, postChatbotMessageSteer);
+  // Human-in-the-loop tool approval: the decision channel back into a turn
+  // paused mid-answer, and the recovery read a reloaded page uses to get the
+  // prompt (and the `tool_call_id`s a decision must name) back.
+  app.post(`${basePath}/chatbot/messages/approve`, postChatbotMessageApprove);
+  app.get(`${basePath}/chatbot/conversations/:conversationId/pending-approvals`, getChatbotPendingApprovals);
+  app.post(`${basePath}/chatbot/upload`, postChatbotUpload);
+  app.get(`${basePath}/chatbot/files/:fileId/download`, getChatbotFileDownload);
+  app.post(`${basePath}/chatbot/agent`, postAgentMessage);
+  app.post(`${basePath}/chatbot/agent/stream`, postAgentMessageStream);
+  // Legacy Flowise proxy (used when xtm_one_token is NOT set)
+  app.post(`${basePath}/chatbot`, getLegacyChatbotProxy);
+
+  // Other routes - Render index.html
+  app.get('*any', async (_, res) => {
+    if (ENABLED_UI) {
+      const context = executionContext('app_loading');
+      const settings = await getEntityFromCache(context, SYSTEM_USER, ENTITY_TYPE_SETTINGS);
+      const data = await readFile(`${publicDir}/index.html`, 'utf8');
+      const settingsTitle = settings?.platform_title;
+      const description = 'OpenCTI is an open source platform allowing organizations'
+        + ' to manage their cyber threat intelligence knowledge and observables.';
+      const settingFavicon = settings?.platform_favicon;
+      const withOptionValued = data
+        .replace(/%BASE_PATH%/g, basePath)
+        .replace(/%APP_SCRIPT_SNIPPET%/g, nconf.get('app:script_snippet')?.trim() ?? '')
+        .replace(/%APP_TITLE%/g, isNotEmptyField(settingsTitle) ? validator.escape(settingsTitle)
+          : 'OpenCTI - Cyber Threat Intelligence Platform')
+        .replace(/%APP_DESCRIPTION%/g, validator.escape(description))
+        .replace(/%APP_FAVICON%/g, isNotEmptyField(settingFavicon) ? validator.escape(settingFavicon)
+          : './assets/static/favicon.png');
+      res.set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.set('Expires', '-1');
+      res.set('Pragma', 'no-cache');
+      res.send(withOptionValued);
+    } else {
+      res.status(503).send({ status: 'error', error: 'Interface is disabled by configuration' });
+    }
+  });
+
+  // Any random unexpected request not GET
+  app.use((_req, res, _next) => {
+    res.status(404).send({ status: 'error', error: 'Path not found' });
+  });
+
+  // Error handling
+  app.use((err, req, res, _next) => {
+    logApp.error('Http call interceptor fail', { cause: err, referer: req.headers?.referer });
+    res.status(500).send({ status: 'error', error: DEV_MODE ? err.stack : err.message });
+  });
+
+  return { sseMiddleware };
+};
+
+export default createApp;

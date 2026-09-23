@@ -1,0 +1,318 @@
+############## Indicators
+enum IndicatorsOrdering {
+  pattern_type
+  pattern_version
+  pattern
+  name
+  indicator_types
+  valid_from
+  valid_until
+  x_opencti_score
+  x_opencti_detection
+  confidence
+  created
+  modified
+  created_at
+  updated_at
+  x_opencti_workflow_id
+  objectMarking
+  creator
+  createdBy
+  _score
+}
+type IndicatorConnection {
+  pageInfo: PageInfo!
+  edges: [IndicatorEdge]
+}
+type IndicatorEdge {
+  cursor: String!
+  node: Indicator!
+}
+
+type DecayHistory {
+  updated_at: DateTime!
+  refreshed_at: DateTime
+  score: Int!
+}
+
+type IndicatorDecayRule {
+  decay_rule_id: String
+  decay_lifetime: Int!
+  decay_pound: Float!
+  decay_points: [Int!]
+  decay_revoke_score: Int!
+}
+
+type IndicatorDecayExclusionRule {
+  decay_exclusion_id: String!
+  decay_exclusion_name: String!
+  decay_exclusion_created_at: DateTime!
+  decay_exclusion_filters: String!
+}
+
+type DecayLiveDetails {
+  live_score: Int!
+  live_points: [DecayHistory!]
+}
+
+type DecayChartData {
+  live_score_serie: [DecayHistory!]
+}
+
+type ObservablesValues {
+  type: String
+  value: String
+  hashes: [Hash!]
+}
+
+type Indicator implements BasicObject & StixObject & StixCoreObject & StixDomainObject {
+  id: ID! # internal_id
+  standard_id: String!
+  entity_type: String!
+  parent_types: [String!]!
+  metrics:[Metric]
+  # StixObject
+  representative: Representative!
+  x_opencti_stix_ids: [StixId]
+  is_inferred: Boolean!
+  spec_version: String!
+  created_at: DateTime!
+  updated_at: DateTime!
+  x_opencti_modified_at: DateTime
+  refreshed_at: DateTime
+  draftVersion: DraftVersion
+  # inferences
+  x_opencti_inferences: [Inference]
+  # StixCoreObject
+  createdBy: Identity
+  currentUserAccessRight: String
+  numberOfConnectedElement: Int!
+  objectMarking: [MarkingDefinition!]
+  objectOrganization: [Organization!]
+  objectLabel: [Label!]
+  externalReferences(first: Int): ExternalReferenceConnection
+  containersNumber: Number
+  containers(first: Int, entityTypes: [String!]): ContainerConnection
+  reports(first: Int): ReportConnection
+  notes(first: Int): NoteConnection
+  opinions(first: Int): OpinionConnection
+  observedData(first: Int): ObservedDataConnection
+  groupings(first: Int): GroupingConnection
+  cases(first: Int): CaseConnection
+  stixCoreRelationships(
+    first: Int
+    after: ID
+    orderBy: StixCoreRelationshipsOrdering
+    orderMode: OrderingMode
+    fromId: StixRef
+    toId: StixRef
+    fromTypes: [String]
+    toTypes: [String]
+    relationship_type: String
+    startTimeStart: DateTime
+    startTimeStop: DateTime
+    stopTimeStart: DateTime
+    stopTimeStop: DateTime
+    firstSeenStart: DateTime
+    firstSeenStop: DateTime
+    lastSeenStart: DateTime
+    lastSeenStop: DateTime
+    confidences: [Int]
+    search: String
+    filters: FilterGroup
+  ): StixCoreRelationshipConnection
+  stixCoreObjectsDistribution(
+    relationship_type: [String]
+    toTypes: [String]
+    field: String!
+    startDate: DateTime
+    endDate: DateTime
+    dateAttribute: String
+    operation: StatsOperation!
+    limit: Int
+    order: String
+    types: [String]
+    filters: FilterGroup
+    search: String
+  ): [Distribution] @auth(for: [KNOWLEDGE, EXPLORE])
+  stixCoreRelationshipsDistribution(
+    field: String!
+    operation: StatsOperation!
+    startDate: DateTime
+    endDate: DateTime
+    dateAttribute: String
+    isTo: Boolean
+    limit: Int
+    order: String
+    elementWithTargetTypes: [String]
+    fromId: [String]
+    fromRole: String
+    fromTypes: [String]
+    toId: [String]
+    toRole: String
+    toTypes: [String]
+    relationship_type: [String]
+    confidences: [Int]
+    search: String
+    filters: FilterGroup
+  ): [Distribution] @auth(for: [KNOWLEDGE, EXPLORE])
+  opinions_metrics: OpinionsMetrics
+  # StixDomainObject
+  revoked: Boolean!
+  confidence: Int
+  lang: String
+  created: DateTime
+  modified: DateTime
+  x_opencti_graph_data: String
+  objectAssignee: [Assignee!]
+  objectParticipant: [Participant!]
+  avatar: OpenCtiFile
+  fintelTemplates: [FintelTemplate!]
+  filesFromTemplate(
+    first: Int
+    prefixMimeType: String
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  # Indicator
+  pattern_type: String
+  pattern_version: String
+  pattern: String
+  name: String!
+  description: String
+  indicator_types: [String]
+  valid_from: DateTime
+  valid_until: DateTime
+  x_opencti_score: Int
+  x_opencti_detection: Boolean
+  x_opencti_main_observable_type: String
+  x_opencti_observable_values: [ObservablesValues!]
+  x_opencti_reliability: String
+  x_mitre_platforms: [String]
+  killChainPhases: [KillChainPhase!]
+  observables(first: Int): StixCyberObservableConnection
+  #Decay
+  decay_base_score : Int
+  decay_base_score_date : DateTime
+  decay_applied_rule: IndicatorDecayRule
+  decay_exclusion_applied_rule: IndicatorDecayExclusionRule
+  decay_history: [DecayHistory!]
+  decayLiveDetails: DecayLiveDetails
+  decayChartData: DecayChartData
+  # Technical
+  creators: [Creator!]
+  toStix(version: Version): String
+  importFiles(
+    first: Int
+    prefixMimeType: String
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  pendingFiles(
+    first: Int
+    after: ID
+    orderBy: FileOrdering
+    orderMode: OrderingMode
+    search: String
+    filters: FilterGroup
+  ): FileConnection
+  exportFiles(first: Int): FileConnection
+  editContext: [EditUserContext!]
+  connectors(onlyAlive: Boolean): [Connector]
+  jobs(first: Int): [Work]
+  status: Status
+  workflowEnabled: Boolean
+  workflowInstance: WorkflowInstance
+  pirInformation(pirId: ID!): PirInformation @auth(for: [PIRAPI])
+}
+
+input IndicatorAddInput {
+  stix_id: StixId
+  x_opencti_stix_ids: [StixId!]
+  pattern_type: String!
+  pattern_version: String
+  pattern: String!
+  name: String! @constraint(minLength: 2, format: "not-blank")
+  description: String
+  indicator_types: [String!]
+  valid_from: DateTime
+  valid_until: DateTime
+  confidence: Int
+  revoked: Boolean
+  lang: String
+  x_opencti_score: Int @constraint(min: 0, max: 100)
+  x_opencti_detection: Boolean
+  x_opencti_main_observable_type: String
+  x_opencti_reliability: String
+  x_mitre_platforms: [String!]
+  killChainPhases: [String!]
+  createdBy: String
+  objectMarking: [String!]
+  objectLabel: [String!]
+  objectOrganization: [String!]
+  externalReferences: [String!]
+  created: DateTime
+  modified: DateTime
+  clientMutationId: String
+  update: Boolean
+  createObservables: Boolean
+  x_opencti_modified_at: DateTime
+  x_opencti_workflow_id: String
+  file: Upload
+  fileMarkings: [String]
+  files: [Upload]
+  filesMarkings: [[String]]
+  noTriggerImport: [Boolean]
+  embedded: [Boolean]
+  basedOn: [String!]
+  upsertOperations: [EditInput!]
+}
+
+type Query {
+  indicator(id: String!): Indicator @auth(for: [KNOWLEDGE])
+  indicators(
+    first: Int
+    after: ID
+    orderBy: IndicatorsOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+    toStix: Boolean
+  ): IndicatorConnection @auth(for: [KNOWLEDGE])
+  indicatorsTimeSeries(
+    objectId: String
+    field: String!
+    operation: StatsOperation!
+    startDate: DateTime!
+    endDate: DateTime!
+    interval: String!
+    filters: FilterGroup
+  ): [TimeSeries] @auth(for: [KNOWLEDGE])
+  indicatorsNumber(pattern_type: String, objectId: String, endDate: DateTime): Number @auth(for: [KNOWLEDGE])
+  indicatorsDistribution(
+    objectId: String
+    field: String!
+    operation: StatsOperation!
+    limit: Int
+    order: String
+    startDate: DateTime
+    endDate: DateTime
+    dateAttribute: String
+  ): [Distribution] @auth(for: [KNOWLEDGE])
+}
+
+type Mutation {
+  indicatorAdd(input: IndicatorAddInput!): Indicator @auth(for: [KNOWLEDGE_KNUPDATE])
+  indicatorDelete(id: ID!): ID @auth(for: [KNOWLEDGE_KNUPDATE_KNDELETE])
+  indicatorFieldPatch(id: ID!, input: [EditInput!]!, commitMessage: String, references: [String]): Indicator @auth(for: [KNOWLEDGE_KNUPDATE])
+  indicatorContextPatch(id: ID!, input: EditContext): Indicator @auth(for: [KNOWLEDGE_KNUPDATE])
+  indicatorContextClean(id: ID!): Indicator @auth(for: [KNOWLEDGE_KNUPDATE])
+  indicatorRelationAdd(id: ID!, input: StixRefRelationshipAddInput!): StixRefRelationship @auth(for: [KNOWLEDGE_KNUPDATE])
+  indicatorRelationDelete(id: ID!, toId: StixRef!, relationship_type: String!): Indicator @auth(for: [KNOWLEDGE_KNUPDATE])
+}

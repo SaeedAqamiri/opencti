@@ -1,0 +1,87 @@
+import React, { FunctionComponent, useState } from 'react';
+import IconButton from '@common/button/IconButton';
+import { Add } from '@mui/icons-material';
+import Drawer from '@components/common/drawer/Drawer';
+import { DataSourcesLinesPaginationQuery$variables } from '@components/techniques/__generated__/DataSourcesLinesPaginationQuery.graphql';
+import { useFormatter } from '../../../../components/i18n';
+import DataSourceCreation from '../data_sources/DataSourceCreation';
+import SearchInput from '../../../../components/SearchInput';
+import AddDataSourcesLines, { addDataSourcesLinesQuery } from './AddDataSourcesLines';
+import { AddDataSourcesLinesQuery } from './__generated__/AddDataSourcesLinesQuery.graphql';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+
+const AddDataSources: FunctionComponent<{ dataComponentId: string }> = ({
+  dataComponentId,
+}) => {
+  const { t_i18n } = useFormatter();
+
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const paginationOptions: DataSourcesLinesPaginationQuery$variables = {
+    search,
+    count: 20,
+  };
+
+  const handleSearch = (keyword: string) => setSearch(keyword);
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setSearch('');
+  };
+
+  const queryRef = useQueryLoading<AddDataSourcesLinesQuery>(
+    addDataSourcesLinesQuery,
+    { ...paginationOptions },
+  );
+
+  // flex, not block: an inline-flex button in a block wrapper reserves a text
+  // descender below it, and Label centres the wrapper, not the button.
+  return (
+    <div style={{ display: 'flex' }}>
+      <IconButton
+        color="primary"
+        aria-label="Add"
+        onClick={handleOpen}
+      >
+        <Add fontSize="small" />
+      </IconButton>
+      <Drawer
+        open={open}
+        onClose={handleClose}
+        title={t_i18n('Add data sources')}
+        subHeader={{
+          right: [(
+            <DataSourceCreation
+              contextual={true}
+              display={open}
+              inputValue={search}
+              paginationOptions={paginationOptions}
+              key="rightButton"
+            />
+          )],
+          left: [(
+            <SearchInput
+              variant="inDrawer"
+              onSubmit={handleSearch}
+              key="leftInput"
+            />
+          )],
+        }}
+      >
+        {queryRef && (
+          <React.Suspense
+            fallback={<Loader variant={LoaderVariant.inElement} />}
+          >
+            <AddDataSourcesLines
+              dataComponentId={dataComponentId}
+              queryRef={queryRef}
+            />
+          </React.Suspense>
+        )}
+      </Drawer>
+    </div>
+  );
+};
+
+export default AddDataSources;

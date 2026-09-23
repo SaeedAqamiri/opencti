@@ -1,0 +1,157 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import ConfidenceField from '@components/common/form/ConfidenceField';
+import CreatorField from '@components/common/form/CreatorField';
+import { IngestionEditionUserHandlingQuery$data } from '@components/data/__generated__/IngestionEditionUserHandlingQuery.graphql';
+import { Box } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import DialogActions from '@mui/material/DialogActions';
+import { Formik } from 'formik';
+import { FormikConfig } from 'formik/dist/types';
+import { FunctionComponent, useState } from 'react';
+import { graphql } from 'react-relay';
+import type { GraphQLTaggedNode } from 'relay-runtime';
+import * as Yup from 'yup';
+import { useFormatter } from '../../../components/i18n';
+import { fetchQuery } from '../../../relay/environment';
+import { fieldSpacingContainerStyle } from '../../../utils/field';
+import useApiMutation from '../../../utils/hooks/useApiMutation';
+
+export const ingestionEditionUserHandlingQuery = graphql`
+  query IngestionEditionUserHandlingQuery(
+    $name: String!
+  ) {
+    userAlreadyExists(
+      name: $name
+    )
+  }
+`;
+
+export interface IngestionEditionAddAutoUserInput {
+  user_name: string;
+  confidence_level: number;
+}
+
+interface IngestionEditionUserHandlingProps {
+  feedName: string;
+  dataId: string;
+  onAutoUserCreated: () => void;
+  mutation: GraphQLTaggedNode;
+}
+const IngestionEditionUserHandling: FunctionComponent<IngestionEditionUserHandlingProps> = ({ feedName, dataId, onAutoUserCreated, mutation }) => {
+  const { t_i18n } = useFormatter();
+
+  const [openDialog, setOpenDialog] = useState(false);
+  const [commitUpdate] = useApiMutation(mutation);
+  const validationSchema = () => Yup.object().shape({
+    user_name: Yup.string(),
+    confidence_level: Yup.number(),
+  });
+
+  const initialValues: IngestionEditionAddAutoUserInput = {
+    user_name: `[F] ${feedName}`,
+    confidence_level: 50,
+  };
+
+  const onSubmit: FormikConfig<IngestionEditionAddAutoUserInput>['onSubmit'] = async (
+    values,
+    { setSubmitting, setFieldError },
+  ) => {
+    const existingUsers = await fetchQuery(ingestionEditionUserHandlingQuery, {
+      name: values.user_name,
+    })
+      .toPromise();
+
+    if ((existingUsers as IngestionEditionUserHandlingQuery$data)?.userAlreadyExists) {
+      setSubmitting(false);
+      setFieldError('user_name', t_i18n('This service account already exists. Change the feed\'s name to change the automatically created service account name'));
+      return;
+    }
+
+    commitUpdate({
+      variables: {
+        id: dataId,
+        input: {
+          user_name: values.user_name,
+          confidence_level: Number(values.confidence_level),
+        },
+      },
+      onCompleted: () => {
+        onAutoUserCreated();
+        setSubmitting(false);
+        setOpenDialog(false);
+      },
+    });
+  };
+
+  return (
+
+    <>
+      <Alert
+        severity="warning"
+        variant="outlined"
+        sx={{ padding: '0px 10px 0px 10px', marginTop: '20px' }}
+      >
+        <Box>
+          {t_i18n('You have set System as a creator. Create a service account for this feed to ensure traceability of your data')}
+        </Box>
+        <Button onClick={() => setOpenDialog(true)}>{ t_i18n('Create a service account for this feed')}</Button>
+
+      </Alert>
+
+      <Formik<IngestionEditionAddAutoUserInput>
+        initialValues={initialValues}
+        validationSchema={validationSchema}
+        onSubmit={onSubmit}
+      >
+        {({ submitForm, resetForm }) => (
+
+          <Dialog
+            open={openDialog}
+            fullWidth={true}
+            onClose={() => {
+              setOpenDialog(false);
+            }}
+            title={t_i18n('Create an automatic user')}
+          >
+            <CreatorField
+              name="user_name"
+              label={t_i18n('Service account responsible for data creation')}
+              containerStyle={fieldSpacingContainerStyle}
+              showConfidence
+              disabled={true}
+            />
+            <Box sx={{ marginTop: 2 }}>
+              <ConfidenceField
+                name="confidence_level"
+                entityType="User"
+                containerStyle={fieldSpacingContainerStyle}
+                showAlert={false}
+              />
+            </Box>
+            <DialogActions>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setOpenDialog(false);
+                  resetForm();
+                }}
+              >
+                {t_i18n('Cancel')}
+              </Button>
+              <Button onClick={() => {
+                submitForm();
+              }}
+              >
+                {t_i18n('Confirm')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+        )}
+      </Formik>
+    </>
+  );
+};
+
+export default IngestionEditionUserHandling;

@@ -1,0 +1,165 @@
+import { useMemo } from 'react';
+import { useParams, useLocation, Route } from 'react-router';
+import { graphql, useSubscription } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
+import { QueryRenderer } from '../../../../relay/environment';
+import Loader from '../../../../components/Loader';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import DataComponent from './DataComponent';
+import FileManager from '../../common/files/FileManager';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import { RootDataComponentQuery$data } from './__generated__/RootDataComponentQuery.graphql';
+import DataComponentKnowledge from './DataComponentKnowledge';
+import { RootDataComponentSubscription } from './__generated__/RootDataComponentSubscription.graphql';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import Security from '../../../../utils/Security';
+import DataComponentEdition from './DataComponentEdition';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import DataComponentDeletion from './DataComponentDeletion';
+import { PATH_DATA_COMPONENT, PATH_DATA_COMPONENTS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootDataComponentSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on DataComponent {
+        ...DataComponent_dataComponent
+        ...DataComponentEditionOverview_dataComponent
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const dataComponentQuery = graphql`
+  query RootDataComponentQuery($id: String!) {
+    dataComponent(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      standard_id
+      entity_type
+      name
+      x_opencti_graph_data
+      currentUserAccessRight
+      ...DataComponent_dataComponent
+      ...DataComponentKnowledge_dataComponent
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+      ...StixCoreObjectSharingListFragment
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+const RootDataComponent = () => {
+  const { dataComponentId } = useParams() as { dataComponentId: string };
+  const subConfig = useMemo<
+    GraphQLSubscriptionConfig<RootDataComponentSubscription>
+  >(
+    () => ({
+      subscription,
+      variables: { id: dataComponentId },
+    }),
+    [dataComponentId],
+  );
+  useSubscription(subConfig);
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  return (
+    <>
+      <QueryRenderer
+        query={dataComponentQuery}
+        variables={{ id: dataComponentId }}
+        render={({ props }: { props: RootDataComponentQuery$data }) => {
+          if (props) {
+            if (props.dataComponent) {
+              const { dataComponent } = props;
+              const basePath = PATH_DATA_COMPONENT(dataComponentId);
+              const paddingRight = getPaddingRight(location.pathname, basePath, false);
+              return (
+                <div style={{ paddingRight }}>
+                  <Breadcrumbs elements={[
+                    { label: t_i18n('Techniques') },
+                    { label: t_i18n('Data components'), link: PATH_DATA_COMPONENTS },
+                    { label: dataComponent.name, current: true },
+                  ]}
+                  />
+                  <StixDomainObjectHeader
+                    entityType="Data-Component"
+                    stixDomainObject={props.dataComponent}
+                    EditComponent={(
+                      <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                        <DataComponentEdition dataComponentId={dataComponent.id} />
+                      </Security>
+                    )}
+                    DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                      <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                        <DataComponentDeletion id={dataComponent.id} isOpen={isOpen} handleClose={onClose} />
+                      </Security>
+                    )}
+                    noAliases={true}
+                    redirectToContent={true}
+                    enableEnrollPlaybook={true}
+                  />
+                  <StixDomainObjectMain
+                    entity={dataComponent}
+                    basePath={basePath}
+                    pages={{
+                      overview:
+                        <DataComponent dataComponentData={dataComponent} />,
+                      content: (
+                        <StixCoreObjectContentRoot
+                          stixCoreObject={dataComponent}
+                        />
+                      ),
+                      files: (
+                        <FileManager
+                          id={dataComponentId}
+                          connectorsImport={props.connectorsForImport}
+                          connectorsExport={props.connectorsForExport}
+                          entity={dataComponent}
+                        />
+                      ),
+                      history:
+                        <StixCoreObjectHistory stixCoreObjectId={dataComponentId} />,
+                    }}
+                    extraRoutes={(
+                      <Route
+                        path="/knowledge/*"
+                        element={
+                          <DataComponentKnowledge data={dataComponent} />
+                        }
+                      />
+                    )}
+                  />
+                </div>
+              );
+            }
+            return <ErrorNotFound />;
+          }
+          return <Loader />;
+        }}
+      />
+    </>
+  );
+};
+
+export default RootDataComponent;

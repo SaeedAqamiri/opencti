@@ -1,0 +1,93 @@
+import { expect } from 'vitest';
+import gql from 'graphql-tag';
+import { topEntitiesOrRelationsList } from '../../src/database/middleware';
+import { SYSTEM_USER } from '../../src/utils/access';
+import { isNotEmptyField, READ_INDEX_HISTORY, READ_INDEX_INFERRED_ENTITIES, READ_INDEX_INFERRED_RELATIONSHIPS } from '../../src/database/utils';
+import { ENTITY_TYPE_BACKGROUND_TASK } from '../../src/schema/internalObject';
+import { internalFindByIds, internalLoadById, topEntitiesList } from '../../src/database/middleware-loader';
+import { testContext } from './testQuery';
+import { awaitUntilCondition, queryAsAdmin } from './testQueryHelper';
+import { fetchStreamInfo } from '../../src/database/stream/stream-handler';
+import { logApp } from '../../src/config/conf';
+import { TASK_TYPE_RULE } from '../../src/domain/backgroundTask-common';
+import { getManagerInfo } from '../../src/manager/ruleManager';
+
+export const inferenceLookup = async (inferences, fromStandardId, toStandardId, type) => {
+  for (let index = 0; index < inferences.length; index += 1) {
+    const inference = inferences[index];
+    const from = await internalLoadById(testContext, SYSTEM_USER, inference.fromId);
+    const to = await internalLoadById(testContext, SYSTEM_USER, inference.toId);
+    const sameFrom = from.standard_id === fromStandardId;
+    const sameTo = to.standard_id === toStandardId;
+    const sameType = inference.relationship_type === type;
+    if (sameFrom && sameTo && sameType) {
+      return inference;
+    }
+  }
+  return null;
+};
+
+export const getInferences = (type) => {
+  const opts = { indices: [READ_INDEX_INFERRED_RELATIONSHIPS, READ_INDEX_INFERRED_ENTITIES] };
+  return topEntitiesOrRelationsList(testContext, SYSTEM_USER, [type], opts);
+};
+
+const RULE_MUTATION = gql`
+  mutation ruleSetActivation($enable: Boolean!, $id: ID!) {
+    ruleSetActivation(enable: $enable, id: $id) {
+      activated
+    }
+  }
+`;
+
+// Those two waits had no bound at all and could only end on the vitest timeout.
+const RULE_ACTIVATION_BUDGET = 10000;
+const RULE_STABILISATION_BUDGET = 15000;
+
+export const changeRule = async (ruleId, active) => {
+  const start = new Date().getTime();
+  // Change the status
+  await queryAsAdmin({ query: RULE_MUTATION, variables: { id: ruleId, enable: active } });
+  // Wait for rule to finish activation
+  await awaitUntilCondition(async () => {
+    // Handle tasks
+    const tasks = await topEntitiesList(testContext, SYSTEM_USER, [ENTITY_TYPE_BACKGROUND_TASK]);
+    const ruleActivationTask = tasks.filter((t) => t.type === TASK_TYPE_RULE && t.rule === ruleId && t.enable === active);
+    ruleActivationTask.forEach((t) => {
+      if (t.errors.length > 0) {
+        logApp.info('[RULE TEST] Change rule tasks failure', { active, errors: t.errors });
+      }
+      expect(t.errors.length).toBe(0);
+    });
+    const doneProvision = ruleActivationTask.filter((t) => !t.completed).length === 0;
+    // Handle works
+    const workIds = ruleActivationTask.map((task) => task.work_id).filter((workId) => isNotEmptyField(workId));
+    const works = await internalFindByIds(testContext, SYSTEM_USER, workIds, { indices: [READ_INDEX_HISTORY] });
+    works.forEach((w) => {
+      if (w.errors.length > 0) {
+        logApp.info('[RULE TEST] Change rule works failure', { active, errors: w.errors });
+      }
+      expect(w.errors.length, `Something is wrong with this query: ${w.errors.map((e) => e.message).join(' || ')}`).toBe(0);
+    });
+    const doneWorks = works.filter((t) => t.status !== 'complete').length === 0;
+    // Final status
+    return doneProvision && doneWorks;
+  }, RULE_ACTIVATION_BUDGET, { intervalMs: 1000, message: `Rule ${ruleId} did not finish its activation` });
+  // Wait all events to be consumed
+  let stableCount = 1;
+  await awaitUntilCondition(async () => {
+    const innerInfo = await fetchStreamInfo();
+    const ruleManagerInfo = await getManagerInfo(testContext, SYSTEM_USER);
+    const lastEventDate = new Date(parseInt(innerInfo.lastEventId.split('-').at(0), 10));
+    const managerEventDate = new Date(parseInt(ruleManagerInfo.lastEventId.split('-').at(0), 10));
+    if (managerEventDate >= lastEventDate) {
+      stableCount += 1;
+    }
+    return stableCount >= 3;
+  }, RULE_STABILISATION_BUDGET, { intervalMs: 2000, message: `Rule ${ruleId} stream did not stabilise` });
+  const stop = new Date().getTime() - start;
+  logApp.info(`[TEST] Rule ${ruleId} ${active ? 'activated' : 'disabled'} in ${stop} ms`);
+};
+
+export const activateRule = async (ruleId) => changeRule(ruleId, true);
+export const disableRule = (ruleId) => changeRule(ruleId, false);

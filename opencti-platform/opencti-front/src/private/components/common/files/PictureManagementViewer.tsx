@@ -1,0 +1,103 @@
+import React, { FunctionComponent } from 'react';
+import Grid from '@mui/material/Grid';
+import { graphql, useFragment } from 'react-relay';
+import List from '@mui/material/List';
+import { useFormatter } from '../../../../components/i18n';
+import PictureLine from './PictureLine';
+import { PictureManagementViewer_entity$data, PictureManagementViewer_entity$key } from './__generated__/PictureManagementViewer_entity.graphql';
+import ColumnsLinesTitles from '../../../../components/ColumnsLinesTitles';
+import Card from '../../../../components/common/card/Card';
+
+export const pictureManagementViewerFragment = graphql`
+  fragment PictureManagementViewer_entity on StixDomainObject {
+    id
+    entity_type
+    images: importFiles(prefixMimeType: "image/") {
+      edges {
+        node {
+          id
+          name
+          ...PictureManagementUtils_node
+        }
+      }
+    }
+  }
+`;
+
+interface PictureManagementViewerProps {
+  entity: PictureManagementViewer_entity$key;
+}
+
+const PictureManagementViewer: FunctionComponent<
+  PictureManagementViewerProps
+> = ({ entity }) => {
+  const { t_i18n } = useFormatter();
+
+  const data: PictureManagementViewer_entity$data = useFragment(
+    pictureManagementViewerFragment,
+    entity,
+  );
+
+  const dataColumns = {
+    description: {
+      label: 'Description',
+      width: '60%',
+      isSortable: false,
+    },
+    order: {
+      label: 'Order',
+      width: '15%',
+      isSortable: false,
+    },
+    inCarousel: {
+      label: 'In Carousel',
+      width: '20%',
+      isSortable: false,
+    },
+  };
+  const images = data?.images?.edges
+    ?.filter((edge) => edge?.node)
+    .map((edge) => edge?.node) ?? [];
+  return (
+    <Grid item xs={6}>
+      <div style={{ height: '100%' }} className="break">
+        <Card title={t_i18n('Pictures Management')}>
+          {images && images.length > 0 ? (
+            <>
+              <ColumnsLinesTitles
+                dataColumns={dataColumns}
+                handleSort={() => {}}
+              />
+              <List>
+                {images.map(
+                  (file, idx) => file && (
+                    <PictureLine
+                      picture={file}
+                      key={idx}
+                      dataColumns={dataColumns}
+                      entityId={data.id}
+                    />
+                  ),
+                )}
+              </List>
+            </>
+          ) : (
+            <div style={{ display: 'table', height: '100%', width: '100%' }}>
+              <span
+                style={{
+                  display: 'table-cell',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                }}
+              >
+                {t_i18n('No file for the moment')}
+              </span>
+            </div>
+          )}
+        </Card>
+      </div>
+    </Grid>
+  );
+};
+
+export default PictureManagementViewer;

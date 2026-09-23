@@ -1,0 +1,445 @@
+import React, { useState } from 'react';
+import { Checkbox } from '@filigran/design-system';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import { graphql } from 'react-relay';
+import Skeleton from '@mui/material/Skeleton';
+import * as R from 'ramda';
+import { ListItemButton } from '@mui/material';
+import ItemIcon from '../../../../components/ItemIcon';
+import { deleteNodeFromEdge } from '../../../../utils/store';
+import { useFormatter } from '../../../../components/i18n';
+import { useIsEnforceReference, useSchemaCreationValidation } from '../../../../utils/hooks/useEntitySettings';
+import StixCoreRelationshipCreationForm, { stixCoreRelationshipBasicShape } from './StixCoreRelationshipCreationForm';
+import { formatDate } from '../../../../utils/Time';
+import { findFlagUrl } from '../../../../utils/flags';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+
+const stixCoreRelationshipCreationFromEntityListRelationAdd = graphql`
+  mutation StixCoreRelationshipCreationFromEntityListRelationAddMutation(
+    $input: StixCoreRelationshipAddInput
+  ) {
+    stixCoreRelationshipAdd(input: $input) {
+      from {
+        ... on CourseOfAction {
+          id
+          attackPatterns {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                description
+              }
+            }
+          }
+        }
+        ... on IntrusionSet {
+          id
+          locations {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                parent_types
+                x_opencti_aliases
+                description
+              }
+            }
+          }
+        }
+        ... on ThreatActorIndividual {
+          id
+          locations {
+            edges {
+              types
+              node {
+                id
+                entity_type
+                name
+                parent_types
+                x_opencti_aliases
+                description
+              }
+            }
+          }
+        }
+        ... on ThreatActorGroup {
+          id
+          locations {
+            edges {
+              types
+              node {
+                id
+                entity_type
+                name
+                parent_types
+                x_opencti_aliases
+                description
+              }
+            }
+          }
+        }
+        ... on DataComponent {
+          id
+          attackPatterns {
+            edges {
+              node {
+                id
+                entity_type
+                parent_types
+                name
+                description
+              }
+            }
+          }
+        }
+        ... on SecurityCoverage {
+          id
+          vulnerabilities: stixCoreRelationships(
+            relationship_type: "has-covered"
+            toTypes: ["Vulnerability"]
+            first: 200
+          ) @connection(key: "Pagination_vulnerabilities") {
+            edges {
+              node {
+                id
+                to {
+                  ... on Vulnerability {
+                    id
+                    parent_types
+                    name
+                    description
+                  }
+                }
+              }
+            }
+          }
+          securityPlatforms: stixCoreRelationships(
+            relationship_type: "has-covered"
+            toTypes: ["SecurityPlatform"]
+            first: 200
+          ) @connection(key: "Pagination_securityPlatforms") {
+            edges {
+              node {
+                id
+                to {
+                  ... on SecurityPlatform {
+                    id
+                    parent_types
+                    name
+                    description
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      to {
+        ... on AttackPattern {
+          id
+          subAttackPatterns {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                description
+                x_mitre_id
+              }
+            }
+          }
+          coursesOfAction {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                description
+              }
+            }
+          }
+          dataComponents {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                description
+              }
+            }
+          }
+        }
+        ... on Sector {
+          id
+          subSectors {
+            edges {
+              types
+              node {
+                id
+                entity_type
+                name
+                description
+              }
+            }
+          }
+        }
+        ... on Narrative {
+          id
+          subNarratives {
+            edges {
+              node {
+                id
+                entity_type
+                name
+                description
+              }
+            }
+          }
+        }
+        ... on Vulnerability {
+          ...VulnerabilitySoftwaresHas_vulnerability
+          ...VulnerabilitySoftwaresRemediates_vulnerability
+        }
+        ... on StixCyberObservable {
+          ...StixCyberObservableIndicators_stixCyberObservable
+        }
+      }
+    }
+  }
+`;
+
+const stixCoreRelationshipCreationFromEntityListRelationDelete = graphql`
+  mutation StixCoreRelationshipCreationFromEntityListRelationDeleteMutation(
+    $fromId: StixRef!
+    $toId: StixRef!
+    $relationship_type: String!
+  ) {
+    stixCoreRelationshipDelete(
+      fromId: $fromId
+      toId: $toId
+      relationship_type: $relationship_type
+    )
+  }
+`;
+
+const StixCoreRelationshipCreationFromEntityDummyList = () => {
+  return (
+    <List>
+      {Array.from(Array(20), (e, i) => (
+        <ListItem key={i} divider={true}>
+          <ListItemIcon>
+            <Skeleton
+              animation="wave"
+              variant="circular"
+              width={30}
+              height={30}
+            />
+          </ListItemIcon>
+          <ListItemText
+            primary={(
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="90%"
+                height={15}
+                style={{ marginBottom: 10 }}
+              />
+            )}
+            secondary={(
+              <Skeleton
+                animation="wave"
+                variant="rectangular"
+                width="90%"
+                height={15}
+              />
+            )}
+          />
+        </ListItem>
+      ))}
+    </List>
+  );
+};
+
+const StixCoreRelationshipCreationFromEntityList = ({
+  entity,
+  relationshipType,
+  availableDatas,
+  existingDatas,
+  updaterOptions,
+  isRelationReversed,
+}) => {
+  const { t_i18n } = useFormatter();
+
+  const [commitRelationAdd] = useApiMutation(
+    stixCoreRelationshipCreationFromEntityListRelationAdd,
+  );
+  const [commitRelationDelete] = useApiMutation(
+    stixCoreRelationshipCreationFromEntityListRelationDelete,
+  );
+
+  const enableReferences = useIsEnforceReference('stix-core-relationship');
+  const stixCoreRelationshipValidator = useSchemaCreationValidation(
+    'stix-core-relationship',
+    stixCoreRelationshipBasicShape(t_i18n),
+  );
+  const [showForm, setShowForm] = useState(false);
+  const [selected, setSelected] = useState(null);
+
+  const handleOpenForm = () => {
+    setShowForm(true);
+  };
+  const handleCloseForm = () => {
+    setShowForm(false);
+  };
+
+  const buildInput = (data) => {
+    const from = isRelationReversed ? data.id : entity.id;
+    const to = isRelationReversed ? entity.id : data.id;
+    return {
+      fromId: from,
+      toId: to,
+      relationship_type: relationshipType,
+    };
+  };
+
+  const toggle = (data, alreadyAdded) => {
+    const input = buildInput(data);
+    // Delete
+    if (alreadyAdded) {
+      commitRelationDelete({
+        variables: { ...input },
+        updater: (store) => deleteNodeFromEdge(
+          store,
+          updaterOptions.path,
+          entity.id,
+          data.id,
+          updaterOptions.params,
+        ),
+      });
+      // Add with references
+    } else if (
+      enableReferences
+      || !stixCoreRelationshipValidator.isValidSync(input)
+    ) {
+      handleOpenForm();
+      setSelected(data);
+      // Add
+    } else {
+      commitRelationAdd({
+        variables: { input },
+      });
+    }
+  };
+
+  const createRelation = (values) => {
+    const input = {
+      ...values,
+      ...buildInput(selected),
+    };
+    const finalValues = R.pipe(
+      R.assoc('confidence', parseInt(input.confidence, 10)),
+      R.assoc('start_time', formatDate(input.start_time)),
+      R.assoc('stop_time', formatDate(input.stop_time)),
+      R.assoc('killChainPhases', R.pluck('value', input.killChainPhases)),
+      R.assoc('createdBy', input.createdBy?.value),
+      R.assoc('objectMarking', R.pluck('value', input.objectMarking)),
+      R.assoc('externalReferences', R.pluck('value', input.externalReferences)),
+    )(input);
+    commitRelationAdd({
+      variables: { input: finalValues },
+    });
+    handleCloseForm();
+  };
+
+  if (!availableDatas) {
+    return <StixCoreRelationshipCreationFromEntityDummyList />;
+  }
+
+  const existingIds = existingDatas?.map((n) => n.node.id) ?? [];
+  const nodes = availableDatas.edges
+    .filter((edge) => edge.node.id !== entity.id)
+    .map((edge) => edge.node);
+
+  const defaultDescription = (data) => (data.parent_types.includes('Stix-Cyber-Observable')
+    ? data.x_opencti_description
+    : data.description);
+
+  return (
+    <>
+      {showForm ? (
+        <StixCoreRelationshipCreationForm
+          fromEntities={[entity]}
+          toEntities={[selected]}
+          relationshipTypes={[relationshipType]}
+          onSubmit={createRelation}
+          handleClose={handleCloseForm}
+        />
+      ) : (
+        <div>
+          {nodes.length > 0 ? (
+            <List sx={{ py: 0 }}>
+              {availableDatas.edges
+                .filter((edge) => edge.node.id !== entity.id)
+                .map((edge) => {
+                  const { node } = edge;
+                  const alreadyAdded = existingIds.includes(node.id);
+                  const flagUrl = node.entity_type === 'Country'
+                    && findFlagUrl(node.x_opencti_aliases);
+                  return (
+                    <ListItemButton
+                      dense
+                      key={node.id}
+                      divider={true}
+                      onClick={() => toggle(node, alreadyAdded)}
+                    >
+                      {/* The check no longer replaces the type icon: a row used
+                          to lose the only thing that said WHAT it was as soon as
+                          it was selected. Same slot width as the reference
+                          implementation in AddExternalReferencesLines. */}
+                      <ListItemIcon style={{ minWidth: 40 }}>
+                        <Checkbox checked={alreadyAdded} />
+                      </ListItemIcon>
+                      <ListItemIcon>
+                        {flagUrl ? (
+                          <img
+                            style={{ width: 20 }}
+                            src={flagUrl}
+                            alt={node.name}
+                          />
+                        ) : (
+                          <ItemIcon type={node.entity_type} />
+                        )}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={node.name}
+                        secondary={defaultDescription(node)}
+                        sx={{
+                          '.MuiListItemText-primary, .MuiListItemText-secondary': {
+                            overflowX: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginRight: '20px',
+                          },
+                        }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+            </List>
+          ) : (
+            <div style={{ paddingTop: 20 }}>
+              {t_i18n('No entities were found for this search.')}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
+
+export default StixCoreRelationshipCreationFromEntityList;

@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="2 - Frontend on test backend" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/opencti-platform/opencti-front/package.json" />
+    <command value="start" />
+    <node-interpreter value="project" />
+    <package-manager value="yarn" />
+    <envs>
+      <env name="BACK_END_URL" value="http://localhost:4010" />
+      <env name="FRONT_END_PORT" value="3010" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

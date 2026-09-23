@@ -1,0 +1,221 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import { Field, Form, Formik } from 'formik';
+import * as R from 'ramda';
+import { useState } from 'react';
+import { graphql } from 'react-relay';
+import * as Yup from 'yup';
+import SelectFieldFds, { SelectItem } from '../../../../components/fields/SelectFieldFds';
+import { useFormatter } from '../../../../components/i18n';
+import Loader from '../../../../components/Loader';
+import { commitMutation, MESSAGING$, QueryRenderer } from '../../../../relay/environment';
+import { ExportContext } from '../../../../utils/ExportContextProvider';
+import { fieldSpacingContainerStyle } from '../../../../utils/field';
+import { markingDefinitionsLinesSearchQuery } from '../../settings/MarkingDefinitionsQuery';
+import { CONTENT_MAX_MARKINGS_HELPERTEXT, CONTENT_MAX_MARKINGS_TITLE } from '../files/FileManager';
+import ObjectMarkingField from '../form/ObjectMarkingField';
+import GenerateExportTitle from '../GenerateExportTitle';
+
+export const StixCoreObjectsExportCreationMutation = graphql`
+  mutation StixCoreObjectsExportCreationMutation(
+    $input: StixCoreObjectsExportAskInput!
+  ) {
+    stixCoreObjectsExportAsk(input: $input) {
+      id
+    }
+  }
+`;
+
+const exportValidation = (t_i18n) => Yup.object().shape({
+  format: Yup.string().trim().required(t_i18n('This field is required')),
+});
+
+export const scopesConn = (exportConnectors) => {
+  const scopes = R.uniq(
+    R.flatten(R.map((c) => c.connector_scope, exportConnectors)),
+  );
+  const connectors = R.map((s) => {
+    const filteredConnectors = R.filter(
+      (e) => R.includes(s, e.connector_scope),
+      exportConnectors,
+    );
+    return R.map(
+      (x) => ({ data: { name: x.name, active: x.active } }),
+      filteredConnectors,
+    );
+  }, scopes);
+  const zipped = R.zip(scopes, connectors);
+  return R.fromPairs(zipped);
+};
+
+const StixCoreObjectsExportCreation = ({
+  paginationOptions,
+  exportContext,
+  onExportAsk,
+  exportType,
+  exportScopes,
+  isExportActive,
+  open,
+  setOpen,
+}) => {
+  const { t_i18n } = useFormatter();
+
+  const [selectedContentMaxMarkingsIds, setSelectedContentMaxMarkingsIds] = useState([]);
+  const handleSelectedContentMaxMarkingsChange = (values) => setSelectedContentMaxMarkingsIds(values.map(({ value }) => value));
+  const visibleColumnExportEnabledFormats = ['text/csv'];
+  const onSubmit = (selectedIds, values, { setSubmitting, resetForm }) => {
+    const { orderBy, filters, orderMode, search } = paginationOptions;
+    const contentMaxMarkings = values.contentMaxMarkings.map(({ value }) => value);
+    const fileMarkings = values.fileMarkings.map(({ value }) => value);
+
+    const updatedExportContext = { ...exportContext };
+    // Only forward visible_columns for a "Current view" CSV export. The column
+    // selector is hidden for other formats, so clear it otherwise (including
+    // after the format is switched away from CSV) to avoid sending a stale
+    // hidden-field value to the export connector.
+    if (values.columns !== 'view' || values.format !== 'text/csv') {
+      updatedExportContext.visible_columns = undefined;
+    }
+
+    commitMutation({
+      mutation: StixCoreObjectsExportCreationMutation,
+      variables: {
+        input: {
+          exportContext: updatedExportContext,
+          format: values.format,
+          exportType: exportType ?? 'full',
+          selectedIds,
+          orderBy,
+          filters,
+          orderMode,
+          contentMaxMarkings,
+          fileMarkings,
+          search,
+        },
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        if (onExportAsk) onExportAsk();
+        setOpen(false);
+        MESSAGING$.notifySuccess('Export successfully started');
+      },
+    });
+  };
+
+  return (
+    <ExportContext.Consumer>
+      {({ selectedIds }) => {
+        return (
+          <Formik
+            enableReinitialize={true}
+            initialValues={{
+              format: '',
+              contentMaxMarkings: [],
+              fileMarkings: [],
+              columns: 'all',
+            }}
+            validationSchema={exportValidation(t_i18n)}
+            onSubmit={(values, { setSubmitting, resetForm }) => onSubmit(selectedIds, values, { setSubmitting, resetForm })
+            }
+            onReset={() => setOpen(false)}
+          >
+            {({ submitForm, handleReset, isSubmitting, resetForm, setFieldValue, values }) => (
+              <Form>
+                <Dialog
+                  open={open}
+                  onClose={() => {
+                    resetForm();
+                    setOpen(false);
+                  }}
+                  data-testid="StixCoreObjectsExportCreationDialog"
+                  title={<GenerateExportTitle />}
+                >
+                  <QueryRenderer
+                    query={markingDefinitionsLinesSearchQuery}
+                    variables={{ first: 200 }}
+                    render={({ props }) => {
+                      if (props && props.markingDefinitions) {
+                        return (
+                          <>
+                            <Field
+                              component={SelectFieldFds}
+                              variant="outlined"
+                              name="format"
+                              label={t_i18n('Export format')}
+                              fullWidth={true}
+                              containerstyle={{ width: '100%' }}
+                            >
+                              {exportScopes.map((value, i) => (
+                                <SelectItem
+                                  key={i}
+                                  value={value}
+                                  disabled={!isExportActive(value)}
+                                >
+                                  {value}
+                                </SelectItem>
+                              ))}
+                            </Field>
+                            <ObjectMarkingField
+                              name="contentMaxMarkings"
+                              label={t_i18n(CONTENT_MAX_MARKINGS_TITLE)}
+                              onChange={(_, values) => handleSelectedContentMaxMarkingsChange(values)}
+                              style={fieldSpacingContainerStyle}
+                              setFieldValue={setFieldValue}
+                              limitToMaxSharing
+                              helpertext={t_i18n(CONTENT_MAX_MARKINGS_HELPERTEXT)}
+                            />
+                            <ObjectMarkingField
+                              name="fileMarkings"
+                              label={t_i18n('File marking definition levels')}
+                              filterTargetIds={selectedContentMaxMarkingsIds}
+                              style={fieldSpacingContainerStyle}
+                              setFieldValue={setFieldValue}
+                            />
+                            {visibleColumnExportEnabledFormats.includes(values.format)
+                              ? (
+                                  <Field
+                                    component={SelectFieldFds}
+                                    variant="outlined"
+                                    name="columns"
+                                    label={t_i18n('Choose column to export')}
+                                    fullWidth={true}
+                                    containerstyle={fieldSpacingContainerStyle}
+                                  >
+                                    <SelectItem value="all">
+                                      {t_i18n('All attributes')}
+                                    </SelectItem>
+                                    <SelectItem value="view">
+                                      {t_i18n('Current view')}
+                                    </SelectItem>
+                                  </Field>
+                                ) : undefined}
+                          </>
+                        );
+                      }
+                      return <Loader variant="inElement" />;
+                    }}
+                  />
+                  <DialogActions>
+                    <Button variant="secondary" onClick={handleReset} disabled={isSubmitting}>
+                      {t_i18n('Cancel')}
+                    </Button>
+                    <Button
+                      onClick={submitForm}
+                      disabled={isSubmitting}
+                    >
+                      {t_i18n('Create')}
+                    </Button>
+                  </DialogActions>
+                </Dialog>
+              </Form>
+            )}
+          </Formik>
+        );
+      }}
+    </ExportContext.Consumer>
+  );
+};
+
+export default StixCoreObjectsExportCreation;

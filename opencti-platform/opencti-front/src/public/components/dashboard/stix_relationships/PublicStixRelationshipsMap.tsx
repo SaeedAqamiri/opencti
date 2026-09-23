@@ -1,0 +1,140 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React from 'react';
+import LocationMiniMapTargets from '@components/common/location/LocationMiniMapTargets';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import { computeLevel } from '../../../../utils/Number';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import { useFormatter } from '../../../../components/i18n';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { PublicStixRelationshipsMapQuery } from './__generated__/PublicStixRelationshipsMapQuery.graphql';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import type { Widget } from '../../../../utils/widget/widget';
+
+const publicStixRelationshipsMapQuery = graphql`
+  query PublicStixRelationshipsMapQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixRelationshipsDistribution(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      label
+      value
+      entity {
+        ... on BasicObject {
+          entity_type
+        }
+        ... on BasicRelationship {
+          entity_type
+        }
+        ... on Country {
+          name
+          x_opencti_aliases
+          latitude
+          longitude
+        }
+        ... on City {
+          name
+          x_opencti_aliases
+          latitude
+          longitude
+        }
+      }
+    }
+  }
+`;
+
+interface PublicStixRelationshipsMapComponentProps {
+  dataSelection: Widget['dataSelection'];
+  queryRef: PreloadedQuery<PublicStixRelationshipsMapQuery>;
+}
+
+const PublicStixRelationshipsMapComponent = ({
+  dataSelection,
+  queryRef,
+}: PublicStixRelationshipsMapComponentProps) => {
+  const { publicStixRelationshipsDistribution } = usePreloadedQuery(
+    publicStixRelationshipsMapQuery,
+    queryRef,
+  );
+
+  if (
+    publicStixRelationshipsDistribution
+    && publicStixRelationshipsDistribution.length > 0
+  ) {
+    const values = publicStixRelationshipsDistribution.flatMap((node) => {
+      if (node?.value === null || node?.value === undefined) return [];
+      return node.value;
+    });
+
+    const countries = publicStixRelationshipsDistribution.flatMap((node) => {
+      if (node?.entity?.entity_type !== 'Country') return [];
+      return {
+        ...node.entity,
+        level: computeLevel(node.value, values[values.length - 1], values[0] + 1),
+      };
+    });
+
+    const cities = publicStixRelationshipsDistribution.flatMap((node) => {
+      if (node?.entity?.entity_type !== 'City') return [];
+      return node.entity;
+    });
+
+    return (
+      <LocationMiniMapTargets
+        zoom={dataSelection[0].zoom ?? 2}
+        center={dataSelection[0].centerLat && dataSelection[0].centerLng
+          ? { latitude: dataSelection[0].centerLat, longitude: dataSelection[0].centerLng }
+          : undefined}
+        countries={countries}
+        cities={cities}
+      />
+    );
+  }
+  return <WidgetNoData />;
+};
+
+const PublicStixRelationshipsMap = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters, dataSelection } = widget;
+  const queryRef = usePublicDashboardViz<PublicStixRelationshipsMapQuery>(
+    publicStixRelationshipsMapQuery,
+    {
+      uriKey,
+      widgetId: id,
+      startDate,
+      endDate,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      title={parameters?.title ?? title ?? t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixRelationshipsMapComponent
+            queryRef={queryRef}
+            dataSelection={dataSelection}
+          />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixRelationshipsMap;

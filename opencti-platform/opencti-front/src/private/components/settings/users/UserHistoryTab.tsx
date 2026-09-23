@@ -1,0 +1,383 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import { DeleteOutlined, StorageOutlined } from '@mui/icons-material';
+import { Avatar, DialogActions, Tooltip } from '@mui/material';
+import { IconButton } from '@filigran/design-system';
+import { deepOrange, green, indigo, lightGreen, orange, pink, red, teal, yellow } from '@mui/material/colors';
+import { useTheme } from '@mui/styles';
+import { LinkVariantPlus, LinkVariantRemove, Merge, VectorRadius } from 'mdi-material-ui';
+import { FunctionComponent, useState } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import { Link } from 'react-router';
+import { v4 as uuid } from 'uuid';
+import DataTable from '../../../../components/dataGrid/DataTable';
+import { DataTableProps } from '../../../../components/dataGrid/dataTableTypes';
+import { useFormatter } from '../../../../components/i18n';
+import ItemIcon from '../../../../components/ItemIcon';
+import MarkdownDisplay from '../../../../components/markdownDisplay/MarkdownDisplay';
+import type { Theme } from '../../../../components/Theme';
+import { emptyFilterGroup, GqlFilterGroup } from '../../../../utils/filters/filtersUtils';
+import useGranted, { KNOWLEDGE, SETTINGS_SECURITYACTIVITY } from '../../../../utils/hooks/useGranted';
+import { usePaginationLocalStorage } from '../../../../utils/hooks/useLocalStorage';
+import { UsePreloadedPaginationFragment } from '../../../../utils/hooks/usePreloadedPaginationFragment';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import { EMPTY_VALUE } from '../../../../utils/String';
+import { UserHistoryLine_node$data } from './__generated__/UserHistoryLine_node.graphql';
+import { UserHistoryLines_data$data } from './__generated__/UserHistoryLines_data.graphql';
+import { UserHistoryLinesQuery, UserHistoryLinesQuery$variables } from './__generated__/UserHistoryLinesQuery.graphql';
+import { UserHistoryTab_user$key } from './__generated__/UserHistoryTab_user.graphql';
+import { userHistoryLineFragment } from './UserHistoryLine';
+import { userHistoryLinesFragment, userHistoryLinesQuery } from './UserHistoryLines';
+
+const LOCAL_STORAGE_KEY = 'audits';
+
+const userFragment = graphql`
+  fragment UserHistoryTab_user on User {
+    id
+  }
+`;
+
+interface UserHistoryTabProps {
+  data: UserHistoryTab_user$key;
+}
+
+const UserHistoryTab: FunctionComponent<UserHistoryTabProps> = ({
+  data: userData,
+}) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme<Theme>();
+  const user = useFragment(userFragment, userData);
+  const [message, setMessage] = useState<string>(EMPTY_VALUE);
+  const [open, setOpen] = useState<boolean>(false);
+  const handleOpen = () => {
+    setOpen(true);
+  };
+  const handleClose = () => {
+    setOpen(false);
+    setMessage(EMPTY_VALUE);
+  };
+  const dataColumns: DataTableProps['dataColumns'] = {
+    event_scope: {},
+    timestamp: {},
+  };
+  const initialValues = {
+    searchTerm: '',
+    sortBy: 'timestamp',
+    orderAsc: true,
+    openExports: false,
+    filters: emptyFilterGroup,
+  };
+  const { helpers, paginationOptions } = usePaginationLocalStorage<UserHistoryLinesQuery$variables>(
+    LOCAL_STORAGE_KEY,
+    initialValues,
+  );
+  const isGrantedToAudit = useGranted([SETTINGS_SECURITYACTIVITY]);
+  const isGrantedToKnowledge = useGranted([KNOWLEDGE]);
+  let historyTypes = ['History'];
+  if (isGrantedToAudit && !isGrantedToKnowledge) {
+    historyTypes = ['Activity'];
+  } else if (isGrantedToAudit && isGrantedToKnowledge) {
+    historyTypes = ['History', 'Activity'];
+  }
+  const queryPaginationOptions = {
+    ...paginationOptions,
+    types: historyTypes,
+    filters: {
+      mode: 'or',
+      filterGroups: [],
+      filters: [
+        { key: ['user_id'], values: [user.id], operator: 'wildcard', mode: 'or' },
+        { key: ['context_data.id'], values: [user.id], operator: 'wildcard', mode: 'or' },
+      ],
+    } as GqlFilterGroup,
+    first: 25,
+  } as unknown as UserHistoryLinesQuery$variables;
+  const queryRef = useQueryLoading<UserHistoryLinesQuery>(
+    userHistoryLinesQuery,
+    queryPaginationOptions,
+  );
+  const preloadedPaginationProps = {
+    linesQuery: userHistoryLinesQuery,
+    linesFragment: userHistoryLinesFragment,
+    queryRef,
+    nodePath: ['audits', 'pageInfo', 'globalCount'],
+    setNumberOfElements: helpers.handleSetNumberOfElements,
+  } as UsePreloadedPaginationFragment<UserHistoryLinesQuery>;
+
+  // Entities and relationships redirection filters
+  const technicalCreatorFilters = JSON.stringify({
+    mode: 'and',
+    filterGroups: [],
+    filters: [
+      {
+        key: 'creator_id',
+        values: [
+          user.id,
+        ],
+        operator: 'eq',
+        mode: 'or',
+        id: uuid(), // because filters in the URL
+      },
+    ],
+  });
+
+  const renderIcon = (eventScope: string | null | undefined, eventMessage: string | undefined, commit: string | null | undefined) => {
+    setMessage(eventMessage ?? EMPTY_VALUE);
+    if (eventScope === 'create') {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${pink[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+          <ItemIcon type={eventScope} size="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'merge') {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${teal[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          <Merge fontSize="small" />
+        </Avatar>
+      );
+    }
+    if (
+      eventScope === 'update'
+      && (eventMessage?.includes('replaces') || eventMessage?.includes('updates'))
+    ) {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${green[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+          <ItemIcon type={eventScope} size="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'update' && eventMessage?.includes('changes')) {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${green[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+          <ItemIcon type={eventScope} size="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'update' && eventMessage?.includes('adds')) {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${indigo[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          <LinkVariantPlus fontSize="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'update' && eventMessage?.includes('removes')) {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${deepOrange[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+          onClick={() => commit && handleOpen()}
+          role={commit ? 'button' : undefined}
+          tabIndex={commit ? 0 : undefined}
+          aria-label={commit ? t_i18n('View commit message') : undefined}
+        >
+          <LinkVariantRemove fontSize="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'delete') {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${red[500]}`,
+            color: theme.palette.text?.primary,
+          }}
+        >
+          <DeleteOutlined fontSize="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'read') {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${lightGreen[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+        >
+          {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+          <ItemIcon type={eventScope} size="small" />
+        </Avatar>
+      );
+    }
+    if (eventScope === 'download') {
+      return (
+        <Avatar
+          sx={{
+            width: 25,
+            height: 25,
+            backgroundColor: 'transparent',
+            border: `1px solid ${orange[500]}`,
+            color: theme.palette.text?.primary,
+            cursor: commit ? 'pointer' : 'auto',
+          }}
+        >
+          {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+          <ItemIcon type={eventScope} size="small" />
+        </Avatar>
+      );
+    }
+    return (
+      <Avatar
+        sx={{
+          width: 25,
+          height: 25,
+          backgroundColor: 'transparent',
+          border: `1px solid ${yellow[500]}`,
+          color: theme.palette.text?.primary,
+        }}
+        onClick={() => commit && handleOpen()}
+        role={commit ? 'button' : undefined}
+        tabIndex={commit ? 0 : undefined}
+        aria-label={commit ? t_i18n('View commit message') : undefined}
+      >
+        {/* <ItemIcon type={eventScope} color="inherit" size="small" /> */}
+        <ItemIcon type={eventScope} size="small" />
+      </Avatar>
+    );
+  };
+
+  return (
+    <>
+      {queryRef && (
+        <DataTable
+          dataColumns={dataColumns}
+          resolvePath={(data: UserHistoryLines_data$data) => data.audits?.edges?.map((n) => n?.node)}
+          storageKey={LOCAL_STORAGE_KEY}
+          initialValues={initialValues}
+          lineFragment={userHistoryLineFragment}
+          preloadedPaginationProps={preloadedPaginationProps}
+          disableNavigation
+          disableLineSelection
+          removeSelectAll
+          icon={(data: UserHistoryLine_node$data) => renderIcon(data.event_scope, data.context_data?.message, data.context_data?.commit)}
+          additionalHeaderToggleButtons={[
+            <Tooltip title={t_i18n('View all entities created by user')} key="entities">
+              <IconButton
+                asChild
+                variant="default"
+                priority="tertiary"
+                size="sm"
+                aria-label={t_i18n('View all entities created by user')}
+                icon={<StorageOutlined fontSize="small" />}
+              >
+                <Link to={`/dashboard/search/knowledge/?filters=${encodeURIComponent(technicalCreatorFilters)}`} />
+              </IconButton>
+            </Tooltip>,
+            <Tooltip title={t_i18n('View all relationships created by user')} key="relations">
+              <IconButton
+                asChild
+                variant="default"
+                priority="tertiary"
+                size="sm"
+                aria-label={t_i18n('View all relationships created by user')}
+                icon={<VectorRadius fontSize="small" />}
+              >
+                <Link to={`/dashboard/data/relationships/?filters=${encodeURIComponent(technicalCreatorFilters)}`} />
+              </IconButton>
+            </Tooltip>,
+          ]}
+        />
+      )}
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        title={t_i18n('Commit message')}
+      >
+        <MarkdownDisplay
+          content={message}
+          remarkGfmPlugin={true}
+          commonmark={true}
+        />
+        <DialogActions>
+          <Button onClick={handleClose}>
+            {t_i18n('Close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
+export default UserHistoryTab;

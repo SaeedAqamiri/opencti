@@ -1,0 +1,115 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React from 'react';
+import { useFormatter } from '../../../../components/i18n';
+import WidgetMultiHeatMap from '../../../../components/dashboard/WidgetMultiHeatMap';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import usePublicWidgetDefaultDates from '../usePublicWidgetDefaultDates';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { PublicStixRelationshipsMultiHeatMapQuery } from './__generated__/PublicStixRelationshipsMultiHeatMapQuery.graphql';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import type { Widget } from '../../../../utils/widget/widget';
+
+const publicStixRelationshipsMultiHeatMapQuery = graphql`
+  query PublicStixRelationshipsMultiHeatMapQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixRelationshipsMultiTimeSeries(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      data {
+        date
+        value
+      }
+    }
+  }
+`;
+
+interface PublicStixRelationshipsMultiHeatMapComponentProps {
+  parameters: Widget['parameters'];
+  dataSelection: Widget['dataSelection'];
+  queryRef: PreloadedQuery<PublicStixRelationshipsMultiHeatMapQuery>;
+}
+
+const PublicStixRelationshipsMultiHeatMapComponent = ({
+  parameters,
+  dataSelection,
+  queryRef,
+}: PublicStixRelationshipsMultiHeatMapComponentProps) => {
+  const { t_i18n } = useFormatter();
+  const { publicStixRelationshipsMultiTimeSeries } = usePreloadedQuery(
+    publicStixRelationshipsMultiHeatMapQuery,
+    queryRef,
+  );
+
+  if (publicStixRelationshipsMultiTimeSeries) {
+    const allValues = publicStixRelationshipsMultiTimeSeries
+      .map((serie) => (serie?.data ?? []).flatMap((o) => o?.value ?? []))
+      .flat();
+    const maxValue = Math.max(...allValues);
+    const minValue = Math.min(...allValues);
+
+    return (
+      <WidgetMultiHeatMap
+        data={publicStixRelationshipsMultiTimeSeries.map((serie, i) => ({
+          name: dataSelection[i].label ?? t_i18n('Number of entities'),
+          data: (serie?.data ?? []).map((entry) => ({
+            x: new Date(entry?.date),
+            y: entry?.value,
+          })),
+        })).sort((a, b) => b.name.localeCompare(a.name))}
+        minValue={minValue}
+        maxValue={maxValue}
+        isStacked={!!parameters?.stacked}
+      />
+    );
+  }
+  return <WidgetNoData />;
+};
+
+const PublicStixRelationshipsMultiHeatMap = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters, dataSelection } = widget;
+  const dates = usePublicWidgetDefaultDates(startDate, endDate);
+  const queryRef = usePublicDashboardViz<PublicStixRelationshipsMultiHeatMapQuery>(
+    publicStixRelationshipsMultiHeatMapQuery,
+    {
+      uriKey,
+      widgetId: id,
+      ...dates,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      title={parameters?.title ?? title ?? t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixRelationshipsMultiHeatMapComponent
+            queryRef={queryRef}
+            parameters={parameters}
+            dataSelection={dataSelection}
+          />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixRelationshipsMultiHeatMap;

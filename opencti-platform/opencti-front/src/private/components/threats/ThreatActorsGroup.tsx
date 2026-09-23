@@ -1,0 +1,211 @@
+import React from 'react';
+import Grid from '@mui/material/Grid';
+import { GenericAttackCardDummy } from '@components/common/cards/GenericAttackCard';
+import {
+  ThreatActorsGroupCardsPaginationQuery,
+  ThreatActorsGroupCardsPaginationQuery$variables,
+} from '@components/threats/threat_actors_group/__generated__/ThreatActorsGroupCardsPaginationQuery.graphql';
+import { ThreatActorGroupCardFragment } from '@components/threats/threat_actors_group/ThreatActorGroupCard';
+import { ThreatActorsGroupCards_data$data } from '@components/threats/threat_actors_group/__generated__/ThreatActorsGroupCards_data.graphql';
+import Tooltip from '@mui/material/Tooltip';
+import { ViewListOutlined, ViewModuleOutlined } from '@mui/icons-material';
+import ToggleButton from '@mui/material/ToggleButton';
+import StixCoreObjectForms from '@components/common/stix_core_objects/StixCoreObjectForms';
+import ListCards from '../../../components/list_cards/ListCards';
+import ThreatActorsGroupCards, { ThreatActorsGroupCardsFragment, threatActorsGroupCardsQuery } from './threat_actors_group/ThreatActorsGroupCards';
+import ThreatActorGroupCreation from './threat_actors_group/ThreatActorGroupCreation';
+import { usePaginationLocalStorage } from '../../../utils/hooks/useLocalStorage';
+import useQueryLoading from '../../../utils/hooks/useQueryLoading';
+import { emptyFilterGroup, useBuildEntityTypeBasedFilterContext } from '../../../utils/filters/filtersUtils';
+import Breadcrumbs from '../../../components/Breadcrumbs';
+import { useFormatter } from '../../../components/i18n';
+import DataTable from '../../../components/dataGrid/DataTable';
+import { UsePreloadedPaginationFragment } from '../../../utils/hooks/usePreloadedPaginationFragment';
+import useConnectedDocumentModifier from '../../../utils/hooks/useConnectedDocumentModifier';
+import { KNOWLEDGE_KNUPDATE } from '../../../utils/hooks/useGranted';
+import Security from '../../../utils/Security';
+
+const LOCAL_STORAGE_KEY = 'threatActorsGroups';
+
+const ThreatActorsGroup = () => {
+  const { t_i18n } = useFormatter();
+  const initialValues = {
+    filters: emptyFilterGroup,
+    searchTerm: '',
+    sortBy: 'name',
+    orderAsc: true,
+    openExports: false,
+    view: 'cards',
+  };
+  const { setTitle } = useConnectedDocumentModifier();
+  setTitle(t_i18n('Threat Actors (Group) | Threats'));
+  const { viewStorage, helpers, paginationOptions } = usePaginationLocalStorage<ThreatActorsGroupCardsPaginationQuery$variables>(
+    LOCAL_STORAGE_KEY,
+    initialValues,
+  );
+
+  const contextFilters = useBuildEntityTypeBasedFilterContext('Threat-Actor-Group', viewStorage.filters);
+  const queryPaginationOptions = {
+    ...paginationOptions,
+    filters: contextFilters,
+  } as unknown as ThreatActorsGroupCardsPaginationQuery$variables;
+
+  const queryRef = useQueryLoading<ThreatActorsGroupCardsPaginationQuery>(
+    threatActorsGroupCardsQuery,
+    queryPaginationOptions,
+  );
+
+  const renderCards = () => {
+    const {
+      numberOfElements,
+      filters,
+      searchTerm,
+      sortBy,
+      orderAsc,
+      openExports,
+    } = viewStorage;
+    const dataColumns = {
+      name: {
+        label: 'Name',
+      },
+      created: {
+        label: 'Original creation date',
+      },
+      modified: {
+        label: 'Modification date',
+      },
+    };
+    return (
+      <ListCards
+        helpers={helpers}
+        sortBy={sortBy}
+        orderAsc={orderAsc}
+        dataColumns={dataColumns}
+        handleSort={helpers.handleSort}
+        handleSearch={helpers.handleSearch}
+        handleAddFilter={helpers.handleAddFilter}
+        handleRemoveFilter={helpers.handleRemoveFilter}
+        handleSwitchGlobalMode={helpers.handleSwitchGlobalMode}
+        handleSwitchLocalMode={helpers.handleSwitchLocalMode}
+        handleToggleExports={helpers.handleToggleExports}
+        openExports={openExports}
+        exportContext={{ entity_type: 'Threat-Actor-Group' }}
+        keyword={searchTerm}
+        filters={filters}
+        paginationOptions={paginationOptions}
+        numberOfElements={numberOfElements}
+        handleChangeView={helpers.handleChangeView}
+        additionalHeaderButtons={[
+          <Security key="form-intake" needs={[KNOWLEDGE_KNUPDATE]}>
+            <StixCoreObjectForms entityType="Threat-Actor-Group" />
+          </Security>,
+        ]}
+        createButton={(
+          <Security needs={[KNOWLEDGE_KNUPDATE]}>
+            <ThreatActorGroupCreation paginationOptions={queryPaginationOptions} />
+          </Security>
+        )}
+      >
+        {queryRef && (
+          <React.Suspense
+            fallback={(
+              <Grid container={true} spacing={3} style={{ paddingLeft: 17 }}>
+                {Array(20)
+                  .fill(0)
+                  .map((_, idx) => (
+                    <Grid
+                      item
+                      xs={3}
+                      key={idx}
+                    >
+                      <GenericAttackCardDummy />
+                    </Grid>
+                  ))}
+              </Grid>
+            )}
+          >
+            <ThreatActorsGroupCards
+              queryRef={queryRef}
+              setNumberOfElements={helpers.handleSetNumberOfElements}
+              onLabelClick={helpers.handleAddFilter}
+            />
+          </React.Suspense>
+        )}
+      </ListCards>
+    );
+  };
+
+  const renderList = () => {
+    const dataColumns = {
+      name: {
+        percentWidth: 15,
+      },
+      threat_actor_types: {
+        label: 'Type',
+        percentWidth: 13,
+      },
+      sophistication: {},
+      resource_level: {},
+      creator: {},
+      objectLabel: {},
+      modified: {},
+      objectMarking: { percentWidth: 10 },
+    };
+
+    const preloadedPaginationProps = {
+      linesQuery: threatActorsGroupCardsQuery,
+      linesFragment: ThreatActorsGroupCardsFragment,
+      queryRef,
+      nodePath: ['threatActorsGroup', 'pageInfo', 'globalCount'],
+      setNumberOfElements: helpers.handleSetNumberOfElements,
+    } as UsePreloadedPaginationFragment<ThreatActorsGroupCardsPaginationQuery>;
+
+    return (
+      <>
+        {queryRef && (
+          <DataTable
+            dataColumns={dataColumns}
+            resolvePath={(data: ThreatActorsGroupCards_data$data) => data.threatActorsGroup?.edges?.map((n) => n?.node)}
+            storageKey={LOCAL_STORAGE_KEY}
+            initialValues={initialValues}
+            contextFilters={contextFilters}
+            preloadedPaginationProps={preloadedPaginationProps}
+            lineFragment={ThreatActorGroupCardFragment}
+            exportContext={{ entity_type: 'Threat-Actor-Group' }}
+            additionalHeaderButtons={[
+              <Security key="form-intake" needs={[KNOWLEDGE_KNUPDATE]}>
+                <StixCoreObjectForms entityType="Threat-Actor-Group" />
+              </Security>,
+            ]}
+            additionalHeaderToggleButtons={[
+              <Tooltip key="cards" title={t_i18n('Cards view')}>
+                <ToggleButton value="cards" aria-label="cards">
+                  <ViewModuleOutlined fontSize="small" />
+                </ToggleButton>
+              </Tooltip>,
+              <Tooltip key="lines" title={t_i18n('Lines view')}>
+                <ToggleButton value="lines" aria-label="lines">
+                  <ViewListOutlined fontSize="small" />
+                </ToggleButton>
+              </Tooltip>,
+            ]}
+            createButton={(
+              <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                <ThreatActorGroupCreation paginationOptions={queryPaginationOptions} />
+              </Security>
+            )}
+          />
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div data-testid="threat-actor-group-page">
+      <Breadcrumbs elements={[{ label: t_i18n('Threats') }, { label: t_i18n('Threat actors (group)'), current: true }]} />
+      {viewStorage.view !== 'lines' ? renderCards() : renderList()}
+    </div>
+  );
+};
+
+export default ThreatActorsGroup;

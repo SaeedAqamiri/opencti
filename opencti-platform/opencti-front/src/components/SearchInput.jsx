@@ -1,0 +1,492 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { SearchField, Spinner } from '@filigran/design-system';
+import { ManageSearchOutlined, TuneOutlined, KeyboardArrowDownOutlined } from '@mui/icons-material';
+import { LogoXtmOneIcon } from 'filigran-icon';
+import { useNavigate } from 'react-router';
+import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/styles';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import useEnterpriseEdition from '../utils/hooks/useEnterpriseEdition';
+import { useFormatter } from './i18n';
+import useGranted, { SETTINGS_SETPARAMETERS } from '../utils/hooks/useGranted';
+import useAuth from '../utils/hooks/useAuth';
+import FiligranIcon from '../private/components/common/FiligranIcon';
+import EnterpriseEditionAgreement from '../private/components/common/entreprise_edition/EnterpriseEditionAgreement';
+import ValidateTermsOfUseDialog from '../private/components/settings/ValidateTermsOfUseDialog';
+import FeedbackCreation from '../private/components/cases/feedbacks/FeedbackCreation';
+import Loader from './Loader';
+import useAI from '../utils/hooks/useAI';
+import { fetchAgentsForIntent } from '../utils/ai/agentApi';
+import { NLQ_INTENT } from '../private/components/common/ai/AINLQ';
+import { useChatbot } from '../private/components/chatbox/ChatbotContext';
+
+const MODE_SEARCH = 'search';
+const MODE_BULK = 'bulk';
+// NLQ modes are dynamic: `nlq:<agentSlug>`
+const isNlqMode = (mode) => typeof mode === 'string' && mode.startsWith('nlq:');
+const nlqSlugFromMode = (mode) => (isNlqMode(mode) ? mode.slice(4) : null);
+
+const SIZE_BY_VARIANT = {
+  thin: 'sm',
+};
+
+const SearchInput = (props) => {
+  const navigate = useNavigate();
+  const isEnterpriseEdition = useEnterpriseEdition();
+  const { enabled, configured, fullyActive } = useAI();
+  const { xtmOneConfigured } = useChatbot();
+  const useXtmOne = xtmOneConfigured === true;
+  const theme = useTheme();
+  const { t_i18n } = useFormatter();
+  const {
+    onSubmit,
+    variant,
+    keyword,
+    placeholder = `${t_i18n('Search these results')}...`,
+    isNLQLoading,
+    ...otherProps
+  } = props;
+  const [displayEEDialog, setDisplayEEDialog] = useState(false);
+  const [displayCGUDialog, setDisplayCGUDialog] = useState(false);
+  const [searchValue, setSearchValue] = useState(keyword);
+
+  // Current mode: 'search', 'bulk', or 'nlq:<slug>'
+  const [mode, setMode] = useState(MODE_SEARCH);
+
+  // NLQ agent menu state (for the dropdown arrow on the NLQ toggle)
+  const [nlqMenuAnchor, setNlqMenuAnchor] = useState(null);
+  const [nlqAgents, setNlqAgents] = useState([]);
+  const [nlqAgentsLoading, setNlqAgentsLoading] = useState(false);
+  const [nlqAgentsFetched, setNlqAgentsFetched] = useState(false);
+  // Track the default agent slug so clicking NLQ toggle auto-selects it
+  const [defaultNlqSlug, setDefaultNlqSlug] = useState(null);
+
+  useEffect(() => {
+    // Don't sync when in bulk mode: navigating to /search_bulk clears the URL
+    // keyword, but we want to keep the user's typed value in the input.
+    if (mode !== MODE_BULK && keyword !== searchValue) {
+      setSearchValue(keyword);
+    }
+  }, [keyword]);
+
+  const isAIEnabled = variant === 'topBar' && isEnterpriseEdition && enabled && configured;
+  const isNLQActivated = isAIEnabled && isNlqMode(mode);
+  const isAdmin = useGranted([SETTINGS_SETPARAMETERS]);
+  const { settings: { id: settingsId } } = useAuth();
+
+  // Derive selected agent from mode
+  const selectedAgentSlug = nlqSlugFromMode(mode);
+  const selectedAgent = nlqAgents.find((a) => a.slug === selectedAgentSlug) ?? null;
+
+  // ── Fetch NLQ agents eagerly on mount when AI is available ──────────────
+  const fetchNlqAgentsIfNeeded = useCallback(() => {
+    if (!nlqAgentsFetched && !nlqAgentsLoading) {
+      setNlqAgentsLoading(true);
+      fetchAgentsForIntent(NLQ_INTENT).then((agents) => {
+        setNlqAgents(agents);
+        setNlqAgentsFetched(true);
+        setNlqAgentsLoading(false);
+        if (agents.length > 0) {
+          setDefaultNlqSlug(agents[0].slug);
+        }
+      });
+    }
+  }, [nlqAgentsFetched, nlqAgentsLoading]);
+
+  // Eagerly fetch NLQ agents so the default is ready when the user clicks the toggle
+  // Only fetch when XTM One is configured — legacy mode doesn't use agents
+  useEffect(() => {
+    if (isAIEnabled && fullyActive && useXtmOne) {
+      fetchNlqAgentsIfNeeded();
+    }
+  }, [isAIEnabled, fullyActive, useXtmOne]);
+
+  const handleOpenNlqMenu = useCallback((event) => {
+    setNlqMenuAnchor(event.currentTarget);
+    fetchNlqAgentsIfNeeded();
+  }, [fetchNlqAgentsIfNeeded]);
+
+  const handleCloseNlqMenu = () => {
+    setNlqMenuAnchor(null);
+  };
+
+  const handleSelectAgent = (agent) => {
+    setMode(`nlq:${agent.slug}`);
+    handleCloseNlqMenu();
+    // Execute NLQ search immediately with the selected agent
+    if (searchValue && typeof onSubmit === 'function') {
+      onSubmit(searchValue, true, agent.slug);
+    }
+  };
+
+  // Click on the NLQ toggle: activate NLQ and execute search if there's a value
+  const handleNlqToggleClick = useCallback((event) => {
+    if (!isAIEnabled) return;
+    const isCGUStatusPending = useXtmOne && !fullyActive;
+    if (isCGUStatusPending) {
+      setDisplayCGUDialog(true);
+      return;
+    }
+    if (isNlqMode(mode)) {
+      // Already in NLQ mode — do nothing (user switches away via Search/Bulk toggles)
+      return;
+    }
+    let agentSlug;
+    if (useXtmOne && defaultNlqSlug) {
+      // XTM One mode — activate with the default agent
+      setMode(`nlq:${defaultNlqSlug}`);
+      agentSlug = defaultNlqSlug;
+    } else if (useXtmOne) {
+      // XTM One but agents not loaded yet — open the menu as fallback
+      handleOpenNlqMenu(event);
+      return;
+    } else {
+      // Legacy mode — activate NLQ without an agent
+      setMode('nlq:');
+    }
+    // Execute NLQ search immediately if there's a value
+    if (searchValue && typeof onSubmit === 'function') {
+      onSubmit(searchValue, true, agentSlug || undefined);
+    }
+  }, [isAIEnabled, mode, useXtmOne, defaultNlqSlug, handleOpenNlqMenu, searchValue, onSubmit]);
+
+  // ── Mode change handler ────────────────────────────────────────────────
+  const handleModeChange = (_event, newMode) => {
+    if (newMode === null) return; // MUI sends null when clicking the already-selected button
+    if (newMode === MODE_SEARCH) {
+      setMode(newMode);
+      // Execute search immediately with current value
+      if (searchValue && typeof onSubmit === 'function') {
+        onSubmit(searchValue, false, undefined);
+      }
+    } else if (newMode === MODE_BULK) {
+      setMode(newMode);
+      // Navigate to bulk with current value
+      const encoded = encodeURIComponent(searchValue || '');
+      navigate(`/dashboard/search_bulk${searchValue ? `?q=${encoded}` : ''}`);
+    }
+    // NLQ is handled via handleNlqToggleClick, not the toggle group
+  };
+
+  // ── Compute placeholder ────────────────────────────────────────────────
+  const getPlaceholder = () => {
+    if (isNLQActivated) {
+      return selectedAgent
+        ? `${t_i18n('Ask your question')} - ${selectedAgent.name}`
+        : `${t_i18n('Ask your question')}...`;
+    }
+    if (mode === MODE_BULK) {
+      return `${t_i18n('One keyword by line or separated by commas')}...`;
+    }
+    return placeholder;
+  };
+
+  // ── Submit handler ─────────────────────────────────────────────────────
+  const handleKeyDown = (event) => {
+    const { value } = event.target;
+    if (typeof onSubmit === 'function' && event.key === 'Enter') {
+      if (mode === MODE_BULK) {
+        // Navigate to bulk search page with the keyword as a query param
+        const encoded = encodeURIComponent(value);
+        navigate(`/dashboard/search_bulk${value ? `?q=${encoded}` : ''}`);
+      } else {
+        // Pass agentSlug only if it's a non-empty string (XTM One mode),
+        // otherwise pass undefined so AINLQ falls back to legacy
+        onSubmit(value, isNLQActivated, selectedAgentSlug || undefined);
+      }
+    }
+  };
+
+  // ── Non-topBar variant: keep the simple input ──────────────────────────
+  if (variant !== 'topBar') {
+    return (
+      <SearchField
+        name="keyword"
+        // WCAG 2.5.3: the announced name must contain the visible text, which here is the placeholder.
+        aria-label={placeholder}
+        size={SIZE_BY_VARIANT[variant] ?? 'md'}
+        value={searchValue}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setSearchValue(event.target.value);
+        }}
+        onSubmit={(value) => {
+          if (typeof onSubmit === 'function') {
+            onSubmit(value);
+          }
+        }}
+        // The library renders a clear cross only when it can act on one, and clearing has to
+        // re-run the search: dropping the keyword locally while leaving the list filtered would
+        // be a worse state than before, when there was no cross at all.
+        onClear={() => {
+          setSearchValue('');
+          if (typeof onSubmit === 'function') {
+            onSubmit('');
+          }
+        }}
+        // Spread last, exactly as the MUI field did: the three call sites that pass their own onChange drive the
+        // value themselves and must keep winning over the internal handler above.
+        {...otherProps}
+        autoComplete="off"
+      />
+    );
+  }
+
+  // ── TopBar variant: segmented control + search input ───────────────────
+
+  // Styles for toggle buttons — matching the standard IconButton (size="default": 36×36)
+  const toggleButtonSx = {
+    height: 36,
+    minWidth: 36,
+    width: 36,
+    textTransform: 'none',
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    px: 0,
+    py: 0,
+    lineHeight: 1,
+    borderRadius: 1,
+    border: `1px solid ${theme.palette.divider}`,
+    '&.Mui-selected': {
+      backgroundColor: theme.palette.action.selected,
+      color: theme.palette.text.primary,
+      borderColor: theme.palette.divider,
+      '&:hover': {
+        backgroundColor: theme.palette.action.selected,
+      },
+    },
+  };
+
+  const isCGUStatusPending = useXtmOne && !fullyActive;
+  const nlqNoAgentAvailable = useXtmOne && nlqAgentsFetched && nlqAgents.length === 0;
+
+  const aiColor = theme.palette.ai?.main;
+  const nlqToggleButtonSx = {
+    ...toggleButtonSx,
+    width: 'auto', // wider than standard because it contains icon + caret
+    minWidth: 36,
+    px: 1,
+    // Always show AI/pink color on the NLQ button — use !important to beat MUI's default ToggleButton color
+    color: `${aiColor} !important`,
+    '&.Mui-selected': {
+      backgroundColor: aiColor ? `${aiColor}24` : undefined,
+      color: `${aiColor} !important`,
+      borderColor: aiColor,
+      '&:hover': {
+        backgroundColor: aiColor ? `${aiColor}30` : undefined,
+      },
+    },
+    '&:hover': {
+      backgroundColor: aiColor ? `${aiColor}12` : undefined,
+    },
+    ...(isNLQActivated && {
+      backgroundColor: aiColor ? `${aiColor}18` : undefined,
+      borderColor: aiColor,
+    }),
+    // Keep AI/pink color even when disabled (no agents available)
+    '&.Mui-disabled': {
+      color: `${aiColor} !important`,
+      opacity: 0.5,
+    },
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%' }}>
+        {/* ── Search Input Field (left, fills remaining space) ──── */}
+        <SearchField
+          name="keyword"
+          // WCAG 2.5.3: the announced name must contain the visible text, which here is the placeholder.
+          aria-label={getPlaceholder()}
+          value={searchValue}
+          fullWidth
+          placeholder={getPlaceholder()}
+          onChange={(event) => {
+            const { value } = event.target;
+            setSearchValue(value);
+          }}
+          onKeyDown={handleKeyDown}
+          onClear={() => setSearchValue('')}
+          {...otherProps}
+          autoComplete="off"
+          label={t_i18n('Search')}
+        />
+        {/* FDS-WORKAROUND #20: NLQ loading indicator beside the field, SearchField exposes no busy slot — see fds-migration/LIBRARY-FEEDBACK.md #20 */}
+        {isNLQActivated && isNLQLoading && <Loader variant="inline" />}
+
+        {/* ── Mode Toggles (right) ────────────────────────────────── */}
+        <ToggleButtonGroup
+          value={mode}
+          exclusive
+          onChange={handleModeChange}
+          size="small"
+          sx={{
+            flexShrink: 0,
+            // Remove the default grouped border behavior so each button has its own border
+            '& .MuiToggleButtonGroup-grouped': {
+              border: 'none',
+              borderRadius: `${theme.shape.borderRadius}px !important`,
+              '&:not(:first-of-type)': {
+                marginLeft: 0,
+              },
+            },
+          }}
+        >
+          {/* Search mode */}
+          <Tooltip title={t_i18n('Advanced search')}>
+            <ToggleButton value={MODE_SEARCH} sx={{ ...toggleButtonSx, mr: 0.75 }}>
+              <TuneOutlined sx={{ fontSize: 18 }} />
+            </ToggleButton>
+          </Tooltip>
+
+          {/* Bulk mode */}
+          <Tooltip title={t_i18n('Bulk search')}>
+            <ToggleButton value={MODE_BULK} sx={{ ...toggleButtonSx, mr: 0.75 }}>
+              <ManageSearchOutlined sx={{ fontSize: 18 }} />
+            </ToggleButton>
+          </Tooltip>
+
+          {/* NLQ split button — icon toggles NLQ, caret opens agent selector */}
+          {isAIEnabled && (
+            <Tooltip
+              title={(isCGUStatusPending && !isAdmin)
+                ? t_i18n('Ask Ariane isn\'t activated yet. Please reach out to your administrator to enable this feature.')
+                : nlqNoAgentAvailable
+                  ? t_i18n('No agent available for this action. Ask your administrator to configure XTM One.')
+                  : isNLQActivated && selectedAgent
+                    ? `${t_i18n('Ask AI')}: ${selectedAgent.name}${selectedAgent.description ? ` — ${selectedAgent.description}` : ''}`
+                    : t_i18n('Ask AI')}
+            >
+              <span>
+                <ToggleButton
+                  value={mode}
+                  selected={isNLQActivated}
+                  sx={nlqToggleButtonSx}
+                  onClick={handleNlqToggleClick}
+                  disabled={nlqNoAgentAvailable || (isCGUStatusPending && !isAdmin)}
+                >
+                  {/* Plain elements, not MUI layout: the segmented control is the only MUI left in the bar and its
+                      inside must not add more — see TopBar.libraryOnly.test.ts, RETIRED. */}
+                  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+                    <FiligranIcon
+                      icon={LogoXtmOneIcon}
+                      size="small"
+                      color="ai"
+                    />
+                    {/* Caret click zone — larger hit area with visual separator */}
+                    {useXtmOne && nlqAgents.length > 0 && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginLeft: 4,
+                          paddingLeft: 4,
+                          borderLeft: `1px solid ${isNLQActivated ? theme.palette.ai?.main + '40' : theme.palette.divider}`,
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenNlqMenu(e);
+                        }}
+                      >
+                        <KeyboardArrowDownOutlined sx={{ fontSize: 18, color: 'inherit' }} />
+                      </span>
+                    )}
+                  </div>
+                </ToggleButton>
+              </span>
+            </Tooltip>
+          )}
+        </ToggleButtonGroup>
+
+        {/* ── NLQ Agent dropdown menu ─────────────────────────────── */}
+        <Menu
+          anchorEl={nlqMenuAnchor}
+          open={Boolean(nlqMenuAnchor)}
+          onClose={handleCloseNlqMenu}
+          slotProps={{
+            paper: {
+              sx: {
+                minWidth: 240,
+                maxWidth: 360,
+              },
+            },
+          }}
+        >
+          {nlqAgentsLoading && (
+            <MenuItem disabled>
+              <ListItemIcon>
+                <Spinner size="md" label={t_i18n('Loading agents...')} />
+              </ListItemIcon>
+            </MenuItem>
+          )}
+          {!nlqAgentsLoading && nlqAgents.length === 0 && nlqAgentsFetched && (
+            <MenuItem disabled>
+              <ListItemText
+                primary={t_i18n('No agent available')}
+                secondary={t_i18n('No agent available for this action. Ask your administrator to configure XTM One.')}
+                slotProps={{ secondary: { sx: { whiteSpace: 'normal' } } }}
+              />
+            </MenuItem>
+          )}
+          {!nlqAgentsLoading && nlqAgents.map((agent) => (
+            <MenuItem
+              key={agent.id}
+              onClick={() => handleSelectAgent(agent)}
+              selected={selectedAgentSlug === agent.slug}
+            >
+              <ListItemIcon>
+                <FiligranIcon
+                  icon={LogoXtmOneIcon}
+                  size="small"
+                  color="ai"
+                />
+              </ListItemIcon>
+              <ListItemText
+                primary={agent.name}
+                secondary={agent.description}
+                slotProps={{
+                  secondary: {
+                    sx: {
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    },
+                  },
+                }}
+              />
+            </MenuItem>
+          ))}
+        </Menu>
+      </div>
+
+      {isAdmin ? (
+        <EnterpriseEditionAgreement
+          open={displayEEDialog}
+          onClose={() => setDisplayEEDialog(false)}
+          settingsId={settingsId}
+        />
+      ) : (
+        <FeedbackCreation
+          openDrawer={displayEEDialog}
+          handleCloseDrawer={() => setDisplayEEDialog(false)}
+          initialValue={{
+            description: t_i18n('To use this AI feature in the enterprise edition, please add a token.'),
+          }}
+        />
+      )}
+
+      {displayCGUDialog && (
+        <ValidateTermsOfUseDialog open={displayCGUDialog} onClose={() => setDisplayCGUDialog(false)} />
+      )}
+    </>
+  );
+};
+
+export default SearchInput;

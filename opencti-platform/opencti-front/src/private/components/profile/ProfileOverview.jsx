@@ -1,0 +1,658 @@
+import Button from '@common/button/Button';
+import Card from '@common/card/Card';
+import { LockOutlined, NoEncryptionOutlined } from '@mui/icons-material';
+import { ListItem, ListItemText, Stack, Switch } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Dialog from '@common/dialog/Dialog';
+import { useTheme } from '@mui/styles';
+import withStyles from '@mui/styles/withStyles';
+import { Field, Form, Formik } from 'formik';
+import * as PropTypes from 'prop-types';
+import qrcode from 'qrcode';
+import { compose, pick } from 'ramda';
+import { useEffect, useState } from 'react';
+import { createFragmentContainer, graphql } from 'react-relay';
+import { Link } from 'react-router';
+import * as Yup from 'yup';
+import { availableLanguage } from '../../../components/AppIntlProvider';
+import Label from '../../../components/common/label/Label';
+import SelectFieldFds, { SelectItem } from '../../../components/fields/SelectFieldFds';
+import inject18n, { useFormatter } from '../../../components/i18n';
+import Loader from '../../../components/Loader';
+import TextField from '../../../components/TextField';
+import OtpInputField, { OTP_CODE_SIZE } from '../../../public/components/login/OtpInputField';
+import { commitMutation, MESSAGING$, QueryRenderer } from '../../../relay/environment';
+import { convertOrganizations } from '../../../utils/edition';
+import { fieldSpacingContainerStyle } from '../../../utils/field';
+import useConnectedDocumentModifier from '../../../utils/hooks/useConnectedDocumentModifier';
+import useGranted, { APIACCESS_USETOKEN, KNOWLEDGE } from '../../../utils/hooks/useGranted';
+import useHelper from '../../../utils/hooks/useHelper';
+import NotifierField from '../common/form/NotifierField';
+import ObjectOrganizationField from '../common/form/ObjectOrganizationField';
+import PasswordPolicies from '../common/form/PasswordPolicies';
+import HomeDashboardSettings from '../HomeDashboardSettings';
+import TokenCreationDrawer from './api_tokens/TokenCreationDrawer';
+import TokenList from './api_tokens/TokenList';
+import ProfileLocalStorage from './ProfileLocalStorage';
+import ProfileOverviewXtmOneMcp from './ProfileOverviewXtmOneMcp';
+import TextareaField from '../../../components/TextareaField';
+
+const styles = () => ({
+  container: {
+    width: 900,
+    margin: '0 auto',
+  },
+  paper: {
+    width: '100%',
+    margin: '0 auto',
+    marginBottom: 24,
+    padding: 20,
+    textAlign: 'left',
+    borderRadius: 4,
+    position: 'relative',
+  },
+  switchField: {
+    padding: '20px 0 0',
+  },
+});
+
+const profileOverviewFieldPatch = graphql`
+  mutation ProfileOverviewFieldPatchMutation(
+    $input: [EditInput]!
+    $password: String
+  ) {
+    meEdit(input: $input, password: $password) {
+      ...ProfileOverview_me
+    }
+  }
+`;
+
+const generateOTP = graphql`
+  query ProfileOverviewOTPQuery {
+    otpGeneration {
+      secret
+      uri
+    }
+  }
+`;
+
+const validateOtpPatch = graphql`
+  mutation ProfileOverviewOtpMutation($input: UserOTPActivationInput) {
+    otpActivation(input: $input) {
+      ...ProfileOverview_me
+    }
+  }
+`;
+
+const disableOtpPatch = graphql`
+  mutation ProfileOverviewOtpDisableMutation {
+    otpDeactivation {
+      ...ProfileOverview_me
+    }
+  }
+`;
+
+const userValidation = (t) => Yup.object().shape({
+  name: Yup.string().required(t('This field is required')),
+  user_email: Yup.string()
+    .required(t('This field is required'))
+    .email(t('The value must be an email address')),
+  personal_notifiers: Yup.array(),
+  firstname: Yup.string().nullable(),
+  lastname: Yup.string().nullable(),
+  theme: Yup.string().nullable(),
+  language: Yup.string().nullable(),
+  description: Yup.string().nullable(),
+  otp_activated: Yup.boolean(),
+  unit_system: Yup.string().nullable(),
+  submenu_show_icons: Yup.boolean(),
+  submenu_auto_collapse: Yup.boolean(),
+  monochrome_labels: Yup.boolean(),
+  unsubscribed_news_feed_types: Yup.array().of(Yup.string()),
+});
+
+const passwordValidation = (t) => Yup.object().shape({
+  current_password: Yup.string().required(t('This field is required')),
+  password: Yup.string().required(t('This field is required')),
+  confirmation: Yup.string()
+    .oneOf([Yup.ref('password'), null], t('The values do not match'))
+    .required(t('This field is required')),
+});
+
+const Otp = ({ closeFunction, secret, uri }) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme();
+  const [otpQrImage, setOtpQrImage] = useState('');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(null);
+  const [inputDisable, setInputDisable] = useState(false);
+  const handleChange = (data) => setCode(data);
+  if (code.length === OTP_CODE_SIZE && !inputDisable) {
+    setInputDisable(true);
+    commitMutation({
+      mutation: validateOtpPatch,
+      variables: { input: { secret, code } },
+      onError: () => {
+        setInputDisable(false);
+        setCode('');
+        return setError(t_i18n('The code is not correct.'));
+      },
+      onCompleted: () => {
+        setError(null);
+        return closeFunction();
+      },
+    });
+  }
+  useEffect(() => {
+    qrcode.toDataURL(
+      uri,
+      (err, imageUrl) => {
+        if (err) {
+          setOtpQrImage('');
+          return;
+        }
+        setOtpQrImage(imageUrl);
+      },
+    );
+  }, [uri, theme]);
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <img src={otpQrImage} style={{ width: 265 }} alt={t_i18n('QR code for two-factor authentication')} />
+      {error ? (
+        <Alert
+          severity="error"
+          variant="outlined"
+          style={{ margin: '15px 0' }}
+        >
+          {error}
+        </Alert>
+      ) : (
+        <Alert
+          severity="info"
+          variant="outlined"
+          style={{ margin: '15px 0' }}
+        >
+          {t_i18n('Type the code generated in your application')}
+        </Alert>
+      )}
+      <OtpInputField
+        value={code}
+        onChange={handleChange}
+        isDisabled={inputDisable}
+      />
+    </div>
+  );
+};
+
+const OtpComponent = ({ closeFunction }) => (
+  <QueryRenderer
+    query={generateOTP}
+    render={({ props }) => {
+      if (props) {
+        return (
+          <Otp
+            closeFunction={closeFunction}
+            secret={props.otpGeneration.secret}
+            uri={props.otpGeneration.uri}
+          />
+        );
+      }
+      return <Loader />;
+    }}
+  />
+);
+
+const ProfileOverviewComponent = (props) => {
+  const { t, me, classes, about, settings, themes } = props;
+  const { external, otp_activated: useOtp } = me;
+  const { t_i18n } = useFormatter();
+  const { isPlaygroundEnable } = useHelper();
+  const { setTitle } = useConnectedDocumentModifier();
+  setTitle(t_i18n('Profile'));
+  const objectOrganization = convertOrganizations(me);
+  const [display2FA, setDisplay2FA] = useState(false);
+  const hasKnowledgeAccess = useGranted([KNOWLEDGE]);
+  const hasAccessTokenCapability = useGranted([APIACCESS_USETOKEN]);
+  const [displayTokenCreation, setDisplayTokenCreation] = useState(false);
+
+  const fieldNames = [
+    'name',
+    'description',
+    'user_email',
+    'firstname',
+    'lastname',
+    'theme',
+    'language',
+    'otp_activated',
+    'unit_system',
+    'submenu_show_icons',
+    'submenu_auto_collapse',
+    'monochrome_labels',
+  ];
+
+  const initialValues = {
+    ...pick(fieldNames, me),
+    objectOrganization,
+    personal_notifiers: (me.personal_notifiers ?? []).map(({ id, name }) => ({ value: id, label: name })),
+  };
+
+  const disableOtp = () => {
+    commitMutation({
+      mutation: disableOtpPatch,
+    });
+  };
+
+  const handleSubmitField = (name, value) => {
+    userValidation(t)
+      .validateAt(name, { [name]: value })
+      .then(() => {
+        commitMutation({
+          mutation: profileOverviewFieldPatch,
+          variables: { input: { key: name, value } },
+        });
+      })
+      .catch(() => false);
+  };
+
+  const handleSubmitPasswords = (values, { setSubmitting, resetForm }) => {
+    const field = { key: 'password', value: values.password };
+    commitMutation({
+      mutation: profileOverviewFieldPatch,
+      variables: {
+        input: field,
+        password: values.current_password,
+      },
+      setSubmitting,
+      onCompleted: () => {
+        setSubmitting(false);
+        MESSAGING$.notifySuccess('The password has been updated');
+        resetForm();
+      },
+    });
+  };
+
+  const themeList = themes?.edges
+    ?.filter((node) => !!node)
+    .map((node) => node.node)
+    ?? [];
+
+  return (
+    <Stack
+      gap={2}
+      sx={{ width: 900, margin: '0 auto' }}
+    >
+      <TokenCreationDrawer
+        userId={me.id}
+        open={displayTokenCreation}
+        onClose={() => setDisplayTokenCreation(false)}
+      />
+      <Dialog
+        open={display2FA}
+        onClose={() => setDisplay2FA(false)}
+        title={t('Enable two-factor authentication')}
+        size="small"
+      >
+        <OtpComponent closeFunction={() => setDisplay2FA(false)} />
+      </Dialog>
+      <Card title={`${t('Profile')} ${external && `(${t('external')})`}`}>
+        <Formik
+          enableReinitialize={true}
+          initialValues={initialValues}
+          validationSchema={userValidation(t)}
+        >
+          {() => (
+            <Form>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="name"
+                disabled={external}
+                label={t('Name')}
+                fullWidth={true}
+                onSubmit={handleSubmitField}
+              />
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="user_email"
+                disabled={external}
+                label={t('Email address')}
+                fullWidth={true}
+                className="mt-4"
+                onSubmit={handleSubmitField}
+              />
+              <ObjectOrganizationField
+                name="objectOrganization"
+                label="Organizations"
+                disabled={true}
+                style={fieldSpacingContainerStyle}
+                outlined={false}
+              />
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="firstname"
+                label={t('Firstname')}
+                fullWidth={true}
+                className="mt-4"
+                onSubmit={handleSubmitField}
+              />
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="lastname"
+                label={t('Lastname')}
+                fullWidth={true}
+                className="mt-4"
+                onSubmit={handleSubmitField}
+              />
+              <Field
+                component={TextareaField}
+                variant="outlined"
+                name="description"
+                label={t('Description')}
+                fullWidth={true}
+                multiline={true}
+                rows={4}
+                className="mt-4"
+                onSubmit={handleSubmitField}
+                resize="vertical"
+              />
+            </Form>
+          )}
+        </Formik>
+      </Card>
+      <Card title={t('User experience')}>
+        <Formik
+          enableReinitialize={true}
+          initialValues={initialValues}
+          validationSchema={userValidation(t)}
+        >
+          {() => (
+            <Form>
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="theme"
+                label={t('Theme')}
+                fullWidth={true}
+                inputProps={{
+                  name: 'theme',
+                  id: 'theme',
+                }}
+                containerstyle={{ width: '100%' }}
+                onChange={handleSubmitField}
+              >
+                <SelectItem value="default">{t('Default')}</SelectItem>
+                {themeList.map(({ id, name }) => (
+                  <SelectItem key={id} value={id}>{name}</SelectItem>
+                ))}
+              </Field>
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="language"
+                label={t('Language')}
+                fullWidth={true}
+                inputProps={{
+                  name: 'language',
+                  id: 'language',
+                }}
+                containerstyle={fieldSpacingContainerStyle}
+                onChange={handleSubmitField}
+              >
+                <SelectItem value="auto"><em>{t('Automatic')}</em></SelectItem>
+                {
+                  availableLanguage.map(({ value, label }) => <SelectItem key={value} value={value}>{label}</SelectItem>)
+                }
+              </Field>
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="unit_system"
+                label={t('Unit system')}
+                fullWidth={true}
+                inputProps={{ name: 'unit_system', id: 'unit_system' }}
+                containerstyle={fieldSpacingContainerStyle}
+                onChange={handleSubmitField}
+              >
+                <SelectItem value="auto"><em>{t('Automatic')}</em></SelectItem>
+                <SelectItem value="Imperial">{t('Imperial')}</SelectItem>
+                <SelectItem value="Metric">{t('Metric')}</SelectItem>
+              </Field>
+              <ListItem style={{ padding: '20px 0 0 0' }}>
+                <ListItemText
+                  primary={t('Show left navigation submenu icons')}
+                />
+                <Field
+                  component={Switch}
+                  variant="outlined"
+                  name="submenu_show_icons"
+                  checked={initialValues.submenu_show_icons}
+                  onChange={(_, value) => handleSubmitField('submenu_show_icons', value)}
+                />
+              </ListItem>
+              <ListItem style={{ padding: '10px 0 0 0' }}>
+                <ListItemText
+                  primary={t('Auto collapse submenus in left navigation')}
+                />
+                <Field
+                  component={Switch}
+                  variant="outlined"
+                  name="submenu_auto_collapse"
+                  checked={initialValues.submenu_auto_collapse}
+                  onChange={(_, value) => handleSubmitField('submenu_auto_collapse', value)}
+                />
+              </ListItem>
+              {/* <ListItem style={{ padding: '10px 0 0 0' }}>
+                <ListItemText
+                  primary={t('Monochrome labels and entity types')}
+                />
+                <Field
+                  component={Switch}
+                  variant="outlined"
+                  name="monochrome_labels"
+                  checked={initialValues.monochrome_labels}
+                  onChange={(_, value) => handleSubmitField('monochrome_labels', value)}
+                />
+              </ListItem> */}
+              <Alert
+                severity="info"
+                variant="outlined"
+                style={{ margin: '10px 0 0 0' }}
+              >
+                {settings.platform_notifier_auto_trigger_assignee
+                  ? t_i18n('When an event happens on a knowledge your participate, you will receive notification through your personal notifiers')
+                  : t_i18n('Automatic notifications for assignees and participants have been disabled by your platform administrator')
+                }
+              </Alert>
+              {settings.platform_notifier_auto_trigger_assignee && (
+                <NotifierField
+                  label={t('Personal notifiers')}
+                  name="personal_notifiers"
+                  onChange={(name, values) => handleSubmitField(name, values.map(({ value }) => value))}
+                />
+              )}
+            </Form>
+          )}
+        </Formik>
+      </Card>
+      {hasKnowledgeAccess ? (
+        <Card title={t('Dashboard settings')}>
+          <HomeDashboardSettings />
+        </Card>
+      ) : null}
+      <Card title={t('Authentication')}>
+        <div style={{ float: 'right', marginTop: -5 }}>
+          {useOtp && (
+            <Button
+              type="button"
+              startIcon={<NoEncryptionOutlined />}
+              onClick={disableOtp}
+              classes={{ root: classes.button }}
+              disabled={settings.otp_mandatory}
+            >
+              {t('Disable two-factor authentication')}
+            </Button>
+          )}
+          {!useOtp && (
+            <Button
+              type="button"
+              color="secondary"
+              startIcon={<LockOutlined />}
+              onClick={() => setDisplay2FA(true)}
+              classes={{ root: classes.button }}
+            >
+              {t('Enable two-factor authentication')}
+            </Button>
+          )}
+        </div>
+        <div className="clearfix" />
+        {!external && (
+          <Formik
+            enableReinitialize={true}
+            initialValues={{
+              current_password: '',
+              password: '',
+              confirmation: '',
+            }}
+            validationSchema={passwordValidation(t)}
+            onSubmit={handleSubmitPasswords}
+          >
+            {({ submitForm, isSubmitting, values }) => (
+              <Form style={{ margin: '20px 0 20px 0' }}>
+                <Stack gap={2}>
+                  <Field
+                    component={TextField}
+                    variant="outlined"
+                    name="current_password"
+                    label={t('Current password')}
+                    type="password"
+                    fullWidth={true}
+                    disabled={external}
+                  />
+                  <PasswordPolicies value={values.password} />
+                  <Field
+                    component={TextField}
+                    variant="outlined"
+                    name="password"
+                    label={t('New password')}
+                    type="password"
+                    fullWidth={true}
+                    disabled={external}
+                  />
+                  <Field
+                    component={TextField}
+                    variant="outlined"
+                    name="confirmation"
+                    label={t('Confirmation')}
+                    type="password"
+                    fullWidth={true}
+                    disabled={external}
+                  />
+                </Stack>
+                <div style={{ display: 'flex', justifyContent: 'end', marginTop: 16 }}>
+                  <Button
+                    type="button"
+                    onClick={submitForm}
+                    disabled={external || isSubmitting}
+                    classes={{ root: classes.button }}
+                  >
+                    {t('Update')}
+                  </Button>
+                </div>
+              </Form>
+            )}
+          </Formik>
+        )}
+      </Card>
+      <Card title={t('API access')}>
+        <div>
+          <Label>{t('OpenCTI version')}</Label>
+          <pre>{about.version}</pre>
+          <Stack gap={2}>
+            <Stack direction="row" justifyContent="flex-end" gap={1}>
+              {hasAccessTokenCapability && isPlaygroundEnable() && (
+                <Button
+                  variant="secondary"
+                  component={Link}
+                  to="/public/graphql"
+                  target="_blank"
+                >
+                  {t('Playground')}
+                </Button>
+              )}
+              {hasAccessTokenCapability && (
+                <Button
+                  onClick={() => setDisplayTokenCreation(true)}
+                >
+                  {t('Generate Token')}
+                </Button>
+              )}
+            </Stack>
+            <TokenList node={me} />
+          </Stack>
+        </div>
+      </Card>
+      <ProfileOverviewXtmOneMcp />
+      <ProfileLocalStorage />
+    </Stack>
+  );
+};
+
+ProfileOverviewComponent.propTypes = {
+  classes: PropTypes.object,
+  theme: PropTypes.object,
+  t: PropTypes.func,
+  me: PropTypes.object,
+  about: PropTypes.object,
+  settings: PropTypes.object,
+  themes: PropTypes.object,
+};
+
+const ProfileOverview = createFragmentContainer(ProfileOverviewComponent, {
+  me: graphql`
+    fragment ProfileOverview_me on MeUser {
+      id
+      name
+      user_email
+      external
+      firstname
+      lastname
+      language
+      theme
+      otp_activated
+      description
+      unit_system
+      submenu_show_icons
+      submenu_auto_collapse
+      monochrome_labels
+      unsubscribed_news_feed_types
+      personal_notifiers {
+        id
+        name
+      }
+      objectOrganization {
+        edges {
+          node {
+            name
+          }
+        }
+      }
+      ...TokenList_node
+    }
+  `,
+  about: graphql`
+    fragment ProfileOverview_about on AppInfo {
+      version
+    }
+  `,
+  settings: graphql`
+    fragment ProfileOverview_settings on Settings {
+      otp_mandatory
+      platform_notifier_auto_trigger_assignee
+    }
+  `,
+});
+
+export default compose(inject18n, withStyles(styles))(ProfileOverview);

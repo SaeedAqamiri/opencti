@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-custom-rules",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": "./lib/index.js",
+  "devDependencies": {
+    "@typescript-eslint/parser": "8.69.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=7"
+  }
+}

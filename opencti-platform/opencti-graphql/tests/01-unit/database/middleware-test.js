@@ -1,0 +1,553 @@
+import { describe, expect, it } from 'vitest';
+import { hashMergeValidation } from '../../../src/database/middleware';
+import { generateAttributesInputsForUpsert, generateRefsInputsForUpsert, mergeUpsertInput, mergeUpsertInputs } from '../../../src/utils/upsert-utils';
+import { ADMIN_USER, testContext } from '../../utils/testQuery';
+import { ENTITY_DOMAIN_NAME } from '../../../src/schema/stixCyberObservable';
+
+describe('middleware hashMergeValidation test', () => {
+  it('should hashes allowed to merge', () => {
+    const instanceOne = { hashes: { MD5: 'md5', 'SHA-1': 'SHA' } };
+    const instanceTwo = { hashes: { MD5: 'md5' } };
+    hashMergeValidation([instanceOne, instanceTwo]);
+  });
+
+  it('should hashes have collisions', () => {
+    const instanceOne = { hashes: { MD5: 'md5instanceOne' } };
+    const instanceTwo = { hashes: { MD5: 'md5instanceTwo' } };
+    const merge = () => hashMergeValidation([instanceOne, instanceTwo]);
+    expect(merge).toThrow();
+  });
+
+  it('should hashes have complex collisions', () => {
+    const instanceOne = { hashes: { MD5: 'md5', 'SHA-1': 'SHA' } };
+    const instanceTwo = { hashes: { MD5: 'md5', 'SHA-1': 'SHA2' } };
+    const merge = () => hashMergeValidation([instanceOne, instanceTwo]);
+    expect(merge).toThrow();
+  });
+});
+
+describe('middleware upsertElement test', () => {
+  describe('middleware generateAttributesInputsForUpsert with indicator test', () => {
+    const indicator1 = {
+      id: 'indicator1-uuid-internal',
+      internal_id: 'indicator1-uuid-internal',
+      standard_id: 'indicator1-uuid-standard',
+      pattern: '[domain-name:value = \'filigran.dev\']',
+      pattern_type: 'stix',
+      x_opencti_main_observable_type: ENTITY_DOMAIN_NAME,
+    };
+    const type = 'Indicator';
+    const updatePatch = {
+      standard_id: 'indicator1-uuid-standard',
+      description: 'indicator1 new description',
+    };
+    it('should generateAttributesInputsForUpsert with indicator description update no old description', () => {
+      const resolvedElement = { ...indicator1 };
+      const type = 'Indicator';
+
+      let confidenceForUpsert = { isConfidenceMatch: true };
+      let inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(1);
+      expect(inputs[0]).toEqual({ key: 'description', value: ['indicator1 new description'] });
+
+      confidenceForUpsert = { isConfidenceMatch: false };
+      inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(1); // we still update description since no existing
+      expect(inputs[0]).toEqual({ key: 'description', value: ['indicator1 new description'] });
+    });
+    it('should generateAttributesInputsForUpsert with indicator description update', () => {
+      const resolvedElement = { ...indicator1, description: 'indicator1 old description' }; // existing description
+
+      let confidenceForUpsert = { isConfidenceMatch: true };
+      let inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(1);
+      expect(inputs[0]).toEqual({ key: 'description', value: ['indicator1 new description'] });
+
+      confidenceForUpsert = { isConfidenceMatch: false };
+      inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(0); // no changes since confidenceMatch is false, we don't replace existing description
+    });
+
+    it('should generateAttributesInputsForUpsert with indicator description update & indicator types unchanged', () => {
+      const resolvedElement = { ...indicator1, description: 'indicator1 old description', indicator_types: ['type1', 'type2'] };
+      const updatePatchWithTypes = { ...updatePatch, indicator_types: ['type1', 'type2'] };
+      let confidenceForUpsert = { isConfidenceMatch: true };
+      let inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatchWithTypes, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(2);
+      expect(inputs[0]).toEqual({ key: 'description', value: ['indicator1 new description'] });
+      expect(inputs[1]).toEqual({ key: 'indicator_types', value: ['type1', 'type2'], operation: 'add' });
+
+      confidenceForUpsert = { isConfidenceMatch: false };
+      inputs = generateAttributesInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatchWithTypes, confidenceForUpsert);
+
+      expect(inputs.length).toEqual(0); // no changes since confidenceMatch is false, we don't replace existing description
+    });
+  });
+  describe('middleware generateAttributesInputsForUpsert with opencti_upsert_operations test', () => {
+    const indicator1 = {
+      id: 'indicator1-uuid-internal',
+      internal_id: 'indicator1-uuid-internal',
+      standard_id: 'indicator1-uuid-standard',
+      pattern: '[domain-name:value = \'filigran.dev\']',
+      pattern_type: 'stix',
+      x_opencti_main_observable_type: ENTITY_DOMAIN_NAME,
+      indicator_types: ['ip', 'active-directory'],
+    };
+    const indicatorUpsertOperations = [
+      {
+        operation: 'remove',
+        key: 'indicator_types',
+        value: ['active-directory'],
+      },
+    ];
+    const updatePatchIndicator1 = {
+      standard_id: 'indicator1-uuid-standard',
+      // indicator_types: ['malicious-activity'],
+      indicatorUpsertOperations,
+    };
+    it('should mergeUpsertInputs with indicator : different keys', () => {
+      const updatePatch = { ...updatePatchIndicator1, description: 'indicator new description' };
+      const updatePatchInput = [{
+        operation: 'replace',
+        key: 'description',
+        value: ['indicator new description'],
+      }];
+      const inputs = mergeUpsertInputs(indicator1, updatePatch, updatePatchInput, indicatorUpsertOperations);
+
+      expect(inputs.length).toEqual(2);
+      expect(inputs.find((n) => n.key === 'description')).toEqual({ operation: 'replace', key: 'description', value: ['indicator new description'] });
+      expect(inputs.find((n) => n.key === 'indicator_types')).toEqual({ operation: 'remove', key: 'indicator_types', value: ['active-directory'] });
+    });
+    it('should mergeUpsertInput with indicator : upsert adds type and operation removes another type', () => {
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'indicator_types',
+        value: ['indicator-type-to-add'],
+      };
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'indicator_types',
+        value: ['indicator-type-to-remove'],
+      };
+      const elementCurrentValue = ['indicator-type-to-remove', 'indicator-type-current'];
+      const upsertCurrentValue = ['indicator-type-current', 'indicator-type-to-add'];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // inputs should be operation: 'replace', value: ['indicator-type-current', 'indicator-type-to-add']
+      expect(input.key).toEqual('indicator_types');
+      expect(input.operation).toEqual('replace');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.includes('indicator-type-current')).toBe(true);
+      expect(input.value.includes('indicator-type-to-add')).toBe(true);
+    });
+
+    it('should mergeUpsertInput with indicator : upsert adds back the same type that was removed, not in DB', () => {
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'indicator_types',
+        value: ['indicator-type-1'],
+      };
+      // remove operation done before, bundle contains again the type, we should keep it
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'indicator_types',
+        value: ['indicator-type-1'],
+      };
+      const elementCurrentValue = ['indicator-type-current'];
+      const upsertCurrentValue = ['indicator-type-1', 'indicator-type-current'];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // input should be operation: 'replace', value: ['indicator-type-1', 'indicator-type-current']
+      expect(input.key).toEqual('indicator_types');
+      expect(input.operation).toEqual('replace');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.includes('indicator-type-current')).toBe(true);
+      expect(input.value.includes('indicator-type-1')).toBe(true);
+    });
+
+    // skip this one for now, not implemented yet
+    it.skip('should mergeUpsertInput with indicator : upsert adds back the same type that was removed, already in DB', () => {
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'indicator_types',
+        value: ['indicator-type-1'],
+      };
+      // remove operation done before, bundle contains again the type, we should keep it
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'indicator_types',
+        value: ['indicator-type-1'],
+      };
+      const elementCurrentValue = ['indicator-type-1', 'indicator-type-current'];
+      const upsertCurrentValue = ['indicator-type-1', 'indicator-type-current'];
+      const inputs = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // TODO inputs should be empty
+      console.log('inputs', inputs);
+    });
+    const labelToRemove = {
+      _id: '0fc83074-eb2d-47f6-b315-781e511f0322',
+      _index: 'opencti_stix_meta_objects-000001',
+      base_type: 'ENTITY',
+      color: '#320dff',
+      confidence: 100,
+      created: '2025-07-02T15:23:00.703Z',
+      created_at: '2025-07-02T15:23:00.703Z',
+      creator_id: [
+        '88ec0c6a-13ce-5e39-b486-354fe4a7084f',
+      ],
+      entity_type: 'Label',
+      id: '0fc83074-eb2d-47f6-b315-781e511f0322',
+      internal_id: '0fc83074-eb2d-47f6-b315-781e511f0322',
+      modified: '2025-07-02T15:23:00.703Z',
+      parent_types: [
+        'Basic-Object',
+        'Stix-Object',
+        'Stix-Meta-Object',
+      ],
+      standard_id: 'label--00785e04-8bf4-52ee-bba2-88ccecc17b8d',
+      updated_at: '2025-07-02T15:23:00.703Z',
+      value: 'label-to-remove',
+    };
+    it('should mergeUpsertInputs with indicator with only upsertOperation with remove label', () => {
+      const updatePatch = { ...updatePatchIndicator1, description: 'indicator new description' };
+      const upsertOperations = [{
+        operation: 'remove',
+        key: 'objectLabel',
+        value: [labelToRemove],
+      }];
+      const updatePatchInput = [{
+        operation: 'replace',
+        key: 'description',
+        value: ['indicator new description'],
+      }];
+      const inputs = mergeUpsertInputs(indicator1, updatePatch, updatePatchInput, upsertOperations);
+
+      expect(inputs.length).toEqual(2);
+      expect(inputs.find((n) => n.key === 'description')).toEqual({ operation: 'replace', key: 'description', value: ['indicator new description'] });
+      expect(inputs.find((n) => n.key === 'objectLabel')).toEqual({ operation: 'remove', key: 'objectLabel', value: [labelToRemove] });
+    });
+    it('should mergeUpsertInput with indicator : upsert adds label and operation removes another label', () => {
+      const labelToAddId = 'eda3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelToAdd = { ...labelToRemove, value: 'label-to-add', id: labelToAddId, internal_id: labelToAddId, standard_id: labelToAddId };
+      const labelCurrentId = 'ada3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelCurrentValue = { ...labelToRemove, value: 'label-current', id: labelCurrentId, internal_id: labelCurrentId, standard_id: labelCurrentId };
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToAdd],
+      };
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'objectLabel',
+        value: [labelToRemove],
+      };
+      const elementCurrentValue = [labelToRemove, labelCurrentValue];
+      const upsertCurrentValue = [labelCurrentValue, labelToAdd];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // inputs should be operation: 'replace', value: [labelCurrentValue, labelToAdd]
+      expect(input.key).toEqual('objectLabel');
+      expect(input.operation).toEqual('replace');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.some((v) => v.value === labelCurrentValue.value)).toBe(true);
+      expect(input.value.some((v) => v.value === labelToAdd.value)).toBe(true);
+    });
+    it('should mergeUpsertInputs with indicator : upsert adds label and operation removes another label', () => {
+      const labelToAddId = 'eda3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelToAdd = { ...labelToRemove, value: 'label-to-add', id: labelToAddId, internal_id: labelToAddId, standard_id: labelToAddId };
+      const labelCurrentId = 'ada3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelCurrentValue = { ...labelToRemove, value: 'label-current', id: labelCurrentId, internal_id: labelCurrentId, standard_id: labelCurrentId };
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToAdd],
+      };
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'objectLabel',
+        value: [labelToRemove],
+      };
+      const currentIndicator = { ...indicator1, objectLabel: [labelCurrentValue, labelToRemove] };
+      const updatePatch = { ...indicator1, objectLabel: [labelCurrentValue, labelToAdd] };
+      const inputs = mergeUpsertInputs(currentIndicator, updatePatch, [updatePatchInput], [upsertOperation]);
+
+      // inputs should be operation: 'replace', value: [labelCurrentValue, labelToAdd]
+      expect(inputs.length).toEqual(1);
+      expect(inputs.find((n) => n.key === 'objectLabel')).toEqual({ operation: 'replace', key: 'objectLabel', value: [labelCurrentValue, labelToAdd] });
+    });
+    it('should mergeUpsertInput with indicator : upsert adds label and operation replaces labels', () => {
+      const labelToAddId = 'eda3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelToAdd = { ...labelToRemove, value: 'label-to-add', id: labelToAddId, internal_id: labelToAddId, standard_id: labelToAddId };
+      const labelCurrentId = 'ada3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelCurrentValue = { ...labelToRemove, value: 'label-current', id: labelCurrentId, internal_id: labelCurrentId, standard_id: labelCurrentId };
+      const labelToReplaceId = '2b13fe77-429f-4c69-8102-42c57741c79a';
+      const labelToReplace = { ...labelToRemove, value: 'label-replace', id: labelToReplaceId, internal_id: labelToReplaceId, standard_id: labelToReplaceId };
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToAdd],
+      };
+      const upsertOperation = {
+        operation: 'replace',
+        key: 'objectLabel',
+        value: [labelToReplace],
+      };
+      const elementCurrentValue = [labelCurrentValue];
+      const upsertCurrentValue = [labelCurrentValue, labelToAdd];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // inputs should be operation: 'replace', value: [labelCurrentValue, labelToAdd]
+      expect(input.key).toEqual('objectLabel');
+      expect(input.operation).toEqual('replace');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.some((v) => v.value === labelToAdd.value)).toBe(true);
+      expect(input.value.some((v) => v.value === labelToReplace.value)).toBe(true);
+    });
+    it('should mergeUpsertInput with indicator : handles non-array elementCurrentValue', () => {
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'indicator_types',
+        value: ['indicator-type-to-add'],
+      };
+      const upsertOperation = {
+        operation: 'remove',
+        key: 'indicator_types',
+        value: ['indicator-type-to-remove'],
+      };
+      // elementCurrentValue is a scalar string, not an array
+      const elementCurrentValue = 'indicator-type-current';
+      const upsertCurrentValue = ['indicator-type-current', 'indicator-type-to-add'];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // The scalar should be wrapped into an array, then the remove filter applied (no match), then add applied
+      expect(input.key).toEqual('indicator_types');
+      expect(input.operation).toEqual('replace');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.includes('indicator-type-current')).toBe(true);
+      expect(input.value.includes('indicator-type-to-add')).toBe(true);
+    });
+    it('should mergeUpsertInput with indicator : upsert adds label and operation add labels', () => {
+      const labelToAddId = 'eda3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelToAdd = { ...labelToRemove, value: 'label-to-add', id: labelToAddId, internal_id: labelToAddId, standard_id: labelToAddId };
+      const labelCurrentId = 'ada3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelCurrentValue = { ...labelToRemove, value: 'label-current', id: labelCurrentId, internal_id: labelCurrentId, standard_id: labelCurrentId };
+      const labelToUpsertAddId = 'f6a6c3a5-67f6-4a90-b2a9-a1d980ec7ff2';
+      const labelToUpsertAdd = { ...labelToRemove, value: 'label-upsert-add', id: labelToUpsertAddId, internal_id: labelToUpsertAddId, standard_id: labelToUpsertAddId };
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToAdd],
+      };
+      const upsertOperation = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToUpsertAdd],
+      };
+      const elementCurrentValue = [labelCurrentValue];
+      const upsertCurrentValue = [labelCurrentValue, labelToAdd];
+      const input = mergeUpsertInput(elementCurrentValue, upsertCurrentValue, updatePatchInput, upsertOperation);
+
+      // inputs should be operation: 'replace', value: [labelCurrentValue, labelToAdd]
+      expect(input.key).toEqual('objectLabel');
+      expect(input.operation).toEqual('add');
+      expect(input.value.length).toEqual(2);
+      expect(input.value.some((v) => v.value === labelToAdd.value)).toBe(true);
+      expect(input.value.some((v) => v.value === labelToUpsertAdd.value)).toBe(true);
+    });
+    it('should mergeUpsertInputss with indicator : upsert adds label and operations add labels, replace labels and remove label', () => {
+      const labelToAddId = 'eda3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelToAdd = { ...labelToRemove, value: 'label-to-add', id: labelToAddId, internal_id: labelToAddId, standard_id: labelToAddId };
+      const labelToAdd2Id = 'f5cd3534-5e4b-4176-865a-d1ee73566d9c';
+      const labelToAdd2 = { ...labelToRemove, value: 'label-to-add2', id: labelToAdd2Id, internal_id: labelToAdd2Id, standard_id: labelToAdd2Id };
+      const labelToReplaceId = 'eaab8db2-253d-4c67-9549-56be027ee81c';
+      const labelToReplace = { ...labelToRemove, value: 'label-to-replace', id: labelToReplaceId, internal_id: labelToReplaceId, standard_id: labelToReplaceId };
+      const labelCurrentId = 'ada3b7d5-b722-4c34-9dd5-d70cea8f5cfc';
+      const labelCurrentValue = { ...labelToRemove, value: 'label-current', id: labelCurrentId, internal_id: labelCurrentId, standard_id: labelCurrentId };
+      const updatePatchInput = {
+        operation: 'add',
+        key: 'objectLabel',
+        value: [labelToAdd],
+      };
+      const upsertOperations = [
+        {
+          operation: 'remove',
+          key: 'objectLabel',
+          value: [labelToAdd],
+        },
+        {
+          operation: 'replace',
+          key: 'objectLabel',
+          value: [labelToReplace],
+        },
+        {
+          operation: 'add',
+          key: 'objectLabel',
+          value: [labelToAdd2],
+        },
+      ];
+      const currentIndicator = { ...indicator1, objectLabel: [labelCurrentValue, labelToRemove] };
+      const updatePatch = { ...indicator1, objectLabel: [labelCurrentValue, labelToAdd] };
+      const inputs = mergeUpsertInputs(currentIndicator, updatePatch, [updatePatchInput], upsertOperations);
+
+      // inputs should be operation: 'replace', value: [labelCurrentValue, labelToAdd]
+      expect(inputs.length).toEqual(1);
+      expect(inputs.find((n) => n.key === 'objectLabel')).toEqual({ operation: 'replace', key: 'objectLabel', value: [labelToReplace, labelToAdd2, labelToAdd] });
+    });
+  });
+  describe('middleware generateRefsInputsForUpsert test', () => {
+    const type = 'Indicator';
+    // base resolved element (Indicator) used across the tests
+    const baseIndicator = {
+      id: 'indicator1-uuid-internal',
+      internal_id: 'indicator1-uuid-internal',
+      standard_id: 'indicator1-uuid-standard',
+      entity_type: 'Indicator',
+      pattern: '[domain-name:value = \'filigran.dev\']',
+      pattern_type: 'stix',
+      x_opencti_main_observable_type: ENTITY_DOMAIN_NAME,
+    };
+    // createdBy is a "multiple: false" ref (databaseName === 'created-by')
+    const authorA = { internal_id: 'author-A', standard_id: 'identity--author-A', entity_type: 'Organization' };
+    const authorB = { internal_id: 'author-B', standard_id: 'identity--author-B', entity_type: 'Organization' };
+
+    describe('non multiple ref (createdBy)', () => {
+      it('should NOT replace an existing ref value with a null input (regression: no data cleaning)', () => {
+        // resolvedElement has an author, the incoming patch explicitly provides createdBy = null
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: null };
+        // even with a higher confidence, an empty input must not erase the current value
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const createdByInput = inputs.find((n) => n.key === 'createdBy');
+        expect(createdByInput).toBeUndefined();
+      });
+
+      it('should NOT replace an existing ref value with an undefined input', () => {
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: undefined };
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        expect(inputs.find((n) => n.key === 'createdBy')).toBeUndefined();
+      });
+
+      it('should fill an empty ref value with an incoming author (auto consolidation)', () => {
+        // current author is empty -> we always want to set the incoming value
+        const resolvedElement = { ...baseIndicator };
+        const updatePatch = { createdBy: authorA };
+        // even with a lower confidence, empty current value is filled
+        const confidenceForUpsert = { isConfidenceMatch: false, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const createdByInput = inputs.find((n) => n.key === 'createdBy');
+        expect(createdByInput).toEqual({ key: 'createdBy', value: [authorA] });
+      });
+
+      it('should replace an existing author with a different one when confidence is strictly upper', () => {
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: authorB };
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const createdByInput = inputs.find((n) => n.key === 'createdBy');
+        expect(createdByInput).toEqual({ key: 'createdBy', value: [authorB] });
+      });
+
+      it('should NOT replace an existing author when confidence is not strictly upper (protected createdBy)', () => {
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: authorB };
+        // isConfidenceMatch true but not upper -> createdBy is protected against flickering
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        expect(inputs.find((n) => n.key === 'createdBy')).toBeUndefined();
+      });
+
+      it('should NOT produce any input when incoming author is identical to the current one', () => {
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: authorA };
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        expect(inputs.find((n) => n.key === 'createdBy')).toBeUndefined();
+      });
+
+      it('should remove an existing author with a null input in full synchronization mode', () => {
+        // in full synchro, an empty input is an explicit removal request
+        const synchroContext = { ...testContext, synchronizedUpsert: true };
+        const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+        const updatePatch = { createdBy: null };
+        const confidenceForUpsert = { isConfidenceMatch: false, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(synchroContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const createdByInput = inputs.find((n) => n.key === 'createdBy');
+        expect(createdByInput).toEqual({ key: 'createdBy', value: [null] });
+      });
+    });
+
+    describe('multiple ref (objectLabel)', () => {
+      const labelA = { internal_id: 'label-A', standard_id: 'label--A', entity_type: 'Label' };
+      const labelB = { internal_id: 'label-B', standard_id: 'label--B', entity_type: 'Label' };
+
+      it('should fill an empty multiple ref with the incoming values', () => {
+        const resolvedElement = { ...baseIndicator };
+        const updatePatch = { objectLabel: [labelA] };
+        // labels can be added without confidence match
+        const confidenceForUpsert = { isConfidenceMatch: false, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const labelInput = inputs.find((n) => n.key === 'objectLabel');
+        expect(labelInput).toEqual({ key: 'objectLabel', value: [labelA], operation: 'add' });
+      });
+
+      it('should add only the missing values (differential) on a multiple ref', () => {
+        const resolvedElement = { ...baseIndicator, 'object-label': [labelA.internal_id] };
+        const updatePatch = { objectLabel: [labelA, labelB] };
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const labelInput = inputs.find((n) => n.key === 'objectLabel');
+        expect(labelInput).toEqual({ key: 'objectLabel', value: [labelB], operation: 'add' });
+      });
+
+      it('should not add an empty multiple ref input (no data cleaning)', () => {
+        const resolvedElement = { ...baseIndicator, 'object-label': [labelA.internal_id] };
+        const updatePatch = { objectLabel: [] };
+        const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+        const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        // current has label-A, input is empty: currentToInputDiff triggers an update in synchro only,
+        // outside synchro the add operation only contains the (empty) differential -> nothing added
+        const labelInput = inputs.find((n) => n.key === 'objectLabel');
+        expect(labelInput).toBeUndefined();
+      });
+
+      it('should replace all values on a multiple ref in full synchronization mode', () => {
+        const synchroContext = { ...testContext, synchronizedUpsert: true };
+        const resolvedElement = { ...baseIndicator, 'object-label': [labelA.internal_id] };
+        const updatePatch = { objectLabel: [labelB] };
+        const confidenceForUpsert = { isConfidenceMatch: false, isConfidenceUpper: false };
+        const inputs = generateRefsInputsForUpsert(synchroContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+        const labelInput = inputs.find((n) => n.key === 'objectLabel');
+        expect(labelInput).toEqual({ key: 'objectLabel', value: [labelB], operation: 'replace' });
+      });
+    });
+
+    it('should ignore refs not present in the update patch', () => {
+      const resolvedElement = { ...baseIndicator, 'created-by': authorA };
+      const updatePatch = {}; // no ref key at all
+      const confidenceForUpsert = { isConfidenceMatch: true, isConfidenceUpper: true };
+      const inputs = generateRefsInputsForUpsert(testContext, ADMIN_USER, resolvedElement, type, updatePatch, confidenceForUpsert, true);
+
+      expect(inputs.length).toEqual(0);
+    });
+  });
+});

@@ -1,0 +1,97 @@
+import React, { FunctionComponent, ReactElement } from 'react';
+import { Field, FieldArray } from 'formik';
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import { AddOutlined, DeleteOutlined } from '@mui/icons-material';
+import { Paper } from '@filigran/design-system';
+import { useFormatter } from '../../../../components/i18n';
+import TextField from '../../../../components/TextField';
+
+interface HeaderFieldAddProps {
+  id: string;
+  name: string;
+  values: { name: string; value: string }[];
+  containerStyle: { marginTop: number; width: string };
+  setFieldValue?: (name: string, value: unknown) => void;
+}
+
+export const HeaderFieldAdd: FunctionComponent<HeaderFieldAddProps> = ({
+  name,
+  values,
+  containerStyle,
+}): ReactElement => {
+  const { t_i18n } = useFormatter();
+  return (
+    <div style={containerStyle}>
+      <FieldArray
+        name={name}
+        render={(arrayHelpers) => (
+          <>
+            <div id="total_headers">
+              {values?.map((_, index) => (
+                <Paper
+                  padding={24}
+                  className="paper-for-grid"
+                  key={index}
+                  style={{
+                    marginTop: 20,
+                    width: '100%',
+                    position: 'relative',
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--border-elevation-subtle)',
+                    borderRadius: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      paddingRight: 50,
+                      display: 'grid',
+                      gap: 20,
+                      gridTemplateColumns: 'repeat(2, 1fr)',
+                    }}
+                  >
+                    <Field
+                      component={TextField}
+                      variant="outlined"
+                      name={`${name}.${index}.name`}
+                      label={t_i18n('Header name')}
+                    />
+                    <Field
+                      component={TextField}
+                      variant="outlined"
+                      name={`${name}.${index}.value`}
+                      label={t_i18n('Header value')}
+                    />
+                  </div>
+                  <IconButton
+                    id="deleteHeader"
+                    aria-label="Delete"
+                    color="error"
+                    onClick={() => {
+                      arrayHelpers.remove(index);
+                    }}
+                    style={{ position: 'absolute', right: 8, top: 8 }}
+                  >
+                    <DeleteOutlined />
+                  </IconButton>
+                </Paper>
+              ))}
+              <Button
+                size="small"
+                startIcon={<AddOutlined fontSize="small" />}
+                aria-label="Add"
+                id="addHeader"
+                onClick={() => {
+                  arrayHelpers.push({ name: '', value: '' });
+                }}
+                style={{ marginTop: (values?.length ?? 0) > 0 ? 20 : 0 }}
+              >
+                {t_i18n('Add header')}
+              </Button>
+            </div>
+          </>
+        )}
+      />
+    </div>
+  );
+};

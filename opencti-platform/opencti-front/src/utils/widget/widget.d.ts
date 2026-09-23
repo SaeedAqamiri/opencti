@@ -1,0 +1,121 @@
+import type { GqlFilterGroup } from '../filters/filtersUtils';
+import type { FilterGroup } from '../filters/filtersHelpers-types';
+import type { FintelTemplateWidget } from '@components/settings/sub_types/fintel_templates/FintelTemplateWidgetsList';
+import { ReactNode } from 'react';
+import { WidgetColumnsLayout } from '@components/widgets/WidgetCustomAttributesColumnsInput';
+
+export type WidgetHost = {
+  kind: 'workspace';
+} | {
+  kind: 'fintelTemplate';
+  fintelWidgets: FintelTemplateWidget[];
+  fintelEntityType: string;
+  fintelEditorValue: string;
+} | {
+  kind: 'custom-view';
+  customViewTargetEntityType: string;
+  customViewTargetEntityId?: string;
+  previewMode?: boolean;
+  missingHostEntityFiller?: ReactNode;
+};
+
+export type WidgetPerspective = 'audits' | 'entities' | 'relationships' | '%future added value';
+
+export type WidgetColumnAttributeType
+  = | 'date'
+    | 'boolean'
+    | 'markdown'
+    | 'tag'
+    | 'tag_list'
+    | 'text_list'
+    | 'score'
+    | 'cvss_score'
+    | 'open_vocab'
+    | 'open_vocab_list'
+    | 'copy'
+    | 'entity_ref';
+
+interface WidgetColumn {
+  attribute: string | null;
+  displayStyle?: string | null;
+  label?: string | null;
+  variableName?: string | null;
+  attributeType?: WidgetColumnAttributeType;
+}
+
+export interface WidgetTimeSeriesData {
+  date: DateTime;
+  value: Int;
+}
+
+export interface WidgetMultiTimeSeries {
+  data: WidgetTimeSeriesData[];
+}
+
+export interface WidgetDataSelection {
+  label?: string | null;
+  number?: number | null;
+  attribute?: string | null;
+  date_attribute?: string | null;
+  centerLat?: number | null;
+  centerLng?: number | null;
+  zoom?: number | null;
+  isTo?: boolean | null;
+  instance_id?: string | null;
+  perspective?: WidgetPerspective | null;
+  filters?: FilterGroup | null;
+  dynamicFrom?: FilterGroup | null;
+  dynamicTo?: FilterGroup | null;
+  filters_id?: string | null;
+  dynamicFrom_id?: string | null;
+  dynamicTo_id?: string | null;
+  columns?: readonly WidgetColumn[] | null;
+  sort_by?: string | null;
+  sort_mode?: string | null;
+  field?: string;
+  relationship_type?: string;
+  layout?: WidgetColumnsLayout | null;
+  unique?: boolean;
+}
+
+type GqlWidgetDataSelection = WidgetDataSelection & {
+  filters?: GqlFilterGroup | null;
+  dynamicFrom?: GqlFilterGroup | null;
+  dynamicTo?: GqlFilterGroup | null;
+};
+
+interface WidgetParameters {
+  title?: string | null;
+  interval?: string | null;
+  stacked?: boolean | null;
+  legend?: boolean | null;
+  distributed?: boolean | null;
+  content?: string | null;
+}
+
+interface WidgetLayout {
+  w: number;
+  h: number;
+  x: number;
+  y: number;
+  i: string;
+  moved?: boolean;
+  static?: boolean;
+}
+
+export interface Widget {
+  id: string;
+  type: string;
+  perspective?: WidgetPerspective | null;
+  dataSelection: WidgetDataSelection[];
+  parameters?: WidgetParameters | null;
+  layout?: WidgetLayout | null;
+}
+
+export type GqlWidget = Widget & {
+  dataSelection: GqlWidgetDataSelection[];
+};
+
+interface PirWidgetDataSelection extends WidgetDataSelection {
+  pirId: string;
+}

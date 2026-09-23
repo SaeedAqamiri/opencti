@@ -1,0 +1,20 @@
+import { CONNECTOR_INTERNAL_IMPORT_FILE } from '../../schema/general';
+import type { AuthContext, AuthUser } from '../../types/user';
+import { fullEntitiesList } from '../../database/middleware-loader';
+import { ENTITY_TYPE_CSV_MAPPER } from '../../modules/internal/csvMapper/csvMapper-types';
+import type { Connector } from '../internalConnector';
+import { ENABLED_IMPORT_CSV_BUILT_IN_CONNECTOR } from './importCsv-configuration';
+
+export const IMPORT_CSV_CONNECTOR_ID = 'd336676c-4ee5-4257-96ff-b2a86688d4af';
+
+export const IMPORT_CSV_CONNECTOR: Connector = {
+  id: IMPORT_CSV_CONNECTOR_ID,
+  internal_id: IMPORT_CSV_CONNECTOR_ID,
+  active: ENABLED_IMPORT_CSV_BUILT_IN_CONNECTOR,
+  auto: false,
+  connector_scope: ['text/csv', 'application/vnd.ms-excel'].join(','),
+  connector_type: CONNECTOR_INTERNAL_IMPORT_FILE,
+  name: '[FILE] CSV Mapper import',
+  built_in: true,
+  connector_schema_runtime_fn: (context: AuthContext, user: AuthUser) => fullEntitiesList(context, user, [ENTITY_TYPE_CSV_MAPPER]),
+};

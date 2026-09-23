@@ -1,0 +1,97 @@
+import {
+  containersObjectsOfObject,
+  findContainerPaginated,
+  findById,
+  knowledgeAddFromInvestigation,
+  objects,
+  relatedContainers,
+  containersNumber,
+  containersNumberByAuthor,
+  containersNumberByEntity,
+  containerEditAuthorizedMembers,
+  aiSummary,
+  containersDistributionByEntity,
+} from '../domain/container';
+import {
+  stixDomainObjectAddRelation,
+  stixDomainObjectCleanContext,
+  stixDomainObjectDelete,
+  stixDomainObjectDeleteRelation,
+  stixDomainObjectEditContext,
+  stixDomainObjectEditField,
+} from '../domain/stixDomainObject';
+import { investigationAddFromContainer } from '../modules/workspace/investigation-domain';
+import { getAuthorizedMembers } from '../utils/authorizedMembers';
+import { getUserAccessRight } from '../utils/access';
+import { distributionEntities } from '../database/middleware';
+import { ENTITY_TYPE_CONTAINER } from '../schema/general';
+
+const containerResolvers = {
+  Query: {
+    container: (_, { id }, context) => findById(context, context.user, id),
+    containers: (_, args, context) => findContainerPaginated(context, context.user, args),
+    containersObjectsOfObject: (_, args, context) => containersObjectsOfObject(context, context.user, args),
+    containersNumber: (_, args, context) => {
+      if (args.objectId && args.objectId.length > 0) {
+        return containersNumberByEntity(context, context.user, args);
+      }
+      if (args.authorId && args.authorId.length > 0) {
+        return containersNumberByAuthor(context, context.user, args);
+      }
+      return containersNumber(context, context.user, args);
+    },
+    containersDistribution: (_, args, context) => {
+      if (args.objectId && args.objectId.length > 0) {
+        return containersDistributionByEntity(context, context.user, args);
+      }
+      return distributionEntities(context, context.user, [ENTITY_TYPE_CONTAINER], args);
+    },
+    containersAskAiSummary: (_, args, context) => aiSummary(context, context.user, args),
+  },
+  Container: {
+    __resolveType(obj) {
+      if (obj.entity_type) {
+        return obj.entity_type.replace(/(?:^|-)(\w)/g, (matches, letter) => letter.toUpperCase());
+      }
+      return 'Unknown';
+    },
+    authorized_members: (container, _, context) => getAuthorizedMembers(context, context.user, container),
+    currentUserAccessRight: (container, _, context) => getUserAccessRight(context.user, container),
+    objects: (container, args, context) => objects(context, context.user, container.id, args),
+    relatedContainers: (container, args, context) => relatedContainers(context, context.user, container.id, args),
+  },
+  // TODO Reactivate after official release of graphQL 17
+  // StixObjectOrStixRelationshipRefConnection: {
+  //   edges: async function* generateEdges(connection) {
+  //     const t0 = new Date().getTime();
+  //     const elements = connection.edges;
+  //     // eslint-disable-next-line no-restricted-syntax
+  //     for (const [idx, item] of elements.entries()) {
+  //       // Check every Nth item (e.g. 20th) if the elapsed time is larger than 50 ms.
+  //       // If so, break and divide work into chunks using setImmediate
+  //       if (idx % 20 === 0 && idx > 0 && new Date().getTime() - t0 > 50) { // 20 MS of locking
+  //         await new Promise((resolve) => {
+  //           setImmediate(resolve);
+  //         });
+  //       }
+  //       yield item;
+  //     }
+  //   }
+  // },
+  Mutation: {
+    containerEdit: (_, { id }, context) => ({
+      delete: () => stixDomainObjectDelete(context, context.user, id, ENTITY_TYPE_CONTAINER),
+      fieldPatch: ({ input, commitMessage, references }) => stixDomainObjectEditField(context, context.user, id, input, { commitMessage, references }),
+      contextPatch: ({ input }) => stixDomainObjectEditContext(context, context.user, id, input),
+      contextClean: () => stixDomainObjectCleanContext(context, context.user, id),
+      editAuthorizedMembers: ({ input }) => containerEditAuthorizedMembers(context, context.user, id, input),
+      relationAdd: ({ input, commitMessage, references }) => stixDomainObjectAddRelation(context, context.user, id, input, { commitMessage, references }),
+      // eslint-disable-next-line max-len
+      relationDelete: ({ toId, relationship_type: relationshipType, commitMessage, references }) => stixDomainObjectDeleteRelation(context, context.user, id, toId, relationshipType, { commitMessage, references }),
+      investigationAdd: () => investigationAddFromContainer(context, context.user, id),
+      knowledgeAddFromInvestigation: ({ workspaceId }) => knowledgeAddFromInvestigation(context, context.user, { containerId: id, workspaceId }),
+    }),
+  },
+};
+
+export default containerResolvers;

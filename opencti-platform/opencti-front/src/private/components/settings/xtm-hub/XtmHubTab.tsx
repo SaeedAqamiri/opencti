@@ -1,0 +1,426 @@
+import { graphql } from 'react-relay';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import { DialogActions, DialogContentText } from '@mui/material';
+import { useTheme } from '@mui/styles';
+import { useFormatter } from '../../../../components/i18n';
+import ConfirmationDialog from './ConfirmationDialog';
+import { UserContext } from '../../../../utils/hooks/useAuth';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import useExternalTab from './useExternalTab';
+import ProcessInstructions from './ProcessInstructions';
+import ProcessLoader from './ProcessLoader';
+import ProcessDialog from './ProcessDialog';
+import type { Theme } from '../../../../components/Theme';
+import { LICENSE_OPTION_TRIAL } from '@components/LicenseBanner';
+import { useLocation, useNavigate } from 'react-router';
+import { XTM_HUB_AUTO_REGISTER_QUERY_PARAM } from '@components/RedirectByPath';
+
+enum ProcessSteps {
+  INSTRUCTIONS = 'INSTRUCTIONS',
+  WAITING_HUB = 'WAITING_HUB',
+  ERROR = 'ERROR',
+  CANCELED = 'CANCELED',
+}
+
+enum OperationType {
+  REGISTER = 'register',
+  UNREGISTER = 'unregister',
+}
+
+const xtmHubTabSettingsFieldPatchMutation = graphql`
+  mutation XtmHubTabSettingsFieldPatchMutation($id: ID!, $input: [EditInput]!) {
+    settingsEdit(id: $id) {
+      fieldPatch(input: $input) {
+        id
+        xtm_hub_registration_date
+        xtm_hub_registration_status
+        xtm_hub_registration_user_id
+        xtm_hub_registration_user_name
+        xtm_hub_last_connectivity_check
+        xtm_hub_token
+      }
+    }
+  }
+`;
+
+interface XtmHubTabProps {
+  registrationStatus?: string;
+  /**
+   * When provided, the connect/disconnect trigger is rendered by the caller
+   * (e.g. inside the Filigran Experience card footer) instead of the default
+   * floated button. The callback receives the dialog opener.
+   */
+  renderTrigger?: (openDialog: () => void) => React.ReactNode;
+}
+
+const XtmHubTab: React.FC<XtmHubTabProps> = ({ registrationStatus, renderTrigger }) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme<Theme>();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAutoRegistrationPromptOpen, setIsAutoRegistrationPromptOpen] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const { settings, about } = useContext(UserContext);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const eeSettings = settings?.platform_enterprise_edition;
+  const isEnterpriseEdition = eeSettings?.license_validated;
+  const isDemo = settings?.platform_demo ?? false;
+  const registrationHubUrl = settings?.platform_xtmhub_url ?? 'https://hub.filigran.io/app';
+  const registrationPlatformTitle = settings?.platform_title ?? 'OpenCTI Platform';
+  const [processStep, setProcessStep] = useState<ProcessSteps>(
+    ProcessSteps.INSTRUCTIONS,
+  );
+  const [operationType, setOperationType] = useState<OperationType | null>(
+    null,
+  );
+  const [commitRegistration] = useApiMutation(
+    xtmHubTabSettingsFieldPatchMutation,
+    undefined,
+    {
+      successMessage: t_i18n('Your OpenCTI product is successfully connected'),
+    },
+  );
+
+  const [commitUnregistration] = useApiMutation(
+    xtmHubTabSettingsFieldPatchMutation,
+    undefined,
+    {
+      successMessage: t_i18n(
+        'Your OpenCTI product is successfully disconnected',
+      ),
+    },
+  );
+
+  const isRegistered = registrationStatus === 'registered';
+
+  const OCTIInformations = {
+    platform_url: window.location.origin,
+    platform_title: registrationPlatformTitle,
+    platform_id: settings?.id ?? '',
+    platform_contract: isEnterpriseEdition ? 'EE' : 'CE',
+    platform_version: about?.version ?? '',
+  };
+  const queryParamsOCTIInformations = new URLSearchParams(
+    OCTIInformations,
+  ).toString();
+
+  const registrationUrl = `${registrationHubUrl}/redirect/register-opencti?${queryParamsOCTIInformations}`;
+  const unregistrationUrl = `${registrationHubUrl}/redirect/unregister-opencti?platform_id=${settings?.id ?? ''}`;
+
+  const handleClosingTab = () => {
+    setProcessStep(ProcessSteps.CANCELED);
+  };
+
+  const handleRegistration = (token: string) => {
+    commitRegistration({
+      variables: {
+        id: settings?.id ?? '',
+        input: [
+          { key: 'xtm_hub_token', value: token },
+          { key: 'xtm_hub_registration_status', value: 'registered' },
+        ],
+      },
+      onCompleted: () => {
+        setIsDialogOpen(false);
+        setShowConfirmation(false);
+        setProcessStep(ProcessSteps.INSTRUCTIONS);
+        setOperationType(null);
+      },
+      onError: () => {
+        setProcessStep(ProcessSteps.ERROR);
+      },
+    });
+  };
+
+  const handleUnregistration = () => {
+    commitUnregistration({
+      variables: {
+        id: settings?.id ?? '',
+        input: [
+          { key: 'xtm_hub_token', value: '' },
+          { key: 'xtm_hub_registration_status', value: 'unregistered' },
+          { key: 'xtm_hub_registration_user_id', value: '' },
+          { key: 'xtm_hub_registration_user_name', value: '' },
+          { key: 'xtm_hub_registration_date', value: '' },
+          { key: 'xtm_hub_last_connectivity_check', value: '' },
+        ],
+      },
+      onCompleted: () => {
+        setIsDialogOpen(false);
+        setShowConfirmation(false);
+        setProcessStep(ProcessSteps.INSTRUCTIONS);
+        setOperationType(null);
+      },
+      onError: () => {
+        setProcessStep(ProcessSteps.ERROR);
+      },
+    });
+  };
+
+  const handleTabMessage = useCallback(
+    (event: MessageEvent) => {
+      const eventData = event.data;
+      const { action, token } = eventData;
+      if (action === 'register') {
+        setOperationType(OperationType.REGISTER);
+        handleRegistration(token);
+      } else if (action === 'unregister') {
+        setOperationType(OperationType.UNREGISTER);
+        handleUnregistration();
+      } else if (action === 'cancel') {
+        setProcessStep(ProcessSteps.CANCELED);
+      } else {
+        setProcessStep(ProcessSteps.ERROR);
+      }
+    },
+    [commitRegistration, commitUnregistration, settings?.id],
+  );
+
+  const { openTab, closeTab, focusTab } = useExternalTab({
+    url: isRegistered ? unregistrationUrl : registrationUrl,
+    tabName: isRegistered ? 'xtmhub-unregistration' : 'xtmhub-registration',
+    onMessage: handleTabMessage,
+    onClosingTab: handleClosingTab,
+  });
+
+  const clearAutoRegisterQueryParam = useCallback(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (!searchParams.has(XTM_HUB_AUTO_REGISTER_QUERY_PARAM)) {
+      return;
+    }
+    searchParams.delete(XTM_HUB_AUTO_REGISTER_QUERY_PARAM);
+    const targetSearch = searchParams.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: targetSearch ? `?${targetSearch}` : '',
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
+
+  const handleConfirmAutoRegistration = () => {
+    setIsAutoRegistrationPromptOpen(false);
+    setOperationType(OperationType.REGISTER);
+    setIsDialogOpen(true);
+    handleWaitingHubStep();
+  };
+
+  const handleCancelAutoRegistration = () => {
+    setIsAutoRegistrationPromptOpen(false);
+    setProcessStep(ProcessSteps.INSTRUCTIONS);
+    setOperationType(null);
+  };
+
+  const handleCancelClose = () => {
+    setShowConfirmation(false);
+  };
+
+  const handleCloseDialog = () => {
+    closeTab();
+    setIsDialogOpen(false);
+    setShowConfirmation(false);
+    setProcessStep(ProcessSteps.INSTRUCTIONS);
+    setOperationType(null);
+  };
+
+  const handleAttemptClose = () => {
+    // If tab is open, show confirmation dialog
+    if (processStep === ProcessSteps.WAITING_HUB) {
+      setShowConfirmation(true);
+    } else {
+      handleCloseDialog();
+    }
+  };
+
+  const handleWaitingHubStep = () => {
+    openTab();
+    setProcessStep(ProcessSteps.WAITING_HUB);
+  };
+
+  const handleOpenDialog = () => {
+    setOperationType(
+      isRegistered ? OperationType.UNREGISTER : OperationType.REGISTER,
+    );
+    setIsDialogOpen(true);
+  };
+
+  useEffect(() => {
+    if (isDemo || isRegistered) {
+      return;
+    }
+    const searchParams = new URLSearchParams(location.search);
+    const shouldAutoRegister = searchParams.get(XTM_HUB_AUTO_REGISTER_QUERY_PARAM) === 'true';
+    if (!shouldAutoRegister) {
+      return;
+    }
+    setOperationType(OperationType.REGISTER);
+    setProcessStep(ProcessSteps.INSTRUCTIONS);
+    setIsAutoRegistrationPromptOpen(true);
+    clearAutoRegisterQueryParam();
+  }, [clearAutoRegisterQueryParam, isDemo, isRegistered, location.search]);
+
+  const config = useMemo(() => {
+    const isUnregister = operationType === OperationType.UNREGISTER;
+    const messages = {
+      register: {
+        dialogTitle: t_i18n('Connect your product to XTM Hub'),
+        errorMessage: t_i18n('Sorry, we have an issue, please retry'),
+        canceledMessage: t_i18n('You have canceled the connection process'),
+        loaderButtonText: t_i18n('Continue to connect'),
+        confirmationTitle: t_i18n('Close connection process?'),
+        confirmationMessage: t_i18n('The connection process is still in progress. Closing this dialog will terminate the connection. Are you sure you want to close?'),
+        continueButtonText: t_i18n('Continue connection'),
+        instructionKey: 'You will be redirected to a new tab to complete the connection. Please complete all required steps. Your current session will remain active during the process.',
+      },
+      unregister: {
+        dialogTitle: t_i18n('Disconnect your product from XTM Hub'),
+        errorMessage: t_i18n('Sorry, we have an issue, please retry'),
+        canceledMessage: t_i18n('You have canceled the disconnection process'),
+        loaderButtonText: t_i18n('Continue to disconnect'),
+        confirmationTitle: t_i18n('Close disconnection process?'),
+        confirmationMessage: t_i18n('The disconnection process is still in progress. Closing this dialog will terminate the disconnection. Are you sure you want to close?'),
+        continueButtonText: t_i18n('Continue disconnection'),
+        instructionKey: 'You will be redirected to a new tab to complete the disconnection. Please complete all required steps. Your current session will remain active during the process.',
+      },
+    };
+
+    return isUnregister ? messages.unregister : messages.register;
+  }, [operationType, t_i18n]);
+
+  const renderDialogContent = () => {
+    const PROCESS_RENDERERS = new Map([
+      [
+        ProcessSteps.INSTRUCTIONS,
+        () => (
+          <ProcessInstructions
+            onContinue={handleWaitingHubStep}
+            instructionKey={config.instructionKey}
+          />
+        ),
+      ],
+      [
+        ProcessSteps.WAITING_HUB,
+        () => (
+          <ProcessLoader
+            onFocusTab={focusTab}
+            buttonText={config.loaderButtonText}
+          />
+        ),
+      ],
+      [ProcessSteps.ERROR, () => <div>{config.errorMessage}</div>],
+      [ProcessSteps.CANCELED, () => <div>{config.canceledMessage}</div>],
+    ]);
+    const renderer = PROCESS_RENDERERS.get(processStep);
+    return renderer && isDialogOpen ? renderer() : null;
+  };
+
+  const getButtonText = () => {
+    if (isRegistered) {
+      return t_i18n('Disconnect from XTM Hub');
+    }
+    return t_i18n('Connect to XTM Hub');
+  };
+
+  if (isDemo) {
+    return null;
+  }
+
+  if (isRegistered) {
+    if (isEnterpriseEdition && eeSettings?.license_type === LICENSE_OPTION_TRIAL) {
+      return null;
+    }
+    return (
+      <>
+        {renderTrigger ? renderTrigger(handleOpenDialog) : (
+          <div style={{ float: 'right', marginTop: theme.spacing(-2), position: 'relative' }}>
+            <Button
+              variant="secondary"
+              size="small"
+              intent="destructive"
+              onClick={handleOpenDialog}
+            >
+              {getButtonText()}
+            </Button>
+          </div>
+        )}
+        <ProcessDialog
+          open={isDialogOpen}
+          title={config.dialogTitle}
+          onClose={handleAttemptClose}
+        >
+          {renderDialogContent()}
+        </ProcessDialog>
+        <ConfirmationDialog
+          open={showConfirmation}
+          title={config.confirmationTitle}
+          message={config.confirmationMessage}
+          confirmButtonText={t_i18n('Yes, close')}
+          cancelButtonText={config.continueButtonText}
+          onConfirm={handleCloseDialog}
+          onCancel={handleCancelClose}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {renderTrigger ? renderTrigger(handleOpenDialog) : (
+        <div style={{ float: 'right', marginTop: theme.spacing(-2), position: 'relative' }}>
+          <Button
+            gradient
+            variant="secondary"
+            style={{ marginTop: 10, marginBottom: 10 }}
+            onClick={handleOpenDialog}
+          >
+            {getButtonText()}
+          </Button>
+        </div>
+      )}
+      <Dialog
+        open={isAutoRegistrationPromptOpen}
+        onClose={handleCancelAutoRegistration}
+        aria-labelledby="xtm-hub-auto-registration-title"
+        aria-describedby="xtm-hub-auto-registration-description"
+        title={(
+          <span id="xtm-hub-auto-registration-title">
+            {t_i18n('Authorize connection')}
+          </span>
+        )}
+      >
+        <DialogContentText id="xtm-hub-auto-registration-description">
+          {t_i18n('Allow OpenCTI to connect with XTM Hub')}
+        </DialogContentText>
+        <DialogActions>
+          <Button variant="secondary" onClick={handleCancelAutoRegistration} color="primary">
+            {t_i18n('Cancel')}
+          </Button>
+          <Button onClick={handleConfirmAutoRegistration} color="primary" autoFocus>
+            {t_i18n('Continue')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <ProcessDialog
+        open={isDialogOpen}
+        title={config.dialogTitle}
+        onClose={handleAttemptClose}
+      >
+        {renderDialogContent()}
+      </ProcessDialog>
+      <ConfirmationDialog
+        open={showConfirmation}
+        title={config.confirmationTitle}
+        message={config.confirmationMessage}
+        confirmButtonText={t_i18n('Yes, close')}
+        cancelButtonText={config.continueButtonText}
+        onConfirm={handleCloseDialog}
+        onCancel={handleCancelClose}
+      />
+    </>
+  );
+};
+
+export default XtmHubTab;

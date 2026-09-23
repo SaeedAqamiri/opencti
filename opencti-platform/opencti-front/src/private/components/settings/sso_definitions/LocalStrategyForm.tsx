@@ -1,0 +1,280 @@
+import React from 'react';
+import { Field, Form, Formik } from 'formik';
+import * as Yup from 'yup';
+import { graphql, useLazyLoadQuery } from 'react-relay';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import { InfoOutlined } from '@mui/icons-material';
+import { useTheme } from '@mui/styles';
+import SwitchField from '../../../../components/fields/SwitchField';
+import TextField from '../../../../components/TextField';
+import { useFormatter } from '../../../../components/i18n';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import type { Theme } from '../../../../components/Theme';
+import Button from '@common/button/Button';
+import type { LocalStrategyFormQuery } from './__generated__/LocalStrategyFormQuery.graphql';
+import type { LocalStrategyFormMutation } from './__generated__/LocalStrategyFormMutation.graphql';
+
+const localStrategyFormQuery = graphql`
+  query LocalStrategyFormQuery {
+    settings {
+      id
+      local_auth {
+        enabled
+      }
+      password_policy_min_length
+      password_policy_max_length
+      password_policy_min_symbols
+      password_policy_min_numbers
+      password_policy_min_words
+      password_policy_min_lowercase
+      password_policy_min_uppercase
+      password_policy_validity_days
+      platform_enterprise_edition {
+        license_validated
+      }
+      platform_providers {
+        name
+        type
+        strategy
+        provider
+      }
+      headers_auth {
+        enabled
+      }
+      platform_https_enabled
+      is_authentication_by_env
+    }
+  }
+`;
+
+const localStrategyFormMutation = graphql`
+  mutation LocalStrategyFormMutation($id: ID!, $input: LocalAuthConfigInput!) {
+    settingsEdit(id: $id) {
+      updateLocalAuth(input: $input) {
+        id
+        local_auth {
+          enabled
+        }
+        password_policy_min_length
+        password_policy_max_length
+        password_policy_min_symbols
+        password_policy_min_numbers
+        password_policy_min_words
+        password_policy_min_lowercase
+        password_policy_min_uppercase
+        password_policy_validity_days
+      }
+    }
+  }
+`;
+
+const validationSchema = Yup.object().shape({
+  enabled: Yup.boolean(),
+  password_policy_min_length: Yup.number(),
+  password_policy_max_length: Yup.number(),
+  password_policy_min_symbols: Yup.number(),
+  password_policy_min_numbers: Yup.number(),
+  password_policy_min_words: Yup.number(),
+  password_policy_min_lowercase: Yup.number(),
+  password_policy_min_uppercase: Yup.number(),
+  password_policy_validity_days: Yup.number(),
+});
+
+interface LocalStrategyFormProps {
+  onCancel: () => void;
+}
+
+const LocalStrategyForm = ({ onCancel }: LocalStrategyFormProps) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme<Theme>();
+  const data = useLazyLoadQuery<LocalStrategyFormQuery>(localStrategyFormQuery, {});
+  const settings = data.settings;
+  const isConfigurationFromEnv = settings.is_authentication_by_env ?? false;
+
+  const [commitMutation] = useApiMutation<LocalStrategyFormMutation>(
+    localStrategyFormMutation,
+    undefined,
+    { successMessage: t_i18n('Authentication successfully updated') },
+  );
+
+  const localAuth = settings.local_auth;
+
+  const eeActive = settings.platform_enterprise_edition?.license_validated === true;
+  const isHttpsEnabled = settings.platform_https_enabled;
+  const hasNonLocalProvider = (settings.platform_providers ?? []).some(
+    (p) => p.provider !== 'local' && (p.provider !== 'cert' || isHttpsEnabled),
+  );
+  const hasHeaderAuth = settings.headers_auth?.enabled === true;
+  const canDisableLocal = eeActive && (hasNonLocalProvider || hasHeaderAuth);
+
+  const initialValues = {
+    enabled: localAuth?.enabled ?? true,
+    password_policy_min_length: settings.password_policy_min_length ?? 0,
+    password_policy_max_length: settings.password_policy_max_length ?? 0,
+    password_policy_min_symbols: settings.password_policy_min_symbols ?? 0,
+    password_policy_min_numbers: settings.password_policy_min_numbers ?? 0,
+    password_policy_min_words: settings.password_policy_min_words ?? 0,
+    password_policy_min_lowercase: settings.password_policy_min_lowercase ?? 0,
+    password_policy_min_uppercase: settings.password_policy_min_uppercase ?? 0,
+    password_policy_validity_days: settings.password_policy_validity_days ?? 0,
+  };
+
+  const handleSubmit = (
+    values: typeof initialValues,
+    { setSubmitting }: { setSubmitting: (flag: boolean) => void },
+  ) => {
+    setSubmitting(true);
+    commitMutation({
+      variables: {
+        id: settings.id,
+        input: {
+          enabled: values.enabled,
+          password_policy_min_length: Number(values.password_policy_min_length) || 0,
+          password_policy_max_length: Number(values.password_policy_max_length) || 0,
+          password_policy_min_symbols: Number(values.password_policy_min_symbols) || 0,
+          password_policy_min_numbers: Number(values.password_policy_min_numbers) || 0,
+          password_policy_min_words: Number(values.password_policy_min_words) || 0,
+          password_policy_min_lowercase: Number(values.password_policy_min_lowercase) || 0,
+          password_policy_min_uppercase: Number(values.password_policy_min_uppercase) || 0,
+          password_policy_validity_days: Number(values.password_policy_validity_days) || 0,
+        },
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        onCancel();
+      },
+      onError: () => {
+        setSubmitting(false);
+      },
+    });
+  };
+
+  return (
+    <Formik
+      enableReinitialize
+      initialValues={initialValues}
+      validationSchema={validationSchema}
+      onSubmit={handleSubmit}
+      onReset={onCancel}
+    >
+      {({ handleReset, submitForm, isSubmitting, dirty }) => (
+        <Form>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Field
+              component={SwitchField}
+              type="checkbox"
+              name="enabled"
+              label={t_i18n('Enable local authentication')}
+              disabled={isConfigurationFromEnv || (!canDisableLocal && initialValues.enabled)}
+            />
+            {isConfigurationFromEnv && (
+              <Tooltip title={t_i18n('Local authentication cannot be changed when authentication is managed by environment configuration')}>
+                <InfoOutlined fontSize="small" color="primary" sx={{ ml: 1, cursor: 'default' }} />
+              </Tooltip>
+            )}
+            {!canDisableLocal && initialValues.enabled && (
+              <Tooltip title={t_i18n('Local authentication cannot be disabled when no other authentication provider is enabled')}>
+                <InfoOutlined fontSize="small" color="primary" sx={{ ml: 1, cursor: 'default' }} />
+              </Tooltip>
+            )}
+          </Box>
+          <Typography variant="h4" gutterBottom style={{ marginBottom: 20, marginTop: 20 }}>
+            {t_i18n('Local password policies')}
+          </Typography>
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            name="password_policy_min_length"
+            label={t_i18n('Number of chars must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_max_length"
+            label={`${t_i18n('Number of chars must be lower or equals to')} (${t_i18n('0 equals no maximum')})`}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_min_symbols"
+            label={t_i18n('Number of symbols must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_min_numbers"
+            label={t_i18n('Number of digits must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_min_words"
+            label={t_i18n('Number of words (split on hyphen, space) must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_min_lowercase"
+            label={t_i18n('Number of lowercase chars must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_min_uppercase"
+            label={t_i18n('Number of uppercase chars must be greater or equals to')}
+            fullWidth
+          />
+          <Field
+            component={TextField}
+            type="number"
+            variant="outlined"
+            className="mt-5"
+            name="password_policy_validity_days"
+            label={`${t_i18n('Password validity duration in days')} (${t_i18n('0 equals unlimited')})`}
+            fullWidth
+          />
+          <div style={{ marginTop: 20, textAlign: 'right' }}>
+            <Button
+              variant="secondary"
+              onClick={handleReset}
+              disabled={isSubmitting}
+              style={{ marginLeft: theme.spacing(1) }}
+            >
+              {t_i18n('Cancel')}
+            </Button>
+            <Button
+              onClick={submitForm}
+              disabled={isSubmitting || !dirty}
+              style={{ marginLeft: theme.spacing(1) }}
+            >
+              {t_i18n('Update')}
+            </Button>
+          </div>
+        </Form>
+      )}
+    </Formik>
+  );
+};
+
+export default LocalStrategyForm;

@@ -1,0 +1,172 @@
+import { describe, expect, it } from 'vitest';
+import { fullEntitiesList, fullEntitiesThroughRelationsToList } from '../../../src/database/middleware-loader';
+import { ENTITY_TYPE_CAPABILITY, ENTITY_TYPE_GROUP, ENTITY_TYPE_ROLE, ENTITY_TYPE_SETTINGS } from '../../../src/schema/internalObject';
+import { ADMIN_USER, testContext } from '../../utils/testQuery';
+import type { BasicStoreEntity } from '../../../src/types/store';
+import { loadEntity } from '../../../src/database/middleware';
+import { createDefaultRetentionRules, setPlatformId } from '../../../src/database/data-initialization';
+import { entitiesCounter } from '../../02-dataInjection/01-dataCount/entityCountHelper';
+import { RELATION_HAS_CAPABILITY } from '../../../src/schema/internalRelationship';
+import { listRules, deleteRetentionRule } from '../../../src/modules/retentionRules/retentionRules-domain';
+import type { BasicStoreEntityRetentionRule } from '../../../src/modules/retentionRules/retentionRules-types';
+
+describe('Data initialization test', () => {
+  it('should have a specific platform_id from config file', async () => {
+    const platformSettings = await loadEntity(testContext, ADMIN_USER, [ENTITY_TYPE_SETTINGS]);
+    // as configured in test.json
+    expect(platformSettings?.id).toEqual('7992a4b1-128c-4656-bf97-2018b6f1f395');
+  });
+
+  it('should be able to set another platform_id', async () => {
+    await setPlatformId(testContext, '74cc0eba-b0c6-4822-8db6-6ddbdf49498f');
+    const platformSettings = await loadEntity(testContext, ADMIN_USER, [ENTITY_TYPE_SETTINGS]);
+    expect(platformSettings?.id).toEqual('74cc0eba-b0c6-4822-8db6-6ddbdf49498f');
+    // restore initial id
+    await setPlatformId(testContext, '7992a4b1-128c-4656-bf97-2018b6f1f395');
+  });
+
+  it('should not be able to set a platform_id that is not a valid uuid', async () => {
+    await expect(async () => {
+      await setPlatformId(testContext, 'wrong-id');
+    }).rejects.toThrowError('Cannot switch platform identifier: platform_id is not a valid UUID');
+  });
+
+  it('should create all capabilities', async () => {
+    const capabilities = await fullEntitiesList<BasicStoreEntity>(testContext, ADMIN_USER, [ENTITY_TYPE_CAPABILITY]);
+    expect(capabilities.length).toEqual(entitiesCounter.Capability);
+    const capabilitiesNames = capabilities.map((capa) => capa.name).sort();
+    const allExpectedNames = [
+      'APIACCESS',
+      'APIACCESS_USEBASICAUTH',
+      'APIACCESS_USETOKEN',
+      'AUTOMATION',
+      'AUTOMATION_AUTMANAGE',
+      'BYPASS',
+      'CONNECTORAPI',
+      'CSVMAPPERS',
+      'EXPLORE',
+      'EXPLORE_EXUPDATE',
+      'EXPLORE_EXUPDATE_EXDELETE',
+      'EXPLORE_EXUPDATE_PUBLISH',
+      'INGESTION',
+      'INGESTION_SETINGESTIONS',
+      'INVESTIGATION',
+      'INVESTIGATION_INUPDATE',
+      'INVESTIGATION_INUPDATE_INDELETE',
+      'KNOWLEDGE',
+      'KNOWLEDGE_KNASKIMPORT',
+      'KNOWLEDGE_KNDISSEMINATION',
+      'KNOWLEDGE_KNENRICHMENT',
+      'KNOWLEDGE_KNFRONTENDEXPORT',
+      'KNOWLEDGE_KNGETEXPORT',
+      'KNOWLEDGE_KNGETEXPORT_KNASKEXPORT',
+      'KNOWLEDGE_KNPARTICIPATE',
+      'KNOWLEDGE_KNSHAREFILTERS',
+      'KNOWLEDGE_KNUPDATE',
+      'KNOWLEDGE_KNUPDATE_KNBYPASSFIELDS',
+      'KNOWLEDGE_KNUPDATE_KNBYPASSREFERENCE',
+      'KNOWLEDGE_KNUPDATE_KNDELETE',
+      'KNOWLEDGE_KNUPDATE_KNMANAGEAUTHMEMBERS',
+      'KNOWLEDGE_KNUPDATE_KNMERGE',
+      'KNOWLEDGE_KNUPDATE_KNORGARESTRICT',
+      'KNOWLEDGE_KNUPLOAD',
+      'MODULES',
+      'MODULES_MODMANAGE',
+      'PIRAPI',
+      'PIRAPI_PIRUPDATE',
+      'SETTINGS',
+      'SETTINGS_FILEINDEXING',
+      'SETTINGS_SECURITYACTIVITY',
+      'SETTINGS_SETACCESSES',
+      'SETTINGS_SETAUTH',
+      'SETTINGS_SETCASETEMPLATES',
+      'SETTINGS_SETCUSTOMIZATION',
+      'SETTINGS_SETDISSEMINATION',
+      'SETTINGS_SETKILLCHAINPHASES',
+      'SETTINGS_SETLABELS',
+      'SETTINGS_SETMANAGEXTMHUB',
+      'SETTINGS_SETMARKINGS',
+      'SETTINGS_SETPARAMETERS',
+      'SETTINGS_SETSTATUSTEMPLATES',
+      'SETTINGS_SETVOCABULARIES',
+      'SETTINGS_SUPPORT',
+      'TAXIIAPI',
+      'TAXIIAPI_SETCOLLECTIONS',
+    ];
+    expect(capabilitiesNames).toEqual(allExpectedNames);
+  });
+
+  it('should create all initial roles', async () => {
+    const allRoles = await fullEntitiesList<BasicStoreEntity>(testContext, ADMIN_USER, [ENTITY_TYPE_ROLE]);
+    const allRolesNames = allRoles.map((role) => role.name).sort();
+    const allExpectedRoles = ['Administrator', 'Connector', 'Default'];
+    for (let i = 0; i < allExpectedRoles.length; i += 1) {
+      expect(allRolesNames, `${allExpectedRoles[i]} Role is missing from initialization`).toContain(allExpectedRoles[i]);
+    }
+  });
+
+  it('should not grant ingestion management to Connector role on initialization', async () => {
+    const roles = await fullEntitiesList<BasicStoreEntity>(testContext, ADMIN_USER, [ENTITY_TYPE_ROLE]);
+    const connectorRole = roles.find((role) => role.name === 'Connector');
+    expect(connectorRole).toBeDefined();
+
+    const connectorCapabilities = await fullEntitiesThroughRelationsToList<BasicStoreEntity>(
+      testContext,
+      ADMIN_USER,
+      connectorRole!.id,
+      RELATION_HAS_CAPABILITY,
+      ENTITY_TYPE_CAPABILITY,
+    );
+    const connectorCapabilityNames = connectorCapabilities.map((capability) => capability.name);
+
+    expect(connectorCapabilityNames).toContain('CONNECTORAPI');
+    expect(connectorCapabilityNames).not.toContain('INGESTION');
+    expect(connectorCapabilityNames).not.toContain('INGESTION_SETINGESTIONS');
+  });
+
+  it('should create all initial Groups', async () => {
+    const allGroups = await fullEntitiesList<BasicStoreEntity>(testContext, ADMIN_USER, [ENTITY_TYPE_GROUP]);
+    const allGroupsNames = allGroups.map((group) => group.name).sort();
+    const allExpectedGroups = ['Administrators', 'Connectors', 'Default'];
+    for (let i = 0; i < allExpectedGroups.length; i += 1) {
+      expect(allGroupsNames, `${allExpectedGroups[i]} Group is missing from initialization`).toContain(allExpectedGroups[i]);
+    }
+  });
+
+  it('should create all default disabled retention rules', async () => {
+    const allRules = await listRules(testContext, ADMIN_USER, {}) as BasicStoreEntityRetentionRule[];
+    const expectedScopes = ['file', 'workbench', 'history', 'activity'];
+
+    for (const scope of expectedScopes) {
+      const rule = allRules.find((r) => r.scope === scope);
+      expect(rule, `Default retention rule for scope "${scope}" is missing from initialization`).toBeDefined();
+      expect(rule!.active, `Default retention rule for scope "${scope}" should be inactive`).toBe(false);
+      expect(rule!.max_retention, `Default retention rule for scope "${scope}" should have 30 days max_retention`).toBe(30);
+      expect(rule!.retention_unit, `Default retention rule for scope "${scope}" should use "days" unit`).toBe('days');
+    }
+  });
+
+  it('should create default retention rules when createDefaultRetentionRules is called directly', async () => {
+    // Collect IDs of existing rules before calling the function, so we can clean up duplicates
+    const rulesBefore = await listRules(testContext, ADMIN_USER, {}) as BasicStoreEntityRetentionRule[];
+    const idsBefore = new Set(rulesBefore.map((r) => r.id));
+
+    // Call the function directly – this is what data-initialization calls during platform boot
+    await createDefaultRetentionRules(testContext);
+
+    // Verify new rules were created for all expected scopes
+    const rulesAfter = await listRules(testContext, ADMIN_USER, {}) as BasicStoreEntityRetentionRule[];
+    const newRules = rulesAfter.filter((r) => !idsBefore.has(r.id));
+    const expectedScopes = ['file', 'workbench', 'history', 'activity'];
+    for (const scope of expectedScopes) {
+      const newRule = newRules.find((r) => r.scope === scope);
+      expect(newRule, `createDefaultRetentionRules should create a "${scope}" rule`).toBeDefined();
+      expect(newRule!.active).toBe(false);
+      expect(newRule!.max_retention).toBe(30);
+      expect(newRule!.retention_unit).toBe('days');
+    }
+
+    // Cleanup: delete the newly created duplicate rules
+    await Promise.all(newRules.map((r) => deleteRetentionRule(testContext, ADMIN_USER, r.id)));
+  });
+});

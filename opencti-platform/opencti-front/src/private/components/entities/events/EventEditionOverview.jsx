@@ -1,0 +1,384 @@
+import React from 'react';
+import { createFragmentContainer, graphql } from 'react-relay';
+import { Field, Form, Formik } from 'formik';
+import * as Yup from 'yup';
+import * as R from 'ramda';
+import ConfidenceField from '../../common/form/ConfidenceField';
+import { useFormatter } from '../../../../components/i18n';
+import TextField from '../../../../components/TextField';
+import { SubscriptionFocus } from '../../../../components/Subscription';
+import CreatedByField from '../../common/form/CreatedByField';
+import ObjectMarkingField from '../../common/form/ObjectMarkingField';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import CommitMessage from '../../common/form/CommitMessage';
+import { adaptFieldValue } from '../../../../utils/String';
+import StatusField from '../../common/form/StatusField';
+import { convertCreatedBy, convertMarkings, convertStatus } from '../../../../utils/edition';
+import { buildDate, parse } from '../../../../utils/Time';
+import DateTimePickerField from '../../../../components/DateTimePickerField';
+import OpenVocabField from '../../common/form/OpenVocabField';
+import { fieldSpacingContainerStyle } from '../../../../utils/field';
+import { useDynamicSchemaEditionValidation, useIsMandatoryAttribute, yupShapeConditionalRequired } from '../../../../utils/hooks/useEntitySettings';
+import useFormEditor from '../../../../utils/hooks/useFormEditor';
+import AlertConfidenceForEntity from '../../../../components/AlertConfidenceForEntity';
+
+const eventMutationFieldPatch = graphql`
+  mutation EventEditionOverviewFieldPatchMutation(
+    $id: ID!
+    $input: [EditInput]!
+    $commitMessage: String
+    $references: [String]
+  ) {
+      eventFieldPatch(
+        id: $id
+        input: $input
+        commitMessage: $commitMessage
+        references: $references
+      ) {
+        ...EventEditionOverview_event
+        ...Event_event
+      }
+    }
+`;
+
+export const eventEditionOverviewFocus = graphql`
+  mutation EventEditionOverviewFocusMutation($id: ID!, $input: EditContext!) {
+    eventContextPatch(id: $id, input: $input) {
+      id
+    }
+  }
+`;
+
+const eventMutationRelationAdd = graphql`
+  mutation EventEditionOverviewRelationAddMutation(
+    $id: ID!
+    $input: StixRefRelationshipAddInput!
+  ) {
+    eventRelationAdd(id: $id, input: $input) {
+      from {
+        ...EventEditionOverview_event
+      }
+    }
+  }
+`;
+
+const eventMutationRelationDelete = graphql`
+  mutation EventEditionOverviewRelationDeleteMutation(
+    $id: ID!
+    $toId: StixRef!
+    $relationship_type: String!
+  ) {
+    eventRelationDelete(id: $id, toId: $toId, relationship_type: $relationship_type) {
+      ...EventEditionOverview_event
+    }
+  }
+`;
+
+const EVENT_TYPE = 'Event';
+
+const EventEditionOverviewComponent = (props) => {
+  const { event, enableReferences, context, handleClose } = props;
+  const { t_i18n } = useFormatter();
+  const { mandatoryAttributes } = useIsMandatoryAttribute(EVENT_TYPE);
+  const basicShape = yupShapeConditionalRequired({
+    name: Yup.string().trim().min(2),
+    description: Yup.string().nullable(),
+    x_opencti_score: Yup.number().integer(t_i18n('The value must be an integer'))
+      .nullable()
+      .min(0, t_i18n('The value must be greater than or equal to 0'))
+      .max(100, t_i18n('The value must be less than or equal to 100')),
+    confidence: Yup.number().nullable(),
+    event_types: Yup.array().nullable(),
+    start_time: Yup.date().typeError(t_i18n('The value must be a datetime (yyyy-MM-dd hh:mm (a|p)m)')).nullable(),
+    stop_time: Yup.date()
+      .typeError(t_i18n('The value must be a datetime (yyyy-MM-dd hh:mm (a|p)m)'))
+      .min(Yup.ref('start_time'), "The end date can't be before start date")
+      .nullable(),
+    references: Yup.array(),
+    x_opencti_workflow_id: Yup.object(),
+    createdBy: Yup.object().nullable(),
+    objectMarking: Yup.array().nullable(),
+  }, mandatoryAttributes);
+  const eventValidator = useDynamicSchemaEditionValidation(mandatoryAttributes, basicShape);
+
+  const queries = {
+    fieldPatch: eventMutationFieldPatch,
+    relationAdd: eventMutationRelationAdd,
+    relationDelete: eventMutationRelationDelete,
+    editionFocus: eventEditionOverviewFocus,
+  };
+  const editor = useFormEditor(event, enableReferences, queries, eventValidator);
+
+  const onSubmit = (values, { setSubmitting }) => {
+    const commitMessage = values.message;
+    const references = R.pluck('value', values.references || []);
+    const inputValues = R.pipe(
+      R.dissoc('message'),
+      R.dissoc('references'),
+      R.assoc('createdBy', values.createdBy?.value),
+      R.assoc('confidence', parseInt(values.confidence, 10)),
+      R.assoc('objectMarking', R.pluck('value', values.objectMarking)),
+      R.assoc('start_time', parse(values.start_time).format()),
+      R.assoc('stop_time', parse(values.stop_time).format()),
+      R.assoc('x_opencti_workflow_id', values.x_opencti_workflow_id?.value),
+      R.toPairs,
+      R.map((n) => ({
+        key: n[0],
+        value: adaptFieldValue(n[1]),
+      })),
+    )(values);
+    editor.fieldPatch({
+      variables: {
+        id: event.id,
+        input: inputValues,
+        commitMessage: commitMessage && commitMessage.length > 0 ? commitMessage : null,
+        references,
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        handleClose();
+      },
+    });
+  };
+
+  const handleSubmitField = (name, value) => {
+    if (!enableReferences) {
+      let finalValue = value;
+      if (name === 'x_opencti_workflow_id') {
+        finalValue = value.value;
+      }
+      eventValidator
+        .validateAt(name, { [name]: value })
+        .then(() => {
+          editor.fieldPatch({
+            variables: {
+              id: event.id,
+              input: { key: name, value: finalValue ?? [null] },
+            },
+          });
+        })
+        .catch(() => false);
+    }
+  };
+
+  const initialValues = {
+    name: event.name,
+    references: event.references || [],
+    event_types: event.event_types || [],
+    description: event.description || '',
+    x_opencti_score: event.x_opencti_score,
+    start_time: buildDate(event.start_time),
+    stop_time: buildDate(event.stop_time),
+    confidence: event.confidence,
+    createdBy: convertCreatedBy(event),
+    objectMarking: convertMarkings(event),
+    x_opencti_workflow_id: convertStatus(t_i18n, event),
+  };
+
+  return (
+    <Formik
+      enableReinitialize={true}
+      initialValues={initialValues}
+      validationSchema={eventValidator}
+      validateOnChange={true}
+      validateOnBlur={true}
+      onSubmit={onSubmit}
+    >
+      {({
+        submitForm,
+        isSubmitting,
+        setFieldValue,
+        values,
+        isValid,
+        dirty,
+      }) => (
+        <Form>
+          <AlertConfidenceForEntity entity={event} />
+          <Field
+            component={TextField}
+            variant="outlined"
+            name="name"
+            label={t_i18n('Name')}
+            required={(mandatoryAttributes.includes('name'))}
+            fullWidth={true}
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            helperText={
+              <SubscriptionFocus context={context} fieldName="name" />
+            }
+          />
+          <OpenVocabField
+            label={t_i18n('Event types')}
+            type="event-type-ov"
+            name="event_types"
+            required={(mandatoryAttributes.includes('event_types'))}
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            onChange={(name, value) => setFieldValue(name, value)}
+            containerStyle={fieldSpacingContainerStyle}
+            variant="edit"
+            multiple={true}
+            editContext={context}
+          />
+          <Field
+            component={MarkdownField}
+            name="description"
+            label={t_i18n('Description')}
+            required={(mandatoryAttributes.includes('description'))}
+            uploadEntityId={event.id}
+            fullWidth={true}
+            multiline={true}
+            rows="4"
+            style={{ marginTop: 20 }}
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            helperText={
+              <SubscriptionFocus context={context} fieldName="description" />
+            }
+          />
+          <Field
+            component={DateTimePickerField}
+            name="start_time"
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            textFieldProps={{
+              label: t_i18n('Start date'),
+              required: (mandatoryAttributes.includes('start_time')),
+              variant: 'outlined',
+              fullWidth: true,
+              style: { marginTop: 20 },
+              helperText: (
+                <SubscriptionFocus context={context} fieldName="start_date" />
+              ),
+            }}
+          />
+          <Field
+            component={DateTimePickerField}
+            name="stop_time"
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            textFieldProps={{
+              label: t_i18n('End date'),
+              required: (mandatoryAttributes.includes('stop_time')),
+              variant: 'outlined',
+              fullWidth: true,
+              style: { marginTop: 20 },
+              helperText: (
+                <SubscriptionFocus context={context} fieldName="end_date" />
+              ),
+            }}
+          />
+          <ConfidenceField
+            onFocus={editor.changeFocus}
+            onSubmit={handleSubmitField}
+            entityType="Event"
+            containerStyle={fieldSpacingContainerStyle}
+            editContext={context}
+            variant="edit"
+          />
+          {/* A `style` on the field is unplaceable and sends it back to MUI. */}
+          <div style={{ marginTop: 20 }}>
+            <Field
+              component={TextField}
+              name="x_opencti_score"
+              required={(mandatoryAttributes.includes('x_opencti_score'))}
+              label={t_i18n('Score')}
+              type="number"
+              fullWidth={true}
+              onFocus={editor.changeFocus}
+              onSubmit={(name, value) => handleSubmitField(name, (value === '' ? null : value))}
+              helperText={(
+                <SubscriptionFocus
+                  context={context}
+                  fieldName="x_opencti_score"
+                />
+              )}
+            />
+          </div>
+          {event.workflowEnabled && (
+            <StatusField
+              name="x_opencti_workflow_id"
+              type="Event"
+              onFocus={editor.changeFocus}
+              onChange={handleSubmitField}
+              setFieldValue={setFieldValue}
+              style={{ marginTop: 20 }}
+              helpertext={
+                <SubscriptionFocus context={context} fieldName="x_opencti_workflow_id" />
+              }
+            />
+          )}
+          <CreatedByField
+            name="createdBy"
+            required={(mandatoryAttributes.includes('createdBy'))}
+            style={fieldSpacingContainerStyle}
+            setFieldValue={setFieldValue}
+            helpertext={
+              <SubscriptionFocus context={context} fieldName="createdBy" />
+            }
+            onChange={editor.changeCreated}
+          />
+          <ObjectMarkingField
+            name="objectMarking"
+            required={(mandatoryAttributes.includes('objectMarking'))}
+            style={fieldSpacingContainerStyle}
+            helpertext={
+              <SubscriptionFocus context={context} fieldname="objectMarking" />
+            }
+            setFieldValue={setFieldValue}
+            onChange={editor.changeMarking}
+          />
+          {enableReferences && (
+            <CommitMessage
+              submitForm={submitForm}
+              disabled={isSubmitting || !isValid || !dirty}
+              setFieldValue={setFieldValue}
+              open={false}
+              values={values.references}
+              id={event.id}
+            />
+          )}
+        </Form>
+      )}
+    </Formik>
+  );
+};
+
+export default createFragmentContainer(EventEditionOverviewComponent, {
+  event: graphql`
+      fragment EventEditionOverview_event on Event {
+        id
+        name
+        event_types
+        description
+        start_time
+        confidence
+        x_opencti_score
+        entity_type
+        stop_time
+        createdBy {
+          ... on Identity {
+            id
+            name
+            entity_type
+          }
+        }
+        objectMarking {
+          id
+          definition_type
+          definition
+          x_opencti_order
+          x_opencti_color
+        }
+        status {
+          id
+          order
+          template {
+            name
+            color
+          }
+        }
+        workflowEnabled
+      }
+    `,
+});

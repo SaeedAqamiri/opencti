@@ -1,0 +1,233 @@
+import React, { useMemo } from 'react';
+import { Route, Routes, useParams, useLocation } from 'react-router';
+import { graphql, PreloadedQuery, usePreloadedQuery, useSubscription } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import StixCoreObjectContentRoot from '@components/common/stix_core_objects/StixCoreObjectContentRoot';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import AIInsights from '@components/common/ai/AIInsights';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import Region from './Region';
+import RegionKnowledge from './RegionKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import FileManager from '../../common/files/FileManager';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import { RootCountriesSubscription } from '../countries/__generated__/RootCountriesSubscription.graphql';
+import { RootRegionQuery } from './__generated__/RootRegionQuery.graphql';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import { isPathOverview } from '../../../../utils/tabUtils';
+import RegionEdition from './RegionEdition';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import RegionDeletion from './RegionDeletion';
+import { PATH_REGION, PATH_REGIONS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootRegionsSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on Region {
+        ...Region_region
+        ...RegionEditionOverview_region
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const regionQuery = graphql`
+  query RootRegionQuery($id: String!) {
+    region(id: $id) {
+      id
+      entity_type
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      name
+      x_opencti_aliases
+      x_opencti_graph_data
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...Region_region
+      ...RegionKnowledge_region
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+interface RootRegionComponentProps {
+  queryRef: PreloadedQuery<RootRegionQuery>;
+  regionId: string;
+}
+
+const RootRegionComponent = ({ queryRef, regionId }: RootRegionComponentProps) => {
+  const subConfig = useMemo<
+    GraphQLSubscriptionConfig<RootCountriesSubscription>
+  >(
+    () => ({
+      subscription,
+      variables: { id: regionId },
+    }),
+    [regionId],
+  );
+  useSubscription(subConfig);
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  const data = usePreloadedQuery(regionQuery, queryRef);
+  const { forceUpdate } = useForceUpdate();
+  const { region, connectorsForImport, connectorsForExport } = data;
+  const basePath = PATH_REGION(regionId);
+  const link = `${basePath}/knowledge`;
+  const isOverview = isPathOverview(location.pathname, basePath);
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  return (
+    <CreateRelationshipContextProvider>
+      {region ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={(
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'regions',
+                    'countries',
+                    'areas',
+                    'cities',
+                    'organizations',
+                    'threats',
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'malwares',
+                    'attack_patterns',
+                    'tools',
+                    'observables',
+                  ]}
+                  data={region}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Locations') },
+              { label: t_i18n('Regions'), link: PATH_REGIONS },
+              { label: region.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Region"
+              disableSharing={true}
+              stixDomainObject={region}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <RegionEdition regionId={region.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={region}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <RegionDeletion id={region.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              enableQuickSubscription={true}
+              isOpenctiAlias={true}
+              redirectToContent={true}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={region}
+              basePath={basePath}
+              pages={{
+                overview: <Region regionData={region} />,
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <RegionKnowledge regionData={region} />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={region}
+                  />
+                ),
+                analyses:
+                  <StixCoreObjectOrStixCoreRelationshipContainers stixDomainObjectOrStixCoreRelationship={region} />,
+                sightings: (
+                  <EntityStixSightingRelationships
+                    entityId={region.id}
+                    entityLink={link}
+                    noPadding={true}
+                    isTo={true}
+                  />
+                ),
+                files: (
+                  <FileManager
+                    id={regionId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={region}
+                  />
+                ),
+                history:
+                  <StixCoreObjectHistory stixCoreObjectId={regionId} />,
+              }}
+              extraActions={isOverview && <AIInsights id={region.id} />}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+
+const RootRegion = () => {
+  const { regionId } = useParams() as { regionId: string };
+  const queryRef = useQueryLoading<RootRegionQuery>(regionQuery, {
+    id: regionId,
+  });
+  return (
+    <>
+      {queryRef && (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootRegionComponent queryRef={queryRef} regionId={regionId} />
+        </React.Suspense>
+      )}
+    </>
+  );
+};
+
+export default RootRegion;

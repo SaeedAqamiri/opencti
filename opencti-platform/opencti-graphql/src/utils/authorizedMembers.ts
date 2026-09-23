@@ -1,0 +1,232 @@
+import { uniq } from 'ramda';
+import { BUS_TOPICS } from '../config/conf';
+import { FunctionalError, UnsupportedError } from '../config/errors';
+import { getEntityFromCache } from '../database/cache';
+import { patchAttribute } from '../database/middleware';
+import { notify } from '../database/redis';
+import { isEmptyField } from '../database/utils';
+import { findById as findGroup } from '../domain/group';
+import { findAllMembers, findById as findUser } from '../domain/user';
+import type { MemberAccess, MemberAccessInput, MemberGroupRestriction } from '../generated/graphql';
+import { ENTITY_TYPE_CONTAINER_CASE_INCIDENT } from '../modules/case/case-incident/case-incident-types';
+import { ENTITY_TYPE_CONTAINER_CASE_RFI } from '../modules/case/case-rfi/case-rfi-types';
+import { ENTITY_TYPE_CONTAINER_CASE_RFT } from '../modules/case/case-rft/case-rft-types';
+import { checkAndReturnDraft } from '../modules/draftWorkspace/draftWorkspace-domain';
+import { ENTITY_TYPE_CONTAINER_GROUPING } from '../modules/grouping/grouping-types';
+import { findById as findOrganization } from '../modules/organization/organization-domain';
+import { ENTITY_TYPE_IDENTITY_ORGANIZATION } from '../modules/organization/organization-types';
+import { ENTITY_TYPE_GROUP, ENTITY_TYPE_SETTINGS, ENTITY_TYPE_USER, isInternalObject } from '../schema/internalObject';
+import { RELATION_MEMBER_OF, RELATION_PARTICIPATE_TO } from '../schema/internalRelationship';
+import { ENTITY_TYPE_CONTAINER_NOTE, ENTITY_TYPE_CONTAINER_REPORT } from '../schema/stixDomainObject';
+import type { BasicStoreSettings } from '../types/settings';
+import type { BasicGroupEntity, BasicStoreEntity } from '../types/store';
+import type { AuthContext, AuthUser } from '../types/user';
+import {
+  AccessOperation,
+  type AuthorizedMember,
+  BYPASS,
+  isUserHasCapabilities,
+  isValidMemberAccessRight,
+  MEMBER_ACCESS_ALL,
+  MEMBER_ACCESS_CREATOR,
+  MEMBER_ACCESS_RIGHT_ADMIN,
+  SYSTEM_USER,
+  validateUserAccessOperation,
+} from './access';
+import { getDraftContext } from './draftContext';
+
+export const AUTHORIZED_MEMBERS_SUPPORTED_ENTITY_TYPES = [
+  ENTITY_TYPE_IDENTITY_ORGANIZATION,
+  ENTITY_TYPE_CONTAINER_REPORT,
+  ENTITY_TYPE_CONTAINER_NOTE,
+  ENTITY_TYPE_CONTAINER_GROUPING,
+  ENTITY_TYPE_CONTAINER_CASE_INCIDENT,
+  ENTITY_TYPE_CONTAINER_CASE_RFT,
+  ENTITY_TYPE_CONTAINER_CASE_RFI,
+];
+
+export const AUTHORIZED_MEMBERS_TYPES = [
+  ENTITY_TYPE_IDENTITY_ORGANIZATION,
+  ENTITY_TYPE_USER,
+  ENTITY_TYPE_GROUP,
+];
+
+export const getAuthorizedMembers = async (
+  context: AuthContext,
+  user: AuthUser,
+  entity: BasicStoreEntity,
+): Promise<MemberAccess[]> => {
+  if (isEmptyField(entity.restricted_members)) {
+    return [];
+  }
+  const draftId = getDraftContext(context, user);
+  const draft = draftId ? await checkAndReturnDraft(context, user, draftId) : null;
+  if (!validateUserAccessOperation(user, entity, AccessOperation.MANAGE_ACCESS, draft)) {
+    return []; // return empty if user doesn't have the right access_right
+  }
+  const entityRestrictedMembers = entity.restricted_members ?? [];
+  const membersIds = entityRestrictedMembers.map((e) => e.id);
+  const groupsRestrictionIds = entityRestrictedMembers.flatMap((e) => e.groups_restriction_ids ?? []);
+  const args = {
+    filters: {
+      mode: 'and',
+      filters: [{ key: 'internal_id', values: [...membersIds, ...groupsRestrictionIds] }],
+      filterGroups: [],
+    },
+  };
+  const members = await findAllMembers(context, user, args) as BasicStoreEntity[];
+  return (entity.restricted_members ?? []).map((currentAuthMember, i) => {
+    const member = members.find((m) => m.id === currentAuthMember.id);
+    let groups_restriction: MemberGroupRestriction[] = [];
+    if (currentAuthMember.groups_restriction_ids) {
+      groups_restriction = currentAuthMember.groups_restriction_ids.map((groupId: string) => {
+        const group = members.find((m) => m.id === groupId);
+        return { id: groupId, name: group?.name ?? 'unknown' };
+      });
+    }
+    return {
+      // To avoid id relay caching issue, we need to change the id as it is a different object
+      id: `${currentAuthMember.id}_${i}`,
+      member_id: currentAuthMember.id,
+      name: member?.name ?? '',
+      entity_type: member?.entity_type ?? '',
+      access_right: currentAuthMember.access_right,
+      groups_restriction,
+    };
+  });
+};
+
+export const containsValidAdmin = async (
+  context: AuthContext,
+  authorized_members: Array<AuthorizedMember>,
+  requiredCapabilities: string[] = [],
+) => {
+  const adminIds = authorized_members
+    .filter((n) => n.access_right === MEMBER_ACCESS_RIGHT_ADMIN)
+    .map((e) => e.id);
+  if (adminIds.length === 0) { // no admin
+    return false;
+  }
+  if (adminIds.includes(MEMBER_ACCESS_ALL) || adminIds.includes(MEMBER_ACCESS_CREATOR)) { // everyone  or creator is admin
+    return true;
+  }
+  // find the users that have admin rights
+  const groups = (await Promise.all(adminIds.map((id) => findGroup(context, SYSTEM_USER, id))))
+    .filter((n) => n) as BasicGroupEntity[];
+  const organizations = (await Promise.all(adminIds.map((id) => findOrganization(context, SYSTEM_USER, id))))
+    .filter((n) => n);
+  const groupsMembersIds = uniq(groups.map((group) => group[RELATION_MEMBER_OF]).flat()) as string[];
+  const organizationsMembersIds = uniq(organizations.map((o) => o[RELATION_PARTICIPATE_TO]).flat());
+  const userIds = adminIds
+    .filter((id) => !groups.map((o) => o.id).includes(id)
+      && !organizations.map((o) => o.id).includes(id))
+    .concat(groupsMembersIds, organizationsMembersIds);
+  // resolve the users
+  const users: (AuthUser | undefined)[] = await Promise.all(userIds.map((userId) => findUser(context, SYSTEM_USER, userId))) as (AuthUser | undefined)[];
+  // restrict to the users that exist and have admin exploration capability
+  const authorizedUsers = users.filter((u) => u && isUserHasCapabilities(u, requiredCapabilities));
+
+  // at least 1 user with admin access and admin exploration capability
+  return authorizedUsers.length > 0;
+};
+
+export const sanitizeAuthorizedMembers = (input: MemberAccessInput[]) => {
+  return input.filter((value, index, array) => {
+    if (!value.groups_restriction_ids || value.groups_restriction_ids.length === 0) {
+      // Unrestricted entry: deduplicate only against other unrestricted entries with the same id,
+      // so that a restricted entry for the same id is kept as a separate rule.
+      return isValidMemberAccessRight(value.access_right)
+        && array.findIndex((e) => e.id === value.id && (!e.groups_restriction_ids || e.groups_restriction_ids.length === 0)) === index;
+    }
+
+    return isValidMemberAccessRight(value.access_right) && array.findIndex((e) => e.id === value.id
+      && e.groups_restriction_ids
+      && e.groups_restriction_ids.length === value.groups_restriction_ids?.length
+      && e.groups_restriction_ids.sort().join() === value.groups_restriction_ids.sort().join()) === index;
+  });
+};
+
+export interface AuthorizedMembers {
+  id: string;
+  access_right: string;
+  groups_restriction_ids: string[] | null | undefined;
+}
+
+export const buildRestrictedMembers = async (
+  context: AuthContext,
+  user: AuthUser,
+  args: {
+    entityId: string;
+    input: MemberAccessInput[] | undefined | null;
+    requiredCapabilities: string[];
+    entityType: string;
+    skipAdminValidation?: boolean;
+  },
+): Promise<null | AuthorizedMember[]> => {
+  const { entityId, input, requiredCapabilities, entityType, skipAdminValidation } = args;
+
+  // Allow authorized members edition only on draft type but not for other entity types in draft
+  const draftId = getDraftContext(context, user);
+  if (draftId && draftId !== entityId) throw UnsupportedError('Cannot edit authorized members in draft');
+  let restricted_members: AuthorizedMembers[] | null = null;
+  if (input) {
+    // validate input (validate access right) remove duplicate
+    const filteredInput = sanitizeAuthorizedMembers(input);
+    const settings = await getEntityFromCache<BasicStoreSettings>(context, user, ENTITY_TYPE_SETTINGS);
+    if (filteredInput.some(({ id }) => id === MEMBER_ACCESS_ALL) && settings.platform_organization && !isInternalObject(entityType)) {
+      throw FunctionalError('You can\'t grant access to everyone in an organization sharing context');
+    }
+    // Skip the admin presence check only when explicitly requested by a privileged
+    // system actor (one with BYPASS capability, e.g. WORKFLOW_MANAGER_USER).
+    // This prevents accidental misuse of the flag by regular callers.
+    const bypassAllowed = skipAdminValidation && isUserHasCapabilities(user, [BYPASS]);
+    if (!bypassAllowed) {
+      const hasValidAdmin = await containsValidAdmin(
+        context,
+        filteredInput,
+        requiredCapabilities,
+      );
+      if (!hasValidAdmin) {
+        throw FunctionalError('It should have at least one valid member with admin access');
+      }
+    }
+    restricted_members = filteredInput.map(({ id, access_right, groups_restriction_ids }) => {
+      const member = { id, access_right, groups_restriction_ids };
+      if (!groups_restriction_ids) {
+        delete member.groups_restriction_ids;
+      }
+      return member;
+    });
+  }
+  return restricted_members;
+};
+
+export const editAuthorizedMembers = async (
+  context: AuthContext,
+  user: AuthUser,
+  args: {
+    entityId: string;
+    input: MemberAccessInput[] | undefined | null;
+    requiredCapabilities: string[];
+    entityType: string;
+    busTopicKey?: keyof typeof BUS_TOPICS; // TODO improve busTopicKey types
+    skipAdminValidation?: boolean;
+  },
+) => {
+  const { entityId, input, requiredCapabilities, entityType, busTopicKey, skipAdminValidation } = args;
+
+  const restricted_members = await buildRestrictedMembers(context, user, {
+    entityId,
+    input,
+    requiredCapabilities,
+    entityType,
+    skipAdminValidation,
+  });
+
+  const patch = { restricted_members };
+  const { element } = await patchAttribute(context, user, entityId, entityType, patch);
+  if (busTopicKey) {
+    return notify(BUS_TOPICS[busTopicKey].EDIT_TOPIC, element, user);
+  }
+  return element;
+};

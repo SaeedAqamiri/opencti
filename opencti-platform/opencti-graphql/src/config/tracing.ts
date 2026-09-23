@@ -1,0 +1,142 @@
+import { MeterProvider, type IMetricReader, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { type Counter, type Histogram, ValueType, SpanKind } from '@opentelemetry/api';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import nodeMetrics from 'opentelemetry-node-metrics';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import nconf from 'nconf';
+import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
+import type { Gauge } from '@opentelemetry/api';
+import { ATTR_ENDUSER_ID } from '../telemetry/semantic-conventions';
+import type { AuthContext, AuthUser } from '../types/user';
+import { ENABLED_METRICS, ENABLED_TRACING } from './conf';
+
+class MeterManager {
+  meterProvider: MeterProvider;
+
+  private requests: Counter | null = null;
+
+  private sentEmails: Counter | null = null;
+
+  private errors: Counter | null = null;
+
+  private latencyHistogram: Histogram | null = null;
+
+  private directBulkGauge: Gauge | null = null;
+
+  private sideBulkGauge: Gauge | null = null;
+
+  constructor(meterProvider: MeterProvider) {
+    this.meterProvider = meterProvider;
+  }
+
+  request(attributes: any) {
+    this.requests?.add(1, attributes);
+  }
+
+  emailSent(attributes: any) {
+    this.sentEmails?.add(1, attributes);
+  }
+
+  error(attributes: any) {
+    this.errors?.add(1, attributes);
+  }
+
+  latency(val: number, attributes: any) {
+    this.latencyHistogram?.record(val, attributes);
+  }
+
+  directBulk(val: number, attributes: any) {
+    this.directBulkGauge?.record(val, attributes);
+  }
+
+  sideBulk(val: number, attributes: any) {
+    this.sideBulkGauge?.record(val, attributes);
+  }
+
+  registerMetrics() {
+    const meter = this.meterProvider.getMeter('opencti-api');
+    // - Basic counters
+    this.sentEmails = meter.createCounter('opencti_sent_email', {
+      valueType: ValueType.INT,
+      description: 'Counts total number of email sent',
+    });
+    this.requests = meter.createCounter('opencti_api_requests', {
+      valueType: ValueType.INT,
+      description: 'Counts total number of requests',
+    });
+    this.errors = meter.createCounter('opencti_api_errors', {
+      valueType: ValueType.INT,
+      description: 'Counts total number of errors',
+    });
+    // - Histograms
+    this.latencyHistogram = meter.createHistogram('opencti_api_latency', {
+      valueType: ValueType.INT,
+      description: 'Latency computing per query',
+      advice: { explicitBucketBoundaries: [0, 100, 500, 2000, 5000, 10000, 20000, 30000] },
+    });
+    // - Gauges
+    this.directBulkGauge = meter.createGauge('opencti_api_direct_bulk', {
+      valueType: ValueType.INT,
+      description: 'Size of bulks for direct absorption',
+    });
+    this.sideBulkGauge = meter.createGauge('opencti_api_side_bulk', {
+      valueType: ValueType.INT,
+      description: 'Size of bulk for absorption impacts',
+    });
+    // - Library metrics
+    nodeMetrics(this.meterProvider, { prefix: '' });
+  }
+}
+
+// ------- Metrics
+const metricReaders: IMetricReader[] = [];
+if (ENABLED_METRICS) {
+  // OTLP - JAEGER ...
+  const exporterOtlp = nconf.get('app:telemetry:metrics:exporter_otlp');
+  if (exporterOtlp && exporterOtlp.length > 0) {
+    const metricExporter = new OTLPMetricExporter({ url: exporterOtlp, headers: {}, concurrencyLimit: 1 });
+    const metricReader = new PeriodicExportingMetricReader({ exporter: metricExporter, exportIntervalMillis: 1000 });
+    metricReaders.push(metricReader);
+  }
+  // PROMETHEUS
+  const exporterPrometheus = nconf.get('app:telemetry:metrics:exporter_prometheus');
+  if (exporterPrometheus) {
+    const prometheusExporter = new PrometheusExporter({ port: exporterPrometheus });
+    metricReaders.push(prometheusExporter);
+  }
+}
+const meterProvider = new MeterProvider({
+  readers: metricReaders,
+});
+export const meterManager = new MeterManager(meterProvider);
+// Register metrics
+meterManager.registerMetrics();
+
+export const telemetry = async (context: AuthContext, user: AuthUser, spanName: string, attrs: object, fn: any) => {
+  // if tracing disabled or context is not correctly configured.
+  if (!ENABLED_TRACING || !context) {
+    return fn();
+  }
+  // if tracing enabled
+  const tracer = context.tracing.getTracer();
+  const ctx = context.tracing.getCtx();
+  const tracingSpan = tracer.startSpan(spanName, {
+    attributes: {
+      'enduser.type': context.source,
+      [ATTR_ENDUSER_ID]: user.id,
+      ...attrs,
+    },
+    kind: SpanKind.CLIENT }, ctx);
+
+  try {
+    const data = await fn();
+    tracingSpan.setStatus({ code: 1 });
+    tracingSpan.end();
+    return data;
+  } catch (err) {
+    tracingSpan.setStatus({ code: 2 });
+    tracingSpan.end();
+    throw err;
+  }
+};

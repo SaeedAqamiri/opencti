@@ -1,0 +1,102 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React, { Suspense } from 'react';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import { PublicStixCoreObjectsNumberQuery } from './__generated__/PublicStixCoreObjectsNumberQuery.graphql';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { useFormatter } from '../../../../components/i18n';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import WidgetNumber from '../../../../components/dashboard/WidgetNumber';
+
+const publicStixCoreObjectsNumberQuery = graphql`
+  query PublicStixCoreObjectsNumberQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixCoreObjectsNumber(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      total
+      count
+    }
+  }
+`;
+
+interface PublicStixCoreObjectsNumberComponentProps {
+  title: string;
+  queryRef: PreloadedQuery<PublicStixCoreObjectsNumberQuery>;
+}
+
+const PublicStixCoreObjectsNumberComponent = ({
+  title,
+  queryRef,
+}: PublicStixCoreObjectsNumberComponentProps) => {
+  const { t_i18n } = useFormatter();
+  const { publicStixCoreObjectsNumber } = usePreloadedQuery(
+    publicStixCoreObjectsNumberQuery,
+    queryRef,
+  );
+
+  if (publicStixCoreObjectsNumber) {
+    const { total, count } = publicStixCoreObjectsNumber;
+    return (
+      <WidgetNumber
+        label={title}
+        value={total}
+        diffLabel={t_i18n('24 hours')}
+        diffValue={total - count}
+      />
+    );
+  }
+  return (
+    <WidgetContainer>
+      <WidgetNoData />
+    </WidgetContainer>
+  );
+};
+
+const PublicStixCoreObjectsNumber = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters } = widget;
+  const queryRef = usePublicDashboardViz<PublicStixCoreObjectsNumberQuery>(
+    publicStixCoreObjectsNumberQuery,
+    {
+      uriKey,
+      widgetId: id,
+      startDate,
+      endDate,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      padding="medium"
+      title={t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixCoreObjectsNumberComponent
+            title={parameters?.title ?? title ?? t_i18n('Entities number')}
+            queryRef={queryRef}
+          />
+        </Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixCoreObjectsNumber;

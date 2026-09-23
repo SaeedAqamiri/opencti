@@ -1,0 +1,91 @@
+import Chart, { OpenCTIChartProps } from '@components/common/charts/Chart';
+import React, { useMemo } from 'react';
+import { useTheme } from '@mui/styles';
+import { useNavigate } from 'react-router';
+import { ApexOptions } from 'apexcharts';
+import { horizontalBarsChartOptions } from '../../utils/Charts';
+import { simpleNumberFormat } from '../../utils/Number';
+import type { Theme } from '../Theme';
+import { dateFormat, timestamp } from '../../utils/Time';
+
+interface WidgetHorizontalBarsProps {
+  series: ApexAxisChartSeries;
+  distributed?: boolean;
+  stacked?: boolean;
+  total?: boolean;
+  legend?: boolean;
+  categories?: string[];
+  redirectionUtils?: {
+    id?: string;
+    entity_type?: string;
+  }[];
+  stackType?: string;
+  onMounted?: OpenCTIChartProps['onMounted'];
+}
+
+const WidgetHorizontalBars = ({
+  series,
+  distributed,
+  stacked,
+  total,
+  legend,
+  categories,
+  redirectionUtils,
+  stackType,
+  onMounted,
+}: WidgetHorizontalBarsProps) => {
+  const theme = useTheme<Theme>();
+  const navigate = useNavigate();
+
+  const options: ApexOptions = useMemo(() => {
+    const getFormattedValue = (value: string | number) => {
+      if (typeof value === 'number') {
+        return simpleNumberFormat(value);
+      }
+      const newTimestamp = parseInt(value, 10);
+      if (!Number.isNaN(newTimestamp)) {
+        const convertedDate = timestamp(newTimestamp);
+        const date = dateFormat(convertedDate);
+        if (date) return date;
+      }
+      return value;
+    };
+
+    return horizontalBarsChartOptions(
+      theme,
+      true,
+      simpleNumberFormat,
+      getFormattedValue,
+      distributed,
+      navigate,
+      redirectionUtils,
+      stacked,
+      total,
+      categories,
+      legend,
+      stackType,
+    ) as ApexOptions;
+  }, [
+    theme,
+    categories,
+    distributed,
+    legend,
+    redirectionUtils,
+    stacked,
+    stackType,
+    total,
+  ]);
+
+  return (
+    <Chart
+      options={options}
+      series={series}
+      type="bar"
+      width="100%"
+      height="100%"
+      onMounted={onMounted}
+    />
+  );
+};
+
+export default WidgetHorizontalBars;

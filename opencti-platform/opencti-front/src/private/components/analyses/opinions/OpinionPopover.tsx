@@ -1,0 +1,170 @@
+import Button from '@common/button/Button';
+import IconButton from '@common/button/IconButton';
+import Dialog from '@common/dialog/Dialog';
+import { OpinionEditionContainerQuery$data } from '@components/analyses/opinions/__generated__/OpinionEditionContainerQuery.graphql';
+import MoreVert from '@mui/icons-material/MoreVert';
+import DialogActions from '@mui/material/DialogActions';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import { PopoverProps } from '@mui/material/Popover';
+import ToggleButton from '@mui/material/ToggleButton';
+import { Formik } from 'formik';
+import React, { FunctionComponent, useState } from 'react';
+import { graphql } from 'react-relay';
+import { useNavigate } from 'react-router';
+import { useFormatter } from '../../../../components/i18n';
+import { QueryRenderer } from '../../../../relay/environment';
+import { CollaborativeSecurity } from '../../../../utils/Security';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import { KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import { opinionEditionQuery } from './OpinionEdition';
+import OpinionEditionContainer from './OpinionEditionContainer';
+
+const OpinionPopoverDeletionMutation = graphql`
+  mutation OpinionPopoverDeletionMutation($id: ID!) {
+    opinionEdit(id: $id) {
+      delete
+    }
+  }
+`;
+
+interface CreatedBy {
+  id: string;
+  name: string;
+}
+
+interface ObjectMarking {
+  readonly definition: string | null | undefined;
+  readonly definition_type: string | null | undefined;
+}
+
+interface OpinionPopoverProps {
+  variant: string;
+  onDelete: () => void;
+  opinion: {
+    id: string;
+    opinion: string;
+    explanation: string | null | undefined;
+    createdBy: CreatedBy | null | undefined;
+    objectMarking: readonly ObjectMarking[] | null | undefined; // Mark as readonly
+  };
+}
+
+const OpinionPopover: FunctionComponent<OpinionPopoverProps> = ({ opinion, variant = 'overview', onDelete }) => {
+  const navigate = useNavigate();
+  const { t_i18n } = useFormatter();
+  const [anchorEl, setAnchorEl] = useState<PopoverProps['anchorEl']>(null);
+  const [displayDelete, setDisplayDelete] = useState(false);
+  const [displayEdit, setDisplayEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const handleOpen = (event: React.SyntheticEvent) => setAnchorEl(event.currentTarget);
+  const handleClose = () => setAnchorEl(null);
+  const handleOpenDelete = () => {
+    setDisplayDelete(true);
+    handleClose();
+  };
+  const handleCloseDelete = () => setDisplayDelete(false);
+  const [commit] = useApiMutation(OpinionPopoverDeletionMutation);
+  const submitDelete = () => {
+    setDeleting(true);
+    commit({
+      variables: { id: opinion.id },
+      onCompleted: () => {
+        setDeleting(false);
+        handleCloseDelete();
+        if (onDelete) {
+          onDelete();
+        }
+        if (variant !== 'inList') {
+          navigate('/dashboard/analyses/opinions');
+        }
+      },
+      updater: (store) => {
+        store.delete(opinion.id);
+      },
+    });
+  };
+  const handleOpenEdit = () => {
+    setDisplayEdit(true);
+    handleClose();
+  };
+  const handleCloseEdit = () => setDisplayEdit(false);
+  return (
+    <>
+      {variant === 'inList' ? (
+        <IconButton
+          aria-label={t_i18n('Open menu')}
+          onClick={handleOpen}
+          aria-haspopup="true"
+          style={{ marginTop: 3 }}
+          color="primary"
+        >
+          <MoreVert />
+        </IconButton>
+      ) : (
+        <ToggleButton
+          aria-label={t_i18n('Open menu')}
+          aria-haspopup="true"
+          value="popover"
+          size="small"
+          onClick={handleOpen}
+        >
+          <MoreVert fontSize="small" color="primary" />
+        </ToggleButton>
+      )}
+      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
+        {variant !== 'inList' && <MenuItem onClick={handleOpenEdit}>{t_i18n('Update')}</MenuItem>}
+        <CollaborativeSecurity
+          data={opinion}
+          needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}
+        >
+          <MenuItem onClick={handleOpenDelete}>{t_i18n('Delete')}</MenuItem>
+        </CollaborativeSecurity>
+      </Menu>
+      <Formik
+        initialValues={{}}
+        onSubmit={submitDelete}
+        onReset={handleCloseDelete}
+      >
+        {({ submitForm, handleReset }) => (
+          <Dialog
+            open={displayDelete}
+            onClose={handleCloseDelete}
+            size="small"
+            title={t_i18n('Do you want to delete this opinion?')}
+          >
+            <DialogActions>
+              <Button variant="secondary" onClick={handleReset} disabled={deleting}>
+                {t_i18n('Cancel')}
+              </Button>
+              <Button onClick={submitForm} disabled={deleting}>
+                {t_i18n('Delete')}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+
+      </Formik>
+      {variant !== 'inList' && (
+        <QueryRenderer
+          query={opinionEditionQuery}
+          variables={{ id: opinion.id }}
+          render={({ props }: { props: OpinionEditionContainerQuery$data }) => {
+            if (props) {
+              return (
+                <OpinionEditionContainer
+                  opinion={props.opinion}
+                  handleClose={handleCloseEdit}
+                  open={displayEdit}
+                />
+              );
+            }
+            return <div />;
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+export default OpinionPopover;

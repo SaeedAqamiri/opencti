@@ -1,0 +1,61 @@
+import Chart, { OpenCTIChartProps } from '@components/common/charts/Chart';
+import React, { useMemo } from 'react';
+import { useTheme } from '@mui/styles';
+import { ApexOptions } from 'apexcharts';
+import { useFormatter } from '../i18n';
+import { treeMapOptions } from '../../utils/Charts';
+import { getMainRepresentative, isFieldForIdentifier } from '../../utils/defaultRepresentatives';
+import { simpleNumberFormat } from '../../utils/Number';
+
+interface WidgetTreeProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: readonly any[];
+  groupBy: string;
+  onMounted?: OpenCTIChartProps['onMounted'];
+  isDistributed?: boolean;
+}
+
+const WidgetTree = ({
+  data,
+  groupBy,
+  onMounted,
+  isDistributed = false,
+}: WidgetTreeProps) => {
+  const theme = useTheme();
+  const { t_i18n } = useFormatter();
+
+  const series = useMemo(() => {
+    const chartData = data.map((n) => {
+      const item = { x: n.label, y: n.value };
+      if (isFieldForIdentifier(groupBy)) {
+        item.x = getMainRepresentative(n.entity);
+      } else if (groupBy === 'entity_type' && t_i18n(`entity_${n.label}`) !== `entity_${n.label}`) {
+        item.x = t_i18n(`entity_${n.label}`);
+      }
+      return item;
+    });
+    return [{ data: chartData }];
+  }, [data, groupBy, t_i18n]);
+
+  const options: ApexOptions = useMemo(() => {
+    return treeMapOptions(
+      theme,
+      simpleNumberFormat,
+      'bottom',
+      isDistributed,
+    ) as ApexOptions;
+  }, [theme, isDistributed]);
+
+  return (
+    <Chart
+      options={options}
+      series={series}
+      type="treemap"
+      width="100%"
+      height="100%"
+      onMounted={onMounted}
+    />
+  );
+};
+
+export default WidgetTree;

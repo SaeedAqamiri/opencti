@@ -1,0 +1,265 @@
+import React, { FunctionComponent } from 'react';
+import { Field, Form, Formik } from 'formik';
+import Button from '@common/button/Button';
+import * as Yup from 'yup';
+import { graphql } from 'react-relay';
+import { ConnectionHandler, RecordProxy, RecordSourceSelectorProxy } from 'relay-runtime';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import Box from '@mui/material/Box';
+import { FormikConfig } from 'formik/dist/types';
+import ObjectMembersField from '../../common/form/ObjectMembersField';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation } from '../../../../relay/environment';
+import TextField from '../../../../components/TextField';
+import Filters from '../../common/lists/Filters';
+import { emptyFilterGroup, isFilterGroupNotEmpty, serializeFilterGroupForBackend, useAvailableFilterKeysForEntityTypes } from '../../../../utils/filters/filtersUtils';
+import FilterIconButton from '../../../../components/FilterIconButton';
+import { FieldOption, fieldSpacingContainerStyle } from '../../../../utils/field';
+import Drawer, { DrawerControlledDialProps } from '../../common/drawer/Drawer';
+import useFiltersState from '../../../../utils/filters/useFiltersState';
+import useGranted, { SETTINGS_SETACCESSES } from '../../../../utils/hooks/useGranted';
+import { PaginationOptions } from '../../../../components/list_lines';
+import CreateEntityControlledDial from '../../../../components/CreateEntityControlledDial';
+import FormButtonContainer from '../../../../components/common/form/FormButtonContainer';
+import { useTheme } from '@mui/material/styles';
+import CreatorField from '../../common/form/CreatorField';
+
+interface TaxiiCollectionCreationProps {
+  paginationOptions: PaginationOptions;
+}
+
+interface TaxiiCollectionCreationForm {
+  authorized_members: FieldOption[];
+  description: string;
+  include_inferences?: boolean;
+  name: string;
+  taxii_public?: boolean;
+  score_to_confidence?: boolean;
+  taxii_public_user_id?: FieldOption | null;
+}
+
+const TaxiiCollectionCreationMutation = graphql`
+    mutation TaxiiCollectionCreationMutation($input: TaxiiCollectionAddInput!) {
+        taxiiCollectionAdd(input: $input) {
+            ...TaxiiLine_node
+        }
+    }
+`;
+
+const taxiiCollectionCreationValidation = (requiredSentence: string) => Yup.object().shape({
+  name: Yup.string().required(requiredSentence),
+  description: Yup.string().nullable(),
+  authorized_members: Yup.array().nullable(),
+  taxii_public: Yup.bool().nullable(),
+  include_inferences: Yup.bool().nullable(),
+  score_to_confidence: Yup.bool().nullable(),
+  taxii_public_user_id: Yup.object().nullable()
+    .when('taxii_public', { is: true, then: (s) => s.required(requiredSentence) }),
+});
+
+const sharedUpdater = (store: RecordSourceSelectorProxy, userId: string, paginationOptions: PaginationOptions, newEdge: RecordProxy) => {
+  const userProxy = store.get(userId);
+  if (userProxy) {
+    const conn = ConnectionHandler.getConnection(
+      userProxy,
+      'Pagination_taxiiCollections',
+      paginationOptions,
+    );
+    ConnectionHandler.insertEdgeBefore(conn as RecordProxy, newEdge);
+  }
+};
+
+const CreateTaxiiCollectionControlledDial = (props: DrawerControlledDialProps) => (
+  <CreateEntityControlledDial
+    entityType="TaxiiCollection"
+    {...props}
+  />
+);
+
+const TaxiiCollectionCreation: FunctionComponent<TaxiiCollectionCreationProps> = ({ paginationOptions }) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme();
+  const isGrantedToSetAccesses = useGranted([SETTINGS_SETACCESSES]);
+  const [filters, helpers] = useFiltersState(emptyFilterGroup);
+
+  const onSubmit: FormikConfig<TaxiiCollectionCreationForm>['onSubmit'] = (values, { setSubmitting, resetForm }) => {
+    const jsonFilters = serializeFilterGroupForBackend(filters);
+    const authorized_members = values.authorized_members.map(({ value }) => ({
+      id: value,
+      access_right: 'view',
+    }));
+    const taxii_public_user_id = (values.taxii_public_user_id as FieldOption)?.value ?? null;
+    commitMutation({
+      mutation: TaxiiCollectionCreationMutation,
+      variables: {
+        input: { ...values, filters: jsonFilters, authorized_members, taxii_public_user_id },
+      },
+      updater: (store: RecordSourceSelectorProxy) => {
+        const payload = store.getRootField('taxiiCollectionAdd');
+        const newEdge = payload?.setLinkedRecord(payload, 'node');
+        const container = store.getRoot();
+        sharedUpdater(
+          store,
+          container.getDataID(),
+          paginationOptions,
+          newEdge as RecordProxy,
+        );
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+      },
+      optimisticUpdater: undefined,
+      optimisticResponse: undefined,
+      onError: undefined,
+      setSubmitting,
+    });
+  };
+  const availableFilterKeys = useAvailableFilterKeysForEntityTypes(['Stix-Core-Object', 'stix-core-relationship']);
+  return (
+    <Drawer
+      title={t_i18n('Create a TAXII collection')}
+      controlledDial={CreateTaxiiCollectionControlledDial}
+      onClose={helpers.handleClearAllFilters}
+    >
+      {({ onClose }) => (
+        <Formik<TaxiiCollectionCreationForm>
+          initialValues={{
+            name: '',
+            description: '',
+            authorized_members: [],
+            taxii_public: false,
+            include_inferences: true,
+            score_to_confidence: false,
+            taxii_public_user_id: null,
+          }}
+          validationSchema={taxiiCollectionCreationValidation(t_i18n('This field is required'))}
+          onSubmit={onSubmit}
+          onReset={onClose}
+        >
+          {({ values, setFieldValue, submitForm, handleReset, isSubmitting }) => (
+            <Form>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="name"
+                label={t_i18n('Name')}
+                fullWidth={true}
+              />
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="description"
+                label={t_i18n('Description')}
+                fullWidth={true}
+                className="mt-5"
+              />
+              <Alert
+                icon={false}
+                sx={{
+                  width: '100%',
+                  marginTop: 2,
+                  '& .MuiAlert-message': {
+                    width: '100%',
+                    overflow: 'hidden',
+                  },
+                }}
+                severity="warning"
+                variant="outlined"
+                style={{ position: 'relative' }}
+              >
+                <AlertTitle>
+                  {t_i18n('Make this TAXII collection public and available to anyone')}
+                </AlertTitle>
+                <FormControlLabel
+                  control={<Switch disabled={!isGrantedToSetAccesses} />}
+                  style={{ marginLeft: 1 }}
+                  name="taxii_public"
+                  onChange={(_, checked) => setFieldValue('taxii_public', checked)}
+                  label={t_i18n('Public collection')}
+                />
+                {!values.taxii_public && (
+                  <ObjectMembersField
+                    label="Accessible for"
+                    style={fieldSpacingContainerStyle}
+                    helpertext={t_i18n('Leave the field empty to grant all authenticated users')}
+                    multiple={true}
+                    name="authorized_members"
+                  />
+                )}
+                {values.taxii_public && (
+                  <CreatorField
+                    name="taxii_public_user_id"
+                    label={t_i18n('Share data corresponding to permissions associated with this user')}
+                    containerStyle={fieldSpacingContainerStyle}
+                    onChange={(name, value) => setFieldValue(name, value)}
+                  />
+                )}
+              </Alert>
+              <Box sx={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
+                <FormControlLabel
+                  control={<Switch />}
+                  style={{ marginLeft: 1 }}
+                  checked={values.include_inferences}
+                  name="include_inferences"
+                  onChange={(_, checked) => setFieldValue('include_inferences', checked)}
+                  label={t_i18n('Include inferences')}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', marginTop: '20px' }}>
+                <FormControlLabel
+                  control={<Switch />}
+                  style={{ marginLeft: 1 }}
+                  checked={values.score_to_confidence}
+                  name="score_to_confidence"
+                  onChange={(_, checked) => setFieldValue('score_to_confidence', checked)}
+                  label={t_i18n('Copy OpenCTI scores to confidence level for indicators')}
+                />
+              </Box>
+              <Box sx={{
+                paddingTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: theme.spacing(1),
+                marginBottom: theme.spacing(1),
+              }}
+              >
+                <Filters
+                  availableFilterKeys={availableFilterKeys}
+                  helpers={helpers}
+                  searchContext={{ entityTypes: ['Stix-Core-Object', 'stix-core-relationship'] }}
+                />
+              </Box>
+              <FilterIconButton
+                filters={filters}
+                helpers={helpers}
+                redirection
+                searchContext={{ entityTypes: ['Stix-Core-Object', 'stix-core-relationship'] }}
+              />
+              <FormButtonContainer>
+                <Button
+                  variant="secondary"
+                  onClick={handleReset}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Cancel')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={!isFilterGroupNotEmpty(filters) || isSubmitting}
+                >
+                  {t_i18n('Create')}
+                </Button>
+              </FormButtonContainer>
+            </Form>
+          )}
+        </Formik>
+      )}
+    </Drawer>
+  );
+};
+
+export default TaxiiCollectionCreation;

@@ -1,0 +1,238 @@
+import { Suspense, useMemo } from 'react';
+import { Route, Routes, useParams, useLocation } from 'react-router';
+import { graphql, PreloadedQuery, useSubscription, usePreloadedQuery } from 'react-relay';
+import useQueryLoading from 'src/utils/hooks/useQueryLoading';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import { RootCampaignSubscription } from '@components/threats/campaigns/__generated__/RootCampaignSubscription.graphql';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import AIInsights from '@components/common/ai/AIInsights';
+import StixCoreObjectSecurityCoverage from '@components/common/stix_core_objects/StixCoreObjectSecurityCoverage';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import Campaign from './Campaign';
+import CampaignKnowledge from './CampaignKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import FileManager from '../../common/files/FileManager';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import { isPathOverview } from '../../../../utils/tabUtils';
+import { RootCampaignQuery } from './__generated__/RootCampaignQuery.graphql';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import CampaignEdition from './CampaignEdition';
+import CampaignDeletion from './CampaignDeletion';
+import StixCoreRelationshipCreationFromEntityHeader from '../../common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import CreateRelationshipContextProvider from '../../common/stix_core_relationships/CreateRelationshipContextProvider';
+import { PATH_CAMPAIGN, PATH_CAMPAIGNS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootCampaignSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on Campaign {
+        ...Campaign_campaign
+        ...CampaignEditionContainer_campaign
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const campaignQuery = graphql`
+  query RootCampaignQuery($id: String!) {
+    campaign(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      standard_id
+      entity_type
+      name
+      aliases
+      x_opencti_graph_data
+      currentUserAccessRight
+      securityCoverage {
+        id
+        coverage_information {
+          coverage_name
+          coverage_score
+        }
+      }
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...Campaign_campaign
+      ...CampaignKnowledge_campaign
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+      ...StixCoreObjectSharingListFragment
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+type RootCampaignProps = {
+  campaignId: string;
+  queryRef: PreloadedQuery<RootCampaignQuery>;
+};
+
+const RootCampaign = ({ campaignId, queryRef }: RootCampaignProps) => {
+  const subConfig = useMemo<GraphQLSubscriptionConfig<RootCampaignSubscription>>(() => ({
+    subscription,
+    variables: { id: campaignId },
+  }), [campaignId]);
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  useSubscription<RootCampaignSubscription>(subConfig);
+  const {
+    campaign,
+    connectorsForExport,
+    connectorsForImport,
+  } = usePreloadedQuery<RootCampaignQuery>(campaignQuery, queryRef);
+  const { forceUpdate } = useForceUpdate();
+  const basePath = PATH_CAMPAIGN(campaignId);
+  const link = `${basePath}/knowledge`;
+  const isOverview = isPathOverview(location.pathname, basePath);
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  return (
+    <CreateRelationshipContextProvider>
+      {campaign ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={(
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'attribution',
+                    'victimology',
+                    'incidents',
+                    'malwares',
+                    'tools',
+                    'channels',
+                    'narratives',
+                    'attack_patterns',
+                    'vulnerabilities',
+                    'indicators',
+                    'observables',
+                    'infrastructures',
+                    'sightings',
+                  ]}
+                  data={campaign}
+                  attribution={['Intrusion-Set', 'Threat-Actor-Individual', 'Threat-Actor-Group']}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Threats') },
+              { label: t_i18n('Campaigns'), link: PATH_CAMPAIGNS },
+              { label: campaign.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Campaign"
+              stixDomainObject={campaign}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <CampaignEdition campaignId={campaign.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={campaign}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <CampaignDeletion id={campaign.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              enableEnricher={true}
+              enableQuickSubscription={true}
+              redirectToContent={true}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={campaign}
+              basePath={basePath}
+              pages={{
+                overview:
+                  <Campaign campaignData={campaign} />,
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <CampaignKnowledge campaignData={campaign} />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={campaign}
+                  />
+                ),
+                analyses:
+                  <StixCoreObjectOrStixCoreRelationshipContainers stixDomainObjectOrStixCoreRelationship={campaign} />,
+                files: (
+                  <FileManager
+                    id={campaignId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={campaign}
+                  />
+                ),
+                history:
+                  <StixCoreObjectHistory stixCoreObjectId={campaignId} />,
+              }}
+              extraActions={isOverview && (
+                <>
+                  <AIInsights id={campaign.id} />
+                  <StixCoreObjectSecurityCoverage id={campaign.id} coverage={campaign.securityCoverage} />
+                </>
+              )}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+
+const Root = () => {
+  const { campaignId } = useParams() as { campaignId: string };
+  const queryRef = useQueryLoading<RootCampaignQuery>(campaignQuery, {
+    id: campaignId,
+  });
+
+  return (
+    <>
+      {queryRef && (
+        <Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootCampaign queryRef={queryRef} campaignId={campaignId} />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+export default Root;

@@ -1,0 +1,151 @@
+# OpenCTI Project Instructions
+
+> **Design system** — before writing or changing any UI, read [`AGENTS.md`](../AGENTS.md)
+> at the repository root. It carries the rule on when the Filigran Design System
+> is mandatory and MUI is not, and names the CI gates that enforce it.
+
+> **Deep-dive references** — read the relevant doc before touching the related code:
+> - [Backend Architecture (opencti-graphql)](instructions/backend.instructions.md)
+> - [Frontend Architecture (opencti-front)](instructions/frontend.instructions.md)
+> - [Python Client & Worker](instructions/python.instructions.md)
+> - [Documentation Authoring (docs)](instructions/docs.instructions.md)
+> - [Code Review Guidelines](instructions/code-review.instructions.md)
+
+> **Copilot Skills** (`.github/skills/`) — procedural playbooks, load the relevant one before starting the task:
+> - `create-module` — Scaffold a new backend domain module (entity type, schema, resolvers, converter)
+> - `create-migration` — Create a new ElasticSearch database migration file
+> - `create-react-component` — Create a new Relay-connected React component
+> - `create-creation-form` — Scaffold a creation form drawer (Formik + Relay mutation)
+> - `create-playbook-component` — Add a new playbook automation component
+> - `create-workflow` — Scaffold a new GitHub Actions workflow
+
+## Project Overview
+
+OpenCTI is a cyber threat intelligence platform built with a **monorepo structure** containing:
+- **opencti-platform/opencti-graphql**: Node.js/TypeScript GraphQL API backend
+- **opencti-platform/opencti-front**: React/TypeScript frontend with Relay
+- **client-python**: Python library (pycti) for API access
+- **opencti-worker**: Python worker for background tasks
+- **docs**: MkDocs documentation
+
+## Global Commands & Setup
+
+### 1. Enable Corepack (first-time only)
+Only needed if Yarn is not already available. Run once per machine:
+```bash
+corepack enable
+```
+Do **not** add this before every command — assume a dev environment already has corepack enabled.
+
+### 2. Copy .yarnrc.yml (first install only)
+Only needed when running `yarn install` for the first time in a subdirectory that does not already have `.yarnrc.yml`:
+
+```bash
+# Example for backend
+cd opencti-platform/opencti-graphql
+cp ../.yarnrc.yml .yarnrc.yml
+yarn install
+```
+
+Do **not** copy `.yarnrc.yml` before running tests or other commands — it only matters for `yarn install`.
+
+### 3. Root NX Commands (run from repo root)
+The root `package.json` uses **NX** to orchestrate all workspaces at once. Prefer these over manually running commands in each subdirectory:
+
+```bash
+# Install all dependencies (frontend + backend + Python)
+yarn deps          # without Python virtualenv
+yarn deps:venv     # with Python virtualenv (recommended)
+
+# Start all dev servers
+yarn dev           # without Python virtualenv
+yarn dev:venv      # with Python virtualenv
+
+# Build everything
+yarn build         # without Python virtualenv
+yarn build:venv    # with Python virtualenv
+
+# Run all tests
+yarn test          # without Python virtualenv
+yarn test:venv     # with Python virtualenv
+
+# Lint everything
+yarn lint
+
+# Regenerate GraphQL schema across all packages
+yarn graphql
+```
+
+The `:venv` variants wrap the command with a Python virtual environment — use them when working on `client-python` or `opencti-worker` and running the backend app.
+
+### 4. Local Development Stack
+Start the necessary infrastructure (Elastic, Redis, RabbitMQ, Silo):
+```bash
+cd opencti-platform/opencti-dev
+docker compose up -d
+```
+**(ElasticSearch requires `vm.max_map_count=262144`)**
+
+## Common Pitfalls
+
+- **Yarn install fails**: Is `.yarnrc.yml` present in the subdirectory? Run `cp ../.yarnrc.yml .yarnrc.yml` then retry.
+- **Yarn not found**: Run `corepack enable` once.
+- **Python Dependencies**: Backend requires `yarn install:python`.
+- **Relay**: Frontend requires `yarn relay` after any GraphQL changes.
+- **Node Memory**: Use `NODE_OPTIONS=--max_old_space_size=8192` for large builds.
+
+## Safety Rules
+
+### Destructive Git & File Operations
+**NEVER** run any operation that could cause loss of uncommitted work without explicit user approval. This includes:
+- `git reset --hard`, `git checkout -- <file>`, `git clean -fd`
+- `git stash drop`, `git rebase`, `git push --force`
+- Deleting or overwriting files that may contain unsaved changes
+
+**Before** running any such command:
+1. Run `git status` and `git diff` to identify uncommitted or unstaged changes.
+2. Present a **clear, plain-language summary** of exactly what would be lost (e.g. "This will discard your unsaved changes to `src/foo.ts` and `src/bar.ts`").
+3. **Wait for explicit approval** before proceeding.
+
+<!-- filigran-conventions:start -->
+## Commit, PR & issue conventions
+
+All commits, pull requests and issues in this repository follow the
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+specification with a GitHub issue reference:
+
+```
+type(scope?)!?: description (#issue)
+```
+
+- Types: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `perf`, `test`,
+  `build`, `ci`, `revert`.
+- The description starts with a lowercase letter and has no trailing period;
+  preserve acronyms and proper nouns.
+- The old `[backend]` / `[frontend]` bracket prefixes are discontinued — use a
+  Conventional Commits scope instead.
+- Pull request titles **must** end with the related issue reference, e.g.
+  `(#1234)`, and every pull request must be linked to an issue.
+- Sign your commits.
+
+When generating commit messages, PR titles or issue titles, always follow this
+convention. See [`.github/LABELS.md`](.github/LABELS.md) for the full title and
+label taxonomy.
+<!-- filigran-conventions:end -->
+
+
+<!-- filigran-model-policy:start -->
+## GitHub Copilot model usage
+
+To keep token consumption under control, pick the model that matches the task:
+
+- **Opus 4.6** — reserve for complex work: deep reasoning, large refactors,
+  architecture design, tricky debugging. It is significantly more
+  token-expensive, so it is not the daily driver.
+- **Sonnet / Gemini / GPT** — default for everyday tasks: autocomplete, small
+  fixes, quick questions, code explanations.
+
+We have a limited token budget — being mindful of the model you pick makes a
+real difference at scale. Think of Opus as a specialist you call in when you
+really need it.
+<!-- filigran-model-policy:end -->

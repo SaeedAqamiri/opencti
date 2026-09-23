@@ -1,0 +1,80 @@
+import React, { FunctionComponent, useState } from 'react';
+import IconButton from '@common/button/IconButton';
+import { Add } from '@mui/icons-material';
+import Drawer from '@components/common/drawer/Drawer';
+import { useFormatter } from '../../../../components/i18n';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import SearchInput from '../../../../components/SearchInput';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import { DataComponentAttackPatterns_dataComponent$data } from './__generated__/DataComponentAttackPatterns_dataComponent.graphql';
+import {
+  AddAttackPatternsLinesToDataComponentQuery,
+  AddAttackPatternsLinesToDataComponentQuery$variables,
+} from './__generated__/AddAttackPatternsLinesToDataComponentQuery.graphql';
+import AddAttackPatternsLines, { addAttackPatternsLinesQuery } from './AddAttackPatternsLines';
+
+const AddAttackPatterns: FunctionComponent<{
+  dataComponent: DataComponentAttackPatterns_dataComponent$data;
+}> = ({ dataComponent }) => {
+  const { t_i18n } = useFormatter();
+
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const paginationOptions: AddAttackPatternsLinesToDataComponentQuery$variables = {
+    search,
+    count: 20,
+  };
+
+  const handleSearch = (keyword: string) => setSearch(keyword);
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setSearch('');
+  };
+
+  const queryRef = useQueryLoading<AddAttackPatternsLinesToDataComponentQuery>(
+    addAttackPatternsLinesQuery,
+    { ...paginationOptions },
+  );
+
+  // flex, not block: an inline-flex button in a block wrapper reserves a text
+  // descender below it, and Label centres the wrapper, not the button.
+  return (
+    <div style={{ display: 'flex' }}>
+      <IconButton
+        color="primary"
+        aria-label="Add"
+        onClick={handleOpen}
+      >
+        <Add fontSize="small" />
+      </IconButton>
+      <Drawer
+        open={open}
+        onClose={handleClose}
+        title={t_i18n('Add attack patterns')}
+        subHeader={{
+          left: [(
+            <SearchInput
+              variant="inDrawer"
+              onSubmit={handleSearch}
+              key="searchInput"
+            />
+          )],
+        }}
+      >
+        {queryRef && (
+          <React.Suspense
+            fallback={<Loader variant={LoaderVariant.inElement} />}
+          >
+            <AddAttackPatternsLines
+              dataComponent={dataComponent}
+              queryRef={queryRef}
+            />
+          </React.Suspense>
+        )}
+      </Drawer>
+    </div>
+  );
+};
+
+export default AddAttackPatterns;

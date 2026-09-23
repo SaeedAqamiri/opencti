@@ -1,0 +1,91 @@
+import React, { FunctionComponent } from 'react';
+import { graphql } from 'react-relay';
+import { Link } from 'react-router';
+import { Stack, Tooltip } from '@mui/material';
+import { InformationOutline } from 'mdi-material-ui';
+import { filterValue, SELF_ID_VALUE } from '../utils/filters/filtersUtils';
+import { truncate } from '../utils/String';
+import { useFormatter } from './i18n';
+import { FilterDefinition } from '../utils/hooks/useAuth';
+import useAttributes from '../utils/hooks/useAttributes';
+import type { WidgetHost } from '../utils/widget/widget';
+
+export const filterValuesContentQuery = graphql`
+    query FilterValuesContentQuery($filters: FilterGroup!, $isMeValueForbidden: Boolean) {
+        filtersRepresentatives(filters: $filters, isMeValueForbidden: $isMeValueForbidden) {
+            id
+            value
+            entity_type
+            color
+        }
+    }
+`;
+interface FilterValuesContentProps {
+  redirection?: boolean;
+  isFilterTooltip?: boolean;
+  filterKey: string;
+  id: string | null;
+  value?: string | null;
+  filterDefinition?: FilterDefinition;
+  filterOperator?: string;
+  host?: WidgetHost;
+}
+
+const FilterValuesContent: FunctionComponent<
+  FilterValuesContentProps
+> = ({ redirection, isFilterTooltip, filterKey, id, value, filterDefinition, filterOperator, host }) => {
+  const { t_i18n } = useFormatter();
+  const { stixCoreObjectTypes } = useAttributes();
+  const completedStixCoreObjectTypes = stixCoreObjectTypes.concat(['Stix-Core-Object', 'Stix-Cyber-Observable']);
+
+  const filterType = filterDefinition?.type;
+  const rawValue = isFilterTooltip
+    ? filterValue(filterKey, value, filterType, filterOperator)
+    : truncate(filterValue(filterKey, value, filterType, filterOperator), 20);
+
+  if (rawValue === null) {
+    return (
+      <>
+        <del>{t_i18n('deleted')}</del>
+      </>
+    );
+  }
+
+  const renderSelfIdValue = () => {
+    const tooltipMessage = host?.kind === 'fintelTemplate'
+      ? t_i18n('Current entity refers to the entity in which you will use the Fintel template. Removing this filter means you will lose the context of the entity in which the template is used.')
+      : host?.kind === 'custom-view'
+        ? t_i18n('Current entity refers to the entity in which the users will view the Custom View. Removing this filter means you will lose the context of the entity in which the Custom View is viewed.')
+        : undefined;
+    return (
+      <Stack
+        direction="row"
+        alignItems="center"
+        gap={0.5}
+      >
+        <span>{rawValue}</span>
+        {tooltipMessage && (
+          <Tooltip title={tooltipMessage}>
+            <InformationOutline color="primary" fontSize="small" />
+          </Tooltip>
+        )}
+      </Stack>
+    );
+  };
+
+  const displayedValue = rawValue === SELF_ID_VALUE ? renderSelfIdValue() : rawValue;
+  const isRedirectableFilter = filterDefinition
+    && filterType === 'id'
+    && filterDefinition.elementsForFilterValuesSearch
+    && filterDefinition.elementsForFilterValuesSearch.every((idType) => completedStixCoreObjectTypes.includes(idType));
+  if (redirection && isRedirectableFilter) {
+    return (
+      <Link to={`/dashboard/id/${id}`}>
+        <span color="primary">{displayedValue}</span>
+      </Link>
+    );
+  }
+  return <span>{displayedValue}</span>;
+};
+
+export default FilterValuesContent;

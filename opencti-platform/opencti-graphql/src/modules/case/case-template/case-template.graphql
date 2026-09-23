@@ -1,0 +1,58 @@
+type CaseTemplate implements InternalObject & BasicObject {
+  id: ID! # internal_id
+  standard_id: String!
+  entity_type: String!
+  representative: Representative!
+  parent_types: [String!]!
+  metrics:[Metric]
+  created: DateTime
+  modified: DateTime
+  name: String!
+  description: String
+  tasks: TaskTemplateConnection!
+}
+
+# Ordering
+enum CaseTemplatesOrdering {
+  name
+  description
+  created
+  _score
+}
+
+type CaseTemplateConnection {
+  pageInfo: PageInfo!
+  edges: [CaseTemplateEdge!]!
+}
+type CaseTemplateEdge {
+  cursor: String!
+  node: CaseTemplate!
+}
+
+# Queries
+type Query {
+  caseTemplate(id: String!): CaseTemplate @auth
+  caseTemplates(
+    first: Int
+    after: ID
+    orderBy: CaseTemplatesOrdering
+    orderMode: OrderingMode
+    search: String
+  ): CaseTemplateConnection @auth
+}
+
+# Mutations
+input CaseTemplateAddInput {
+  name: String! @constraint(minLength: 2, format: "not-blank")
+  description: String
+  created: DateTime
+  tasks: [StixRef!]!
+}
+
+type Mutation {
+  caseTemplateAdd(input: CaseTemplateAddInput!): CaseTemplate @auth(for: [SETTINGS_SETCASETEMPLATES])
+  caseTemplateDelete(id: ID!): ID @auth(for: [SETTINGS_SETCASETEMPLATES])
+  caseTemplateFieldPatch(id: ID!, input: [EditInput!]!, commitMessage: String, references: [String]): CaseTemplate @auth(for: [SETTINGS_SETCASETEMPLATES])
+  caseTemplateRelationAdd(id: ID!, input: StixRefRelationshipAddInput!): CaseTemplate @auth(for: [SETTINGS_SETCASETEMPLATES])
+  caseTemplateRelationDelete(id: ID!, toId: StixRef!, relationship_type: String!): CaseTemplate @auth(for: [SETTINGS_SETCASETEMPLATES])
+}

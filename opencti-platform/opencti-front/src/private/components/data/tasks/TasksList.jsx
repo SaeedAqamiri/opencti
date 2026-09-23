@@ -1,0 +1,529 @@
+import Button from '@common/button/Button';
+import { Paper } from '@filigran/design-system';
+import Card from '@common/card/Card';
+import Dialog from '@common/dialog/Dialog';
+import Tag from '@common/tag/Tag';
+import { Stack } from '@mui/material';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContentText from '@mui/material/DialogContentText';
+import Grid from '@mui/material/Grid';
+import LinearProgress from '@mui/material/LinearProgress';
+import Slide from '@mui/material/Slide';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import makeStyles from '@mui/styles/makeStyles';
+import { Delete } from 'mdi-material-ui';
+import * as R from 'ramda';
+import React, { useState } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import TaskScope from '../../../../components/TaskScope';
+import TaskStatus from '../../../../components/TaskStatus';
+import TasksFilterValueContainer from '../../../../components/TasksFilterValueContainer';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation, MESSAGING$ } from '../../../../relay/environment';
+import Security from '../../../../utils/Security';
+import { truncate } from '../../../../utils/String';
+import { convertFiltersFromOldFormat } from '../../../../utils/filters/filtersFromOldFormat';
+import { deserializeFilterGroupForFrontend, isStringifiedFilterGroupFormatCorrect, isFilterGroupNotEmpty } from '../../../../utils/filters/filtersUtils';
+import { KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import { deleteNode } from '../../../../utils/store';
+
+// Deprecated - https://mui.com/system/styles/basics/
+// Do not use it for new code.
+const useStyles = makeStyles(() => ({
+  progress: {
+    borderRadius: 4,
+    height: 10,
+  },
+}));
+
+const Transition = React.forwardRef((props, ref) => (
+  <Slide direction="up" ref={ref} {...props} />
+));
+Transition.displayName = 'TransitionSlide';
+
+export const tasksListTaskDeletionMutation = graphql`
+  mutation TasksListTaskDeletionMutation($id: ID!) {
+    deleteBackgroundTask(id: $id)
+  }
+`;
+
+export const tasksListQuery = graphql`
+  query TasksListQuery(
+    $count: Int
+    $orderBy: BackgroundTasksOrdering
+    $orderMode: OrderingMode
+    $includeAuthorities: Boolean
+    $filters: FilterGroup
+  ) {
+    ...TasksList_data
+    @arguments(
+      count: $count
+      orderBy: $orderBy
+      orderMode: $orderMode
+      includeAuthorities: $includeAuthorities
+      filters: $filters
+    )
+  }
+`;
+
+const TasksListFragment = graphql`
+  fragment TasksList_data on Query
+  @argumentDefinitions(
+    count: { type: "Int" }
+    orderBy: { type: "BackgroundTasksOrdering", defaultValue: created_at }
+    orderMode: { type: "OrderingMode", defaultValue: desc }
+    includeAuthorities: { type: "Boolean", defaultValue: true }
+    filters: { type: "FilterGroup" }
+  ) {
+    backgroundTasks(
+      first: $count
+      orderBy: $orderBy
+      orderMode: $orderMode
+      includeAuthorities: $includeAuthorities
+      filters: $filters
+    ) @connection(key: "Pagination_backgroundTasks") {
+      edges {
+        node {
+          id
+          type
+          description
+          initiator {
+            name
+          }
+          actions {
+            type
+            context {
+              field
+              type
+              values
+            }
+          }
+          created_at
+          last_execution_date
+          completed
+          task_expected_number
+          task_processed_number
+          errors {
+            id
+            timestamp
+            message
+          }
+          ... on ListTask {
+            task_ids
+            scope
+          }
+          ... on QueryTask {
+            task_filters
+            task_search
+            scope
+          }
+          work {
+            id
+            connector {
+              name
+            }
+            user {
+              name
+            }
+            completed_time
+            received_time
+            tracking {
+              import_expected_number
+              import_processed_number
+            }
+            messages {
+              timestamp
+              message
+            }
+            errors {
+              timestamp
+              message
+            }
+            status
+            timestamp
+            draft_context  
+          }
+        }
+      }
+    }
+  }
+`;
+const TasksList = ({ data, options }) => {
+  const classes = useStyles();
+  const { t_i18n, nsdt, n } = useFormatter();
+  const [displayMessages, setDisplayMessages] = useState(false);
+  const [displayErrors, setDisplayErrors] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [errors, setErrors] = useState([]);
+  const { backgroundTasks } = useFragment(TasksListFragment, data);
+  const handleCloseMessages = () => {
+    setDisplayMessages(false);
+    setMessages([]);
+  };
+
+  const handleOpenErrors = (err) => {
+    setDisplayErrors(true);
+    setErrors(err);
+  };
+
+  const handleCloseErrors = () => {
+    setDisplayErrors(false);
+    setErrors([]);
+  };
+
+  const handleDeleteTask = (taskId) => {
+    commitMutation({
+      mutation: tasksListTaskDeletionMutation,
+      variables: {
+        id: taskId,
+      },
+      updater: (store) => {
+        if (options) {
+          deleteNode(store, 'Pagination_backgroundTasks', options, taskId);
+        }
+      },
+      onCompleted: () => {
+        MESSAGING$.notifySuccess(t_i18n('The task has been deleted'));
+      },
+    });
+  };
+
+  const tasks = backgroundTasks?.edges ?? [];
+  return (
+    <div>
+      {tasks.length === 0 && (
+        <Card>
+          <div
+            style={{
+              display: 'table',
+              height: '100%',
+              width: '100%',
+            }}
+          >
+            <div
+              style={{
+                display: 'table',
+                height: '100%',
+                width: '100%',
+              }}
+            >
+              {t_i18n('No task')}
+            </div>
+          </div>
+        </Card>
+      )}
+      <Stack spacing={2}>
+        {tasks.map((taskEdge) => {
+          const task = taskEdge.node;
+          let status;
+          if (task.completed) {
+            status = 'complete';
+          } else if (task.task_processed_number > 0) {
+            status = 'provisioning';
+          } else {
+            status = 'wait';
+          }
+          if (task.work) {
+            if (task.work.status === 'wait' || task.work.status === 'progress') {
+              status = 'processing';
+            }
+          }
+          let filters = null;
+          let listIds = '';
+          if (task.task_filters) {
+            filters = isStringifiedFilterGroupFormatCorrect(task.task_filters)
+              ? deserializeFilterGroupForFrontend(task.task_filters)
+              : convertFiltersFromOldFormat(task.task_filters);
+          } else if (task.task_ids) {
+            listIds = truncate(R.join(', ', task.task_ids), 60);
+          }
+          const lastTaskExecutionDate = task.work ? task.work.completed_time : task.last_execution_date;
+          const taskWorkProcessedNumber = task.work?.tracking?.import_processed_number ?? 0;
+          const taskWorkExpectedNumber = task.work?.tracking?.import_expected_number ?? 0;
+          const progressNumberDisplay = task.work ? ` ${taskWorkProcessedNumber}/${taskWorkExpectedNumber}` : '';
+          const provisioningNumberDisplay = task.work && (task.work.status === 'wait' || task.work.status === 'progress')
+            ? ` (Provisioning: ${task.task_processed_number}/${task.task_expected_number})`
+            : '';
+          const progressFullText = `${t_i18n('Progress')}${progressNumberDisplay}${provisioningNumberDisplay}`;
+          let progressValue;
+          if (task.work) {
+            if (task.work.status === 'complete') {
+              progressValue = 100;
+            } else if (task.work.status === 'wait') {
+              progressValue = 0;
+            } else if (taskWorkExpectedNumber) {
+              progressValue = Math.round((100 * (taskWorkProcessedNumber)) / (taskWorkExpectedNumber));
+            } else {
+              progressValue = 0;
+            }
+          } else {
+            progressValue = 100;
+          }
+          const taskErrors = [...task.errors, ...(task.work?.errors ?? [])];
+          return (
+            <Card key={task.id}>
+              <Grid container={true} spacing={3}>
+                <Grid item xs={5}>
+                  <Grid container={true} spacing={1}>
+                    {task.description && (
+                      <Grid item xs={12}>
+                        <Typography variant="h3" gutterBottom={true}>
+                          {`${t_i18n('Description')}: ${task.description}`}
+                        </Typography>
+                      </Grid>
+                    )}
+                    <Grid item xs={12}>
+                      <Stack gap={1}>
+                        <Typography variant="h3" gutterBottom={true}>
+                          {t_i18n('Targeted entities')} ({n(task.task_expected_number)})
+                        </Typography>
+                        {task.task_search && (
+                          <Stack direction="row" gap={1}>
+                            <Tag
+                              label={`${t_i18n('Search')}: ${task.task_search}`}
+                            />
+                            <Tag
+                              label={t_i18n('AND')}
+                            />
+                          </Stack>
+                        )}
+                        {task.type !== 'RULE'
+                          && (isFilterGroupNotEmpty(filters)
+                            ? (
+                                <TasksFilterValueContainer
+                                  filters={filters}
+                                  entityTypes={['Stix-Core-Object', 'stix-core-relationship', 'Notification', 'User']}
+                                />
+                              )
+                            : (
+                                <Tag
+                                  label={`${t_i18n('List of entities')}: ${listIds}`}
+                                  sx={{
+                                    width: 'fit-content',
+                                  }}
+                                />
+                              )
+                          )
+                        }
+                        {task.type === 'RULE' && (
+                          <Tag
+                            label={t_i18n('All rule targets')}
+                          />
+                        )}
+                      </Stack>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Stack gap={1}>
+                        <Typography variant="h3" gutterBottom={true}>
+                          {t_i18n('Actions')}
+                        </Typography>
+                        {task.type === 'RULE' && (
+                          <Tag
+                            label={t_i18n('APPLY RULE')}
+                          />
+                        )}
+                        {task.actions
+                          && R.map(
+                            (action) => (
+                              <Stack
+                                key={task.actions.indexOf(action)}
+                                direction="row"
+                                gap={1}
+                                flexWrap="wrap"
+                              >
+                                <Tag
+                                  label={action.type}
+                                />
+                                {action.context && (
+                                  <Tag
+                                    label={[
+                                      action.context.field && `${t_i18n(action.context.field)}: `,
+                                      truncate(R.join(', ', action.context.values || []), 80),
+                                    ]
+                                      .filter(Boolean)
+                                      .join('')}
+                                  />
+                                )}
+                              </Stack>
+                            ),
+                            task.actions,
+                          )}
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                </Grid>
+                <Grid item xs={7}>
+                  <Grid container={true} spacing={3}>
+                    <Grid item xs={2}>
+                      <Typography variant="h3" gutterBottom={true}>
+                        {t_i18n('Initiator')}
+                      </Typography>
+                      <Tooltip title={task.initiator?.name}>
+                        {truncate(task.initiator?.name, 15)}
+                      </Tooltip>
+                    </Grid>
+                    <Grid item xs={2}>
+                      <Typography variant="h3" gutterBottom={true}>
+                        {t_i18n('Task start time')}
+                      </Typography>
+                      {nsdt(task.created_at)}
+                    </Grid>
+                    <Grid item xs={2}>
+                      <Typography variant="h3" gutterBottom={true}>
+                        {task.completed
+                          ? t_i18n('Task end time')
+                          : t_i18n('Task last execution time')}
+                      </Typography>
+                      {nsdt(lastTaskExecutionDate)}
+                    </Grid>
+                    {(task.scope ?? task.type)
+                      && (
+                        <Grid item xs={2}>
+                          <Typography variant="h3" gutterBottom={true}>
+                            {t_i18n('Scope')}
+                          </Typography>
+                          <TaskScope scope={task.scope ?? task.type} label={t_i18n(task.scope ?? task.type)} />
+                        </Grid>
+                      )
+                    }
+                    <Grid item xs={2}>
+                      <Typography variant="h3" gutterBottom={true}>
+                        {t_i18n('Status')}
+                      </Typography>
+                      <TaskStatus status={status} label={t_i18n(status)} />
+                    </Grid>
+                    <Grid item xs={10}>
+                      <Typography variant="h3" gutterBottom={true}>
+                        {progressFullText}
+                      </Typography>
+                      <LinearProgress
+                        classes={{ root: classes.progress }}
+                        variant="determinate"
+                        value={progressValue}
+                      />
+                    </Grid>
+                  </Grid>
+                  <br />
+                </Grid>
+                <Button
+                  style={{ position: 'absolute', right: 10, top: 10 }}
+                  variant={taskErrors.length > 0 ? 'contained' : 'outlined'}
+                  color="error"
+                  disabled={taskErrors.length === 0}
+                  onClick={() => handleOpenErrors(taskErrors)}
+                  size="small"
+                >
+                  {taskErrors.length} {t_i18n('errors')}
+                </Button>
+                {task.scope // if task.scope exists = it is list task or a query task
+                  ? (
+                      <Button
+                        style={{ position: 'absolute', right: 10, bottom: 10 }}
+                        variant="secondary"
+                        onClick={() => handleDeleteTask(task.id)}
+                        size="small"
+                      >
+                        <Delete fontSize="small" />
+                    &nbsp;&nbsp;{t_i18n('Delete')}
+                      </Button>
+                    )
+                  : (
+                      <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                        <Button
+                          style={{ position: 'absolute', right: 10, bottom: 10 }}
+                          variant="outlined"
+                          onClick={() => handleDeleteTask(task.id)}
+                          size="small"
+                        >
+                          <Delete fontSize="small" />
+                      &nbsp;&nbsp;{t_i18n('Delete')}
+                        </Button>
+                      </Security>
+                    )
+                }
+              </Grid>
+            </Card>
+          );
+        })}
+      </Stack>
+      <Dialog
+        open={displayMessages}
+        keepMounted={true}
+        onClose={handleCloseMessages}
+      >
+        <DialogContentText>
+          <Paper padding={0}>
+            <TableContainer>
+              <Table className={classes.table} aria-label="simple table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{t_i18n('Timestamp')}</TableCell>
+                    <TableCell>{t_i18n('Message')}</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {messages.map((message) => (
+                    <TableRow key={message.timestamp}>
+                      <TableCell>{nsdt(message.timestamp)}</TableCell>
+                      <TableCell>{message.message}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </DialogContentText>
+        <DialogActions>
+          <Button
+            onClick={handleCloseMessages}
+          >
+            {t_i18n('Close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={displayErrors}
+        keepMounted={true}
+        onClose={handleCloseErrors}
+      >
+        <DialogContentText>
+          <Paper padding={0}>
+            <TableContainer>
+              <Table className={classes.table} aria-label="simple table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>{t_i18n('Timestamp')}</TableCell>
+                    <TableCell>{t_i18n('Message')}</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {errors.map((error) => (
+                    <TableRow key={error.timestamp}>
+                      <TableCell>{nsdt(error.timestamp)}</TableCell>
+                      <TableCell>{error.message}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </DialogContentText>
+        <DialogActions>
+          <Button onClick={handleCloseErrors}>
+            {t_i18n('Close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </div>
+  );
+};
+
+export default TasksList;

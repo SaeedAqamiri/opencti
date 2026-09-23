@@ -1,0 +1,394 @@
+import React, { FunctionComponent, useEffect, useState } from 'react';
+import { Field, Form, Formik } from 'formik';
+import Drawer, { DrawerControlledDialProps } from '@components/common/drawer/Drawer';
+import Button from '@common/button/Button';
+import * as Yup from 'yup';
+import { graphql } from 'react-relay';
+import { RecordSourceSelectorProxy } from 'relay-runtime';
+import { FormikConfig } from 'formik/dist/types';
+import ConfidenceField from '@components/common/form/ConfidenceField';
+import { useFormatter } from '../../../../components/i18n';
+import { handleErrorInForm } from '../../../../relay/environment';
+import TextField from '../../../../components/TextField';
+import CreatedByField from '../../common/form/CreatedByField';
+import ObjectMarkingField from '../../common/form/ObjectMarkingField';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import { ExternalReferencesField } from '../../common/form/ExternalReferencesField';
+import { parse } from '../../../../utils/Time';
+import DateTimePickerField from '../../../../components/DateTimePickerField';
+import OpenVocabField from '../../common/form/OpenVocabField';
+import { FieldOption, fieldSpacingContainerStyle } from '../../../../utils/field';
+import ObjectLabelField from '../../common/form/ObjectLabelField';
+import { useDynamicSchemaCreationValidation, useIsMandatoryAttribute, yupShapeConditionalRequired } from '../../../../utils/hooks/useEntitySettings';
+import { insertNode } from '../../../../utils/store';
+import { EventCreationMutation, EventCreationMutation$variables } from './__generated__/EventCreationMutation.graphql';
+import { EventsLinesPaginationQuery$variables } from './__generated__/EventsLinesPaginationQuery.graphql';
+import useDefaultValues from '../../../../utils/hooks/useDefaultValues';
+import CustomFileUploader from '../../common/files/CustomFileUploader';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import CreateEntityControlledDial from '../../../../components/CreateEntityControlledDial';
+import useBulkCommit from '../../../../utils/hooks/useBulkCommit';
+import { splitMultilines } from '../../../../utils/String';
+import BulkTextModal from '../../../../components/fields/BulkTextField/BulkTextModal';
+import ProgressBar from '../../../../components/ProgressBar';
+import BulkTextField from '../../../../components/fields/BulkTextField/BulkTextField';
+import BulkTextModalButton from '../../../../components/fields/BulkTextField/BulkTextModalButton';
+import FormButtonContainer from '@common/form/FormButtonContainer';
+import useMarkdownCreationFilesInput from '../../../../utils/markdown/useMarkdownCreationFilesInput';
+
+const eventMutation = graphql`
+  mutation EventCreationMutation($input: EventAddInput!) {
+    eventAdd(input: $input) {
+      id
+      standard_id
+      name
+      representative {
+        main
+      }
+      description
+      confidence
+      entity_type
+      parent_types
+      ...EventLine_node
+    }
+  }
+`;
+
+const EVENT_TYPE = 'Event';
+
+interface EventAddInput {
+  name: string;
+  description: string;
+  x_opencti_score?: string;
+  confidence: number | null;
+  event_types: string[];
+  start_time: Date | null;
+  stop_time: Date | null;
+  createdBy: FieldOption | undefined;
+  objectMarking: FieldOption[];
+  objectLabel: FieldOption[];
+  externalReferences: { value: string }[];
+  file: File | null;
+}
+
+interface EventFormProps {
+  updater: (store: RecordSourceSelectorProxy, key: string, response: EventCreationMutation['response']['eventAdd']) => void;
+  onReset?: () => void;
+  onCompleted?: () => void;
+  defaultCreatedBy?: FieldOption;
+  defaultMarkingDefinitions?: FieldOption[];
+  inputValue?: string;
+  bulkModalOpen?: boolean;
+  onBulkModalClose: () => void;
+}
+
+export const EventCreationForm: FunctionComponent<EventFormProps> = ({
+  updater,
+  onReset,
+  onCompleted,
+  defaultCreatedBy,
+  defaultMarkingDefinitions,
+  inputValue,
+  bulkModalOpen = false,
+  onBulkModalClose,
+}) => {
+  const { t_i18n } = useFormatter();
+  const [progressBarOpen, setProgressBarOpen] = useState(false);
+
+  const { mandatoryAttributes } = useIsMandatoryAttribute(EVENT_TYPE);
+  const basicShape = yupShapeConditionalRequired({
+    name: Yup.string().trim().min(2),
+    description: Yup.string().nullable(),
+    x_opencti_score: Yup.number().integer(t_i18n('The value must be an integer'))
+      .nullable()
+      .min(0, t_i18n('The value must be greater than or equal to 0'))
+      .max(100, t_i18n('The value must be less than or equal to 100')),
+    confidence: Yup.number().nullable(),
+    event_types: Yup.array().nullable(),
+    start_time: Yup.date()
+      .typeError(t_i18n('The value must be a datetime (yyyy-MM-dd hh:mm (a|p)m)'))
+      .nullable(),
+    stop_time: Yup.date()
+      .typeError(t_i18n('The value must be a datetime (yyyy-MM-dd hh:mm (a|p)m)'))
+      .min(Yup.ref('start_time'), 'The end date can\'t be before start date')
+      .nullable(),
+    createdBy: Yup.object().nullable(),
+    objectMarking: Yup.array().nullable(),
+  }, mandatoryAttributes);
+  const eventValidator = useDynamicSchemaCreationValidation(mandatoryAttributes, basicShape);
+
+  const [commit] = useApiMutation<EventCreationMutation>(
+    eventMutation,
+    undefined,
+    { successMessage: `${t_i18n('entity_Event')} ${t_i18n('successfully created')}` },
+  );
+  const { buildCreationFilesInput, registerMarkdownImagesController } = useMarkdownCreationFilesInput();
+  const {
+    bulkCommit,
+    bulkCount,
+    bulkCurrentCount,
+    BulkResult,
+    resetBulk,
+  } = useBulkCommit<EventCreationMutation>({
+    commit,
+    relayUpdater: (store, response) => {
+      if (updater) {
+        updater(store, 'eventAdd', response?.eventAdd);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (bulkCount > 1) {
+      setProgressBarOpen(true);
+    }
+  }, [bulkCount]);
+
+  const onSubmit: FormikConfig<EventAddInput>['onSubmit'] = (
+    values,
+    { setSubmitting, setErrors, resetForm },
+  ) => {
+    const allNames = splitMultilines(values.name);
+    const variables: EventCreationMutation$variables[] = allNames.map((name) => {
+      const input: EventCreationMutation$variables['input'] = {
+        ...buildCreationFilesInput(values.file ? [values.file] : []),
+        name,
+        description: values.description,
+        event_types: values.event_types,
+        x_opencti_score: values.x_opencti_score ? parseInt(values.x_opencti_score, 10) : undefined,
+        confidence: parseInt(String(values.confidence), 10),
+        start_time: values.start_time ? parse(values.start_time).format() : null,
+        stop_time: values.stop_time ? parse(values.stop_time).format() : null,
+        createdBy: values.createdBy?.value,
+        objectMarking: values.objectMarking.map((v) => v.value),
+        objectLabel: values.objectLabel.map((v) => v.value),
+        externalReferences: values.externalReferences.map(({ value }) => value),
+      };
+      return { input };
+    });
+
+    bulkCommit({
+      variables,
+      onStepError: (error) => {
+        handleErrorInForm(error, setErrors);
+      },
+      onCompleted: (total: number) => {
+        setSubmitting(false);
+        if (total < 2) {
+          resetForm();
+          onCompleted?.();
+        }
+      },
+    });
+  };
+
+  const initialValues = useDefaultValues(EVENT_TYPE, {
+    name: inputValue ?? '',
+    description: '',
+    x_opencti_score: undefined,
+    event_types: [],
+    start_time: null,
+    confidence: null,
+    stop_time: null,
+    createdBy: defaultCreatedBy ?? undefined, // undefined for Require Fields Flagging, if Configured Mandatory Field
+    objectMarking: defaultMarkingDefinitions ?? [],
+    objectLabel: [],
+    externalReferences: [],
+    file: null,
+  });
+
+  return (
+    <Formik<EventAddInput>
+      initialValues={initialValues}
+      validationSchema={eventValidator}
+      validateOnChange={false}
+      validateOnBlur={false}
+      onSubmit={onSubmit}
+      onReset={onReset}
+    >
+      {({ submitForm, handleReset, isSubmitting, setFieldValue, values, resetForm }) => (
+        <>
+          <BulkTextModal
+            open={bulkModalOpen}
+            onClose={onBulkModalClose}
+            onValidate={async (val) => {
+              await setFieldValue('name', val);
+              if (splitMultilines(val).length > 1) {
+                await setFieldValue('file', null);
+              }
+            }}
+            formValue={values.name}
+          />
+          <ProgressBar
+            open={progressBarOpen}
+            value={(bulkCurrentCount / bulkCount) * 100}
+            label={`${bulkCurrentCount}/${bulkCount}`}
+            title={t_i18n('Create multiple entities')}
+            onClose={() => {
+              setProgressBarOpen(false);
+              resetForm();
+              resetBulk();
+              onCompleted?.();
+            }}
+          >
+            <BulkResult variablesToString={(v) => v.input.name} />
+          </ProgressBar>
+          <Form>
+            <Field
+              component={BulkTextField}
+              variant="outlined"
+              name="name"
+              label={t_i18n('Name')}
+              required={(mandatoryAttributes.includes('name'))}
+              fullWidth={true}
+              detectDuplicate={['Event']}
+            />
+            <OpenVocabField
+              label={t_i18n('Event types')}
+              type="event-type-ov"
+              name="event_types"
+              required={(mandatoryAttributes.includes('event_types'))}
+              containerStyle={fieldSpacingContainerStyle}
+              multiple
+              onChange={setFieldValue}
+            />
+            <Field
+              component={MarkdownField}
+              name="description"
+              label={t_i18n('Description')}
+              required={(mandatoryAttributes.includes('description'))}
+              fullWidth={true}
+              multiline={true}
+              rows={4}
+              style={fieldSpacingContainerStyle}
+              autoPersistOnBlur={false}
+              registerMarkdownImagesController={registerMarkdownImagesController}
+              uploadFileMarkings={values.objectMarking.map(({ value }) => value)}
+            />
+            <Field
+              component={DateTimePickerField}
+              name="start_time"
+              textFieldProps={{
+                label: t_i18n('Start date'),
+                required: (mandatoryAttributes.includes('start_time')),
+                variant: 'outlined',
+                fullWidth: true,
+                style: { ...fieldSpacingContainerStyle },
+              }}
+            />
+            <Field
+              component={DateTimePickerField}
+              name="stop_time"
+              textFieldProps={{
+                label: t_i18n('End date'),
+                required: (mandatoryAttributes.includes('stop_time')),
+                variant: 'outlined',
+                fullWidth: true,
+                style: { ...fieldSpacingContainerStyle },
+              }}
+            />
+            <ConfidenceField
+              entityType="Event"
+              containerStyle={fieldSpacingContainerStyle}
+            />
+            {/* A `style` on the field is unplaceable and sends it back to MUI. */}
+            <div style={fieldSpacingContainerStyle}>
+              <Field
+                component={TextField}
+                name="x_opencti_score"
+                required={(mandatoryAttributes.includes('x_opencti_score'))}
+                label={t_i18n('Score')}
+                fullWidth={true}
+                type="number"
+              />
+            </div>
+            <CreatedByField
+              name="createdBy"
+              required={(mandatoryAttributes.includes('createdBy'))}
+              style={fieldSpacingContainerStyle}
+              setFieldValue={setFieldValue}
+            />
+            <ObjectLabelField
+              name="objectLabel"
+              required={(mandatoryAttributes.includes('objectLabel'))}
+              style={fieldSpacingContainerStyle}
+              setFieldValue={setFieldValue}
+              values={values.objectLabel}
+            />
+            <ObjectMarkingField
+              name="objectMarking"
+              required={(mandatoryAttributes.includes('objectMarking'))}
+              style={fieldSpacingContainerStyle}
+              setFieldValue={setFieldValue}
+            />
+            <ExternalReferencesField
+              name="externalReferences"
+              required={(mandatoryAttributes.includes('externalReferences'))}
+              style={fieldSpacingContainerStyle}
+              setFieldValue={setFieldValue}
+              values={values.externalReferences}
+            />
+            <Field
+              component={CustomFileUploader}
+              name="file"
+              setFieldValue={setFieldValue}
+              disabled={splitMultilines(values.name).length > 1}
+              noFileSelectedLabel={splitMultilines(values.name).length > 1
+                ? t_i18n('File upload not allowed in bulk creation')
+                : undefined
+              }
+            />
+            <FormButtonContainer>
+              <Button
+                variant="secondary"
+                onClick={handleReset}
+                disabled={isSubmitting}
+              >
+                {t_i18n('Cancel')}
+              </Button>
+              <Button
+                onClick={submitForm}
+                disabled={isSubmitting}
+              >
+                {t_i18n('Create')}
+              </Button>
+            </FormButtonContainer>
+          </Form>
+        </>
+      )}
+    </Formik>
+  );
+};
+
+const EventCreation = ({
+  paginationOptions,
+}: {
+  paginationOptions: EventsLinesPaginationQuery$variables;
+}) => {
+  const { t_i18n } = useFormatter();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const updater = (store: RecordSourceSelectorProxy) => insertNode(store, 'Pagination_events', paginationOptions, 'eventAdd');
+
+  const CreateEventControlledDial = (props: DrawerControlledDialProps) => (
+    <CreateEntityControlledDial entityType="Event" {...props} />
+  );
+  return (
+    <Drawer
+      title={t_i18n('Create an event')}
+      header={<BulkTextModalButton onClick={() => setBulkOpen(true)} />}
+      controlledDial={CreateEventControlledDial}
+    >
+      {({ onClose }) => (
+        <EventCreationForm
+          updater={updater}
+          onCompleted={onClose}
+          onReset={onClose}
+          bulkModalOpen={bulkOpen}
+          onBulkModalClose={() => setBulkOpen(false)}
+        />
+      )}
+    </Drawer>
+  );
+};
+
+export default EventCreation;

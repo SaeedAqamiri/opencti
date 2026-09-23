@@ -1,0 +1,234 @@
+import React, { useMemo } from 'react';
+import { Route, Routes, useLocation, useParams } from 'react-router';
+import { graphql, type PreloadedQuery, usePreloadedQuery, useSubscription } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import AdministrativeArea from './AdministrativeArea';
+import AdministrativeAreaKnowledge from './AdministrativeAreaKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import FileManager from '../../common/files/FileManager';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import { RootAdministrativeAreaQuery } from './__generated__/RootAdministrativeAreaQuery.graphql';
+import { RootAdministrativeAreasSubscription } from './__generated__/RootAdministrativeAreasSubscription.graphql';
+import useQueryLoading from '../../../../utils/hooks/useQueryLoading';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import AdministrativeAreaEdition from './AdministrativeAreaEdition';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import AdministrativeAreaDeletion from './AdministrativeAreaDeletion';
+import { PATH_ADMINISTRATIVE_AREA, PATH_ADMINISTRATIVE_AREAS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootAdministrativeAreasSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on AdministrativeArea {
+        ...AdministrativeArea_administrativeArea
+        ...AdministrativeAreaEditionOverview_administrativeArea
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const administrativeAreaQuery = graphql`
+  query RootAdministrativeAreaQuery($id: String!) {
+    administrativeArea(id: $id) {
+      id
+      entity_type
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      name
+      x_opencti_aliases
+      x_opencti_graph_data
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...AdministrativeArea_administrativeArea
+      ...AdministrativeAreaKnowledge_administrativeArea
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+interface RootAdministrativeAreaComponentProps {
+  queryRef: PreloadedQuery<RootAdministrativeAreaQuery>;
+  administrativeAreaId: string;
+}
+
+const RootAdministrativeAreaComponent = ({ queryRef, administrativeAreaId }: RootAdministrativeAreaComponentProps) => {
+  const subConfig = useMemo<
+    GraphQLSubscriptionConfig<RootAdministrativeAreasSubscription>
+  >(
+    () => ({
+      subscription,
+      variables: { id: administrativeAreaId },
+    }),
+    [administrativeAreaId],
+  );
+  useSubscription(subConfig);
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  const data = usePreloadedQuery(administrativeAreaQuery, queryRef);
+  const { forceUpdate } = useForceUpdate();
+  const { administrativeArea, connectorsForImport, connectorsForExport } = data;
+  const basePath = PATH_ADMINISTRATIVE_AREA(administrativeAreaId);
+  const link = `${basePath}/knowledge`;
+  const paddingRight = getPaddingRight(location.pathname, basePath);
+  return (
+    <CreateRelationshipContextProvider>
+      {administrativeArea ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={(
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'organizations',
+                    'regions',
+                    'countries',
+                    'cities',
+                    'threats',
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'malwares',
+                    'attack_patterns',
+                    'tools',
+                    'observables',
+                  ]}
+                  data={administrativeArea}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Locations') },
+              { label: t_i18n('Administrative areas'), link: PATH_ADMINISTRATIVE_AREAS },
+              { label: administrativeArea.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Administrative-Area"
+              disableSharing={true}
+              stixDomainObject={administrativeArea}
+              EditComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <AdministrativeAreaEdition
+                    administrativeAreaId={administrativeArea.id}
+                  />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={administrativeArea}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <AdministrativeAreaDeletion id={administrativeArea.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              enableQuickSubscription={true}
+              isOpenctiAlias={true}
+              redirectToContent={true}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={administrativeArea}
+              basePath={basePath}
+              pages={{
+                overview:
+                  <AdministrativeArea administrativeAreaData={administrativeArea} />,
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <AdministrativeAreaKnowledge administrativeAreaData={administrativeArea} />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={administrativeArea}
+                  />
+                ),
+                analyses:
+                  <StixCoreObjectOrStixCoreRelationshipContainers stixDomainObjectOrStixCoreRelationship={administrativeArea} />,
+                sightings: (
+                  <EntityStixSightingRelationships
+                    entityId={administrativeArea.id}
+                    entityLink={link}
+                    noPadding={true}
+                    isTo={true}
+                  />
+                ),
+                files: (
+                  <FileManager
+                    id={administrativeAreaId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={administrativeArea}
+                  />
+                ),
+                history:
+                  <StixCoreObjectHistory stixCoreObjectId={administrativeAreaId} />,
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+
+const RootAdministrativeArea = () => {
+  const { administrativeAreaId } = useParams() as {
+    administrativeAreaId: string;
+  };
+  const queryRef = useQueryLoading<RootAdministrativeAreaQuery>(
+    administrativeAreaQuery,
+    { id: administrativeAreaId },
+  );
+  return (
+    <>
+      {queryRef && (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootAdministrativeAreaComponent queryRef={queryRef} administrativeAreaId={administrativeAreaId} />
+        </React.Suspense>
+      )}
+    </>
+  );
+};
+
+export default RootAdministrativeArea;

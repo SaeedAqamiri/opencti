@@ -1,0 +1,259 @@
+import { CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import * as R from 'ramda';
+import DataTableHeaders from './DataTableHeaders';
+import { DataTableBodyProps, DataTableLineProps, DataTableVariant } from '../dataTableTypes';
+import DataTableLine, { DataTableLinesDummy } from './DataTableLine';
+import { useDataTableContext } from './DataTableContext';
+import { ICON_COLUMN_SIZE, SELECT_COLUMN_SIZE } from './DataTableHeader';
+import callbackResizeObserver from '../../../utils/resizeObservers';
+import { useDataTable } from '../dataTableHooks';
+import DataTableEmptyState from './DataTableEmptyState';
+import DataTableSearchEmptyState from './DataTableSearchEmptyState';
+import { removeEmptyFiltersFromList } from 'src/utils/filters/filtersUtils';
+
+const DataTableBody = ({
+  settingsMessagesBannerHeight = 0,
+  hasFilterComponent,
+  dataTableToolBarComponent,
+  pageStart,
+  pageSize,
+  hideHeaders = false,
+  emptyStateMessage,
+  searchTerm,
+}: DataTableBodyProps) => {
+  const {
+    rootRef,
+    variant,
+    resolvePath,
+    tableWidthState: [tableWidth],
+    actions,
+    actionsColumnWidth,
+    columns,
+    dataQueryArgs,
+    useDataTableToggle: {
+      selectedElements,
+      onToggleEntity,
+    },
+    useDataTablePaginationLocalStorage: {
+      viewStorage: { filters, searchTerm: storedSearchTerm },
+    },
+    data,
+    enableInfiniteScroll,
+  } = useDataTableContext();
+
+  const {
+    data: queryData,
+    isLoading,
+    loadMore,
+    hasMore,
+  } = data ? { data } : useDataTable(dataQueryArgs); // data is from datatableWithoutFragment
+
+  const tableSearchTerm = searchTerm ?? storedSearchTerm;
+
+  const resolvedData = useMemo(() => {
+    if (!queryData) {
+      return [];
+    }
+    if (enableInfiniteScroll) {
+      // show all loaded data; scroll listener will trigger loadMore
+      return resolvePath(queryData);
+    }
+    return resolvePath(queryData).slice(pageStart, pageStart + pageSize);
+  }, [queryData, pageStart, pageSize, enableInfiniteScroll]);
+
+  useEffect(() => {
+    if (resolvePath(queryData).length < pageStart + pageSize && hasMore?.()) {
+      loadMore?.(pageSize);
+    }
+  }, [resolvedData]);
+
+  const onToggleShiftEntity: DataTableLineProps['onToggleShiftEntity'] = (currentIndex, currentEntity, event) => {
+    if (selectedElements && !R.isEmpty(selectedElements)) {
+      // Find the indexes of the first and last selected entities
+      let firstIndex = R.findIndex(
+        (n: { id: string }) => n.id === R.head(R.values(selectedElements))?.id,
+        resolvedData,
+      );
+      if (currentIndex > firstIndex) {
+        let entities: { id: string }[] = [];
+        while (firstIndex <= currentIndex) {
+          entities = [...entities, resolvedData[firstIndex]];
+          firstIndex += 1;
+        }
+        const forcedRemove = R.values(selectedElements).filter(
+          (n) => !entities.map((o) => o.id).includes(n.id),
+        );
+        return onToggleEntity(entities, event, forcedRemove);
+      }
+      let entities: { id: string }[] = [];
+      while (firstIndex >= currentIndex) {
+        entities = [...entities, resolvedData[firstIndex]];
+        firstIndex -= 1;
+      }
+      const forcedRemove = R.values(selectedElements).filter(
+        (n) => !entities.map((o) => o.id).includes(n.id),
+      );
+      return onToggleEntity(entities, event, forcedRemove);
+    }
+    return onToggleEntity(currentEntity, event);
+  };
+
+  const [tableHeight, setTableHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (variant === DataTableVariant.widget && !rootRef) {
+      throw Error('Invalid configuration for widget list');
+    }
+
+    const hasFilters = (filters?.filters ?? []).length > 0;
+    let filtersHeight = hasFilterComponent ? 54 : 0;
+    if (hasFilterComponent && hasFilters) filtersHeight += 48;
+
+    // TODO: this computation should be avoided because too many risk of changes.
+    // Instead use the rootRef props. Example in:
+    // - StixCoreRelationshipCreationFromEntity.tsx
+    // - IndicatorObservables.jsx
+    const defaultComputation = () => {
+      const rootHeight = (document.getElementById('root')?.offsetHeight ?? 0) - settingsMessagesBannerHeight;
+      const headerHeight = 64;
+      const breadcrumbHeight = document.getElementById('page-breadcrumb') ? 38 : 0;
+      const mainPadding = 40;
+      const tabsHeight = document.getElementById('tabs-container')?.children.length ? 72 : 0;
+      setTableHeight(rootHeight - headerHeight - breadcrumbHeight - mainPadding - filtersHeight - tabsHeight);
+    };
+
+    // Take the height of the given parent.
+    let observer: ResizeObserver;
+    const rootComputation = () => {
+      if (rootRef) {
+        setTableHeight(rootRef.offsetHeight - filtersHeight);
+      }
+    };
+
+    if (rootRef) {
+      rootComputation();
+      observer = callbackResizeObserver(rootRef, rootComputation);
+    } else {
+      defaultComputation();
+    }
+
+    return () => {
+      observer?.disconnect();
+    };
+  }, [settingsMessagesBannerHeight, rootRef, filters]);
+
+  const endActionsWidth = actionsColumnWidth ?? SELECT_COLUMN_SIZE;
+  const rowWidth = useMemo(() => (
+    Math.floor(columns.reduce((acc, col) => {
+      if (col.percentWidth) {
+        return acc + tableWidth * (col.percentWidth / 100);
+      }
+      return acc + (col.id === 'icon' ? ICON_COLUMN_SIZE : SELECT_COLUMN_SIZE);
+    }, actions ? endActionsWidth + 9 : 9)) // 9 is for scrollbar.
+  ), [columns, tableWidth, actions, endActionsWidth]);
+
+  const containerLinesStyle: CSSProperties = {
+    overflow: 'hidden auto',
+    maxHeight: `calc(${tableHeight}px - ${hideHeaders ? 0 : SELECT_COLUMN_SIZE}px)`,
+    width: rowWidth,
+  };
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  // ROW_HEIGHT represents the theme.spacing(6) (48) + 1px borderBottom from DataTableLine
+  const ROW_HEIGHT = 49;
+  const OVERSCAN = 5;
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    setScrollTop(el.scrollTop);
+    if (!enableInfiniteScroll || isLoading || !hasMore?.()) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 50) {
+      loadMore?.(pageSize);
+    }
+  }, [isLoading, hasMore, loadMore, pageSize, enableInfiniteScroll]);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return undefined;
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  if (!tableWidth) {
+    return null;
+  }
+
+  const isSearching = !!tableSearchTerm
+    || removeEmptyFiltersFromList(filters?.filters ?? []).length > 0;
+
+  return (
+    <>
+      <div style={{ width: rowWidth }}>
+        {!hideHeaders && (
+          <DataTableHeaders dataTableToolBarComponent={dataTableToolBarComponent} />
+        )}
+      </div>
+
+      <div ref={scrollContainerRef} style={containerLinesStyle}>
+        {resolvedData.length === 0 && isSearching && (
+          <DataTableSearchEmptyState rawSearchTerm={tableSearchTerm} />
+        )}
+        {resolvedData.length === 0 && !!emptyStateMessage && (
+          <DataTableEmptyState message={emptyStateMessage} />
+        )}
+        {enableInfiniteScroll ? (() => {
+          const visibleHeight = tableHeight - (hideHeaders ? 0 : SELECT_COLUMN_SIZE);
+          const firstVisible = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
+          const lastVisible = Math.min(
+            resolvedData.length,
+            Math.ceil((scrollTop + visibleHeight) / ROW_HEIGHT) + OVERSCAN,
+          );
+          const loadedHeight = resolvedData.length * ROW_HEIGHT;
+          const rowsMissingInViewport = Math.max(
+            0,
+            Math.floor((scrollTop + visibleHeight - loadedHeight) / ROW_HEIGHT),
+          );
+          const loadingRowsToShow = (isLoading && lastVisible >= resolvedData.length)
+            ? Math.min(Math.max(pageSize, 10), rowsMissingInViewport)
+            : 0;
+          const totalHeight = loadedHeight + loadingRowsToShow * ROW_HEIGHT;
+          const offsetY = firstVisible * ROW_HEIGHT;
+          return (
+            <div style={{ height: totalHeight, position: 'relative' }}>
+              <div style={{ position: 'absolute', top: offsetY, width: '100%' }}>
+                {resolvedData.slice(firstVisible, lastVisible).map((row: { id: string }, i: number) => (
+                  <DataTableLine
+                    key={row.id}
+                    row={row}
+                    index={firstVisible + i}
+                    onToggleShiftEntity={onToggleShiftEntity}
+                  />
+                ))}
+                {loadingRowsToShow > 0 && (
+                  <DataTableLinesDummy number={loadingRowsToShow} />
+                )}
+              </div>
+            </div>
+          );
+        })() : (
+          <>
+            {/* If we have perf issues we should find a way to memoize this */}
+            {resolvedData.map((row: { id: string }, index: number) => (
+              <DataTableLine
+                key={row.id}
+                row={row}
+                index={index}
+                onToggleShiftEntity={onToggleShiftEntity}
+              />
+            ))}
+            {isLoading && <DataTableLinesDummy number={Math.max(pageSize, 10)} />}
+          </>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default DataTableBody;

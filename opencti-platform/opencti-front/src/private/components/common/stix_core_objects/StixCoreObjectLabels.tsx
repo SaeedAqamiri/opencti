@@ -1,0 +1,116 @@
+import RawTag from '@common/tag/RawTag';
+import Tag from '@common/tag/Tag';
+import { Box, Stack } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import React, { SyntheticEvent } from 'react';
+import { useFormatter } from '../../../../components/i18n';
+import { HandleAddFilter } from '../../../../utils/hooks/useLocalStorage';
+import useChipOverflow from '../../integrations/catalog/components/card/usecases/useChipOverflow';
+import { Theme } from '../../../../components/Theme';
+import { EMPTY_VALUE } from '../../../../utils/String';
+
+interface StixCoreObjectLabelsProps {
+  labels: readonly {
+    readonly color: string | null | undefined;
+    readonly id: string;
+    readonly value: string | null | undefined;
+  }[] | null | undefined;
+  onClick?: HandleAddFilter;
+  variant?: string;
+  revoked?: boolean;
+}
+
+const StixCoreObjectLabels = ({
+  labels,
+  onClick,
+  revoked,
+}: StixCoreObjectLabelsProps) => {
+  const { t_i18n } = useFormatter();
+  const theme = useTheme<Theme>();
+
+  const labelValues = labels?.map((l) => l.value || l.id) ?? [];
+  const { containerRef, chipRefs, visibleCount, shouldTruncate } = useChipOverflow(labelValues);
+
+  // case Revoked
+  if (revoked) {
+    return (
+      <RawTag
+        variant="outlined"
+        label={t_i18n('Revoked')}
+        onClick={(e: SyntheticEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick?.('objectLabel', null, 'eq');
+        }}
+        color={theme.palette.designSystem.tertiary.red[400]}
+      />
+    );
+  }
+
+  // case Some labels
+  if (labels && labels.length > 0) {
+    const hiddenCount = labels.length - visibleCount;
+
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          display: 'flex',
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+          overflow: 'hidden',
+          width: '100%',
+          position: 'relative',
+          gap: '8px',
+        }}
+      >
+        {/* Render the chips, but keep it hidden so we can useChipOverflow calculate
+            the width remaining by chip to know if it should truncate or not */}
+        <Stack direction="row" position="absolute" visibility="hidden" gap={1}>
+          {labels.map((label, index) => (
+            <div
+              key={label.id}
+              ref={(el) => {
+                chipRefs.current[index] = el;
+              }}
+            >
+              <RawTag label={label.value || EMPTY_VALUE} />
+            </div>
+          ))}
+        </Stack>
+
+        {/* Visible chips */}
+        <Stack direction="row" gap={1} overflow="hidden">
+          {labels.slice(0, visibleCount).map((label) => (
+            <Box key={label.id} sx={{ minWidth: 0 }}>
+              <RawTag
+                label={label.value || ''}
+                color={label.color || ''}
+                onClick={(e: React.MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClick?.('objectLabel', label.id, 'eq');
+                }}
+              />
+            </Box>
+          ))}
+        </Stack>
+
+        {shouldTruncate && hiddenCount > 0 && (
+          <Tag
+            label={`+${hiddenCount}`}
+            color={theme.tag.overflowColor}
+            tooltipTitle={labels.slice(visibleCount).map((l) => l.value).join(', ')}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // case no labels
+  return (
+    <>{EMPTY_VALUE}</>
+  );
+};
+
+export default StixCoreObjectLabels;

@@ -1,0 +1,423 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import { ImportWorksDrawerQuery, ImportWorksDrawerQuery$data } from '@components/common/files/__generated__/ImportWorksDrawerQuery.graphql';
+import { fileManagerAskJobImportMutation, fileManagerCreateDraftAskJobImportMutation } from '@components/common/files/FileManager';
+import { fileWorksQuery } from '@components/common/files/ImportWorksDrawer';
+import AuthorizedMembersField, { AuthorizedMembersFieldValue } from '@components/common/form/AuthorizedMembersField';
+import ObjectMarkingField from '@components/common/form/ObjectMarkingField';
+import { ImportFilesContentFileLine_file$data } from '@components/data/import/__generated__/ImportFilesContentFileLine_file.graphql';
+import { ImportWorkbenchesContentFileLine_file$data } from '@components/data/import/__generated__/ImportWorkbenchesContentFileLine_file.graphql';
+import ManageImportConnectorMessage from '@components/data/import/ManageImportConnectorMessage';
+import DialogActions from '@mui/material/DialogActions';
+import { Field, Form, Formik } from 'formik';
+import React, { useEffect, useState } from 'react';
+import { PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import * as Yup from 'yup';
+import SelectFieldFds, { SelectItem } from '../../../../components/fields/SelectFieldFds';
+import { useFormatter } from '../../../../components/i18n';
+import { commitMutation, defaultCommitMutation } from '../../../../relay/environment';
+import { resolveHasUserChoiceParsedCsvMapper } from '../../../../utils/csvMapperUtils';
+import { FieldOption, fieldSpacingContainerStyle } from '../../../../utils/field';
+import useAuth from '../../../../utils/hooks/useAuth';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import ObjectAssigneeField from '@components/common/form/ObjectAssigneeField';
+import ObjectParticipantField from '@components/common/form/ObjectParticipantField';
+import CreatedByField from '@components/common/form/CreatedByField';
+import { useIsMandatoryAttribute } from '../../../../utils/hooks/useEntitySettings';
+import { DraftAddInput, DRAFTWORKSPACE_TYPE } from '@components/drafts/DraftCreation';
+import useDefaultValues from '../../../../utils/hooks/useDefaultValues';
+import { AgentOption, fetchAgentsForIntent, isXtmOneIntentWithoutAgents } from '../../../../utils/ai/agentApi';
+import { useChatbot } from '@components/chatbox/ChatbotContext';
+
+interface LaunchImportDialogProps {
+  file: ImportWorkbenchesContentFileLine_file$data | ImportFilesContentFileLine_file$data;
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+  isDraftContext?: boolean;
+  queryRef: PreloadedQuery<ImportWorksDrawerQuery>;
+}
+
+type ConnectorType = NonNullable<ImportWorksDrawerQuery$data['connectorsForImport']>[number];
+
+const LaunchImportDialog: React.FC<LaunchImportDialogProps> = ({
+  file,
+  queryRef,
+  open,
+  onClose,
+  onSuccess,
+  isDraftContext = false,
+}) => {
+  const { t_i18n } = useFormatter();
+  const { me: owner, settings } = useAuth();
+  const { mandatoryAttributes } = useIsMandatoryAttribute(DRAFTWORKSPACE_TYPE);
+  const showAllMembersLine = !settings.platform_organization?.id;
+  const { connectorsForImport: connectors } = usePreloadedQuery<ImportWorksDrawerQuery>(fileWorksQuery, queryRef);
+  const { xtmOneConfigured } = useChatbot();
+  const isXtmOneConfigured = !!xtmOneConfigured;
+  const [selectedConnector, setSelectedConnector] = React.useState<ConnectorType | null>(null);
+  const [hasUserChoiceCsvMapper, setHasUserChoiceCsvMapper] = React.useState(false);
+  const [availableAgents, setAvailableAgents] = useState<AgentOption[]>([]);
+  // Track which intents have no agents (pre-fetched for all XTM One connectors)
+  const [intentAgentCounts, setIntentAgentCounts] = useState<Record<string, number>>({});
+
+  // Pre-fetch agent counts for all XTM One connectors to disable those with no agents
+  useEffect(() => {
+    if (!isXtmOneConfigured) {
+      setIntentAgentCounts({});
+      return;
+    }
+    const intents = new Set<string>();
+    connectors?.forEach((c) => {
+      if (c?.xtm_one_intent) intents.add(c.xtm_one_intent);
+    });
+    intents.forEach((intent) => {
+      fetchAgentsForIntent(intent).then((agents) => {
+        setIntentAgentCounts((prev) => ({ ...prev, [intent]: agents.length }));
+      });
+    });
+  }, [connectors, isXtmOneConfigured]);
+
+  // Fetch agents when a connector with xtm_one_intent is selected
+  // Also stores a pending pre-select slug to apply once inside Formik render
+  const [pendingAgentConfig, setPendingAgentConfig] = useState<string>('');
+  useEffect(() => {
+    const intent = isXtmOneConfigured ? selectedConnector?.xtm_one_intent : undefined;
+    if (intent) {
+      fetchAgentsForIntent(intent).then((agents) => {
+        setAvailableAgents(agents);
+        // Pre-select first agent
+        if (agents.length > 0) {
+          setPendingAgentConfig(JSON.stringify({ agent_slug: agents[0].slug }));
+        }
+      });
+    } else {
+      setAvailableAgents([]);
+      setPendingAgentConfig('');
+    }
+  }, [selectedConnector, isXtmOneConfigured]);
+
+  const handleSetCsvMapper = (_: UIEvent, csvMapper: string) => {
+    try {
+      const parsedCsvMapper = JSON.parse(csvMapper);
+      const parsedRepresentations = JSON.parse(parsedCsvMapper.representations);
+      const selectedCsvMapper = {
+        ...parsedCsvMapper,
+        representations: [...parsedRepresentations],
+      };
+      setHasUserChoiceCsvMapper(resolveHasUserChoiceParsedCsvMapper(selectedCsvMapper));
+    } catch (_e) {
+      setHasUserChoiceCsvMapper(false);
+    }
+  };
+
+  const handleSelectConnector = (_: UIEvent, value: string) => {
+    const connector = connectors?.find((c) => c?.id === value);
+    setSelectedConnector(connector);
+  };
+
+  const onSubmitImport = (
+    values: {
+      connector_id: string;
+      configuration: string;
+      objectMarking: FieldOption[];
+      validation_mode: string;
+      description: string;
+      objectAssignee: FieldOption[];
+      objectParticipant: FieldOption[];
+      createdBy: FieldOption | undefined;
+      authorized_members?: AuthorizedMembersFieldValue;
+    },
+    { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void; resetForm: () => void },
+  ) => {
+    const { connector_id, configuration, objectMarking, validation_mode, authorized_members } = values;
+    let config = configuration;
+
+    // Dynamically inject the markings chosen by the user into the csv mapper
+    const isCsvConnector = selectedConnector?.name === 'ImportCsv';
+    if (isCsvConnector && configuration && objectMarking) {
+      const parsedConfig = JSON.parse(configuration);
+      if (typeof parsedConfig === 'object') {
+        parsedConfig.markings = objectMarking.map((marking) => marking.value);
+        config = JSON.stringify(parsedConfig);
+      }
+    }
+
+    // For XTM One connectors, the configuration already contains the agent_slug JSON
+    // (set by the handleAgentSelect handler below)
+
+    commitMutation({
+      ...defaultCommitMutation,
+      mutation: validation_mode === 'draft' ? fileManagerCreateDraftAskJobImportMutation : fileManagerAskJobImportMutation,
+      variables: {
+        fileName: file.id,
+        connectorId: connector_id,
+        configuration: config,
+        validationMode: validation_mode,
+        description: values.description,
+        objectAssignee: values.objectAssignee.map(({ value }) => value),
+        objectParticipant: values.objectParticipant.map(({ value }) => value),
+        createdBy: values.createdBy?.value,
+        authorized_members: !authorized_members
+          ? null
+          : authorized_members
+              .filter((v) => v.accessRight !== 'none')
+              .map((member) => ({
+                id: member.value,
+                access_right: member.accessRight,
+                groups_restriction_ids: member.groupsRestriction?.length > 0
+                  ? member.groupsRestriction.map((group) => group.value)
+                  : undefined,
+              })),
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        onClose();
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+    });
+  };
+
+  const importValidation = (configurations: boolean) => {
+    const isDraft = (value: string) => value === 'draft';
+    const requiredWhenDraftAndMandatory = (field: string, schema: Yup.StringSchema) => Yup.string().when('validation_mode', {
+      is: isDraft,
+      then: () => mandatoryAttributes.includes(field)
+        ? schema.required(t_i18n('This field is required'))
+        : schema,
+      otherwise: () => Yup.string().nullable(),
+    });
+
+    const draftShape = {
+      description: requiredWhenDraftAndMandatory('description', Yup.string()),
+      objectAssignee: Yup.array().when('validation_mode', {
+        is: isDraft,
+        then: (schema) => mandatoryAttributes.includes('objectAssignee')
+          ? schema.min(1, t_i18n('This field is required'))
+          : schema,
+      }),
+      objectParticipant: Yup.array().when('validation_mode', {
+        is: isDraft,
+        then: (schema) => mandatoryAttributes.includes('objectParticipant')
+          ? schema.min(1, t_i18n('This field is required'))
+          : schema,
+      }),
+      createdBy: Yup.object().when('validation_mode', {
+        is: isDraft,
+        then: (schema) => mandatoryAttributes.includes('createdBy')
+          ? schema.required(t_i18n('This field is required'))
+          : schema.nullable(),
+        otherwise: (schema) => schema.nullable(),
+      }),
+    };
+
+    const shape = {
+      connector_id: Yup.string().required(t_i18n('This field is required')),
+      ...draftShape,
+    };
+    if (configurations) {
+      return Yup.object().shape({
+        ...shape,
+        configuration: Yup.string().required(t_i18n('This field is required')),
+      });
+    }
+    return Yup.object().shape(shape);
+  };
+
+  const invalidCsvMapper = selectedConnector?.name === 'ImportCsv'
+    && selectedConnector?.configurations?.length === 0;
+
+  // XTM One connector requires agent selection when agents are available
+  const requiresAgentSelection = !!selectedConnector?.xtm_one_intent
+    && isXtmOneConfigured
+    && availableAgents.length > 0;
+
+  const draftInitialValues = useDefaultValues<Omit<DraftAddInput, 'name'>>(DRAFTWORKSPACE_TYPE, {
+    description: '',
+    objectAssignee: [],
+    objectParticipant: [],
+    createdBy: undefined,
+    authorized_members: undefined,
+  });
+
+  return (
+    <Formik
+      enableReinitialize={true}
+      initialValues={{
+        connector_id: '',
+        validation_mode: 'draft',
+        configuration: '',
+        objectMarking: [],
+        ...draftInitialValues,
+      }}
+      validationSchema={importValidation(!!selectedConnector?.configurations || requiresAgentSelection)}
+      onSubmit={onSubmitImport}
+      onReset={onClose}
+    >
+      {({ submitForm, handleReset, isSubmitting, setFieldValue, isValid, values }) => {
+        // Apply pending agent config when agents are pre-selected
+        if (pendingAgentConfig && values.configuration !== pendingAgentConfig) {
+          setTimeout(() => {
+            setFieldValue('configuration', pendingAgentConfig);
+            setPendingAgentConfig('');
+          }, 0);
+        }
+        return (
+          <Form>
+            <Dialog
+              open={open}
+              onClose={() => handleReset()}
+              onClick={(event) => event.stopPropagation()}
+              title={t_i18n('Launch an import')}
+            >
+              <Field
+                component={SelectFieldFds}
+                variant="outlined"
+                name="connector_id"
+                label={t_i18n('Connector')}
+                fullWidth={true}
+                containerstyle={{ width: '100%' }}
+                onChange={handleSelectConnector}
+              >
+                {connectors?.map((connector) => {
+                  const disabled = !file
+                    || (connector?.connector_scope && connector?.connector_scope?.length > 0
+                      && file?.metaData?.mimetype && !connector?.connector_scope?.includes(file?.metaData?.mimetype));
+                  const noAgents = isXtmOneIntentWithoutAgents(
+                    isXtmOneConfigured,
+                    connector?.xtm_one_intent,
+                    connector?.xtm_one_intent ? intentAgentCounts[connector.xtm_one_intent] : undefined,
+                  );
+                  return (
+                    <SelectItem
+                      key={connector?.id}
+                      value={connector?.id ?? ''}
+                      disabled={disabled || !connector?.active || noAgents}
+                    >
+                      {connector?.name}
+                      {noAgents ? ` (${t_i18n('No agent available')})` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </Field>
+              {isXtmOneConfigured && selectedConnector?.xtm_one_intent && availableAgents.length > 0 && (
+                <Field
+                  component={SelectFieldFds}
+                  variant="outlined"
+                  name="configuration"
+                  label={t_i18n('Select agent')}
+                  fullWidth={true}
+                  containerstyle={{ marginTop: 20, width: '100%' }}
+                >
+                  {availableAgents.map((agent) => (
+                    <SelectItem key={agent.id} value={JSON.stringify({ agent_slug: agent.slug })}>
+                      {agent.name}
+                    </SelectItem>
+                  ))}
+                </Field>
+              )}
+              {!isDraftContext && (
+                <Field
+                  component={SelectFieldFds}
+                  variant="outlined"
+                  name="validation_mode"
+                  label={t_i18n('Validation mode')}
+                  fullWidth={true}
+                  containerstyle={{ marginTop: 20, width: '100%' }}
+                  setFieldValue={setFieldValue}
+                >
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="workbench">Workbench</SelectItem>
+                </Field>
+              )}
+              {values.validation_mode === 'draft' && (
+                <>
+                  <Field
+                    component={MarkdownField}
+                    name="description"
+                    label={t_i18n('Description')}
+                    required={mandatoryAttributes.includes('description')}
+                    fullWidth={true}
+                    multiline={true}
+                    rows="4"
+                    style={fieldSpacingContainerStyle}
+                    askAi={true}
+                  />
+                  <ObjectAssigneeField
+                    name="objectAssignee"
+                    style={fieldSpacingContainerStyle}
+                    required={mandatoryAttributes.includes('objectAssignee')}
+                  />
+                  <ObjectParticipantField
+                    name="objectParticipant"
+                    style={fieldSpacingContainerStyle}
+                    required={mandatoryAttributes.includes('objectParticipant')}
+                  />
+                  <CreatedByField
+                    name="createdBy"
+                    required={mandatoryAttributes.includes('createdBy')}
+                    style={fieldSpacingContainerStyle}
+                    setFieldValue={setFieldValue}
+                  />
+                  <Field
+                    name="authorized_members"
+                    component={AuthorizedMembersField}
+                    owner={owner}
+                    showAllMembersLine={showAllMembersLine}
+                    canDeactivate
+                    addMeUserWithAdminRights
+                    enableAccesses
+                    applyAccesses
+                    style={fieldSpacingContainerStyle}
+                  />
+                </>
+              )}
+              {selectedConnector?.configurations && selectedConnector?.configurations?.length > 0 ? (
+                <Field
+                  component={SelectFieldFds}
+                  variant="outlined"
+                  name="configuration"
+                  label={t_i18n('Configuration')}
+                  fullWidth={true}
+                  containerstyle={{ marginTop: 20, width: '100%' }}
+                  onChange={handleSetCsvMapper}
+                >
+                  {selectedConnector?.configurations?.map((config) => (
+                    <SelectItem key={config.id} value={config.configuration}>
+                      {config.name}
+                    </SelectItem>
+                  ))}
+                </Field>
+              ) : (
+                <ManageImportConnectorMessage name={selectedConnector?.name} />
+              )}
+              {selectedConnector?.name === 'ImportCsv' && hasUserChoiceCsvMapper && (
+                <ObjectMarkingField
+                  name="objectMarking"
+                  style={fieldSpacingContainerStyle}
+                  setFieldValue={setFieldValue}
+                />
+              )}
+              <DialogActions>
+                <Button variant="secondary" onClick={handleReset} disabled={isSubmitting}>
+                  {t_i18n('Cancel')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={isSubmitting || !isValid || invalidCsvMapper || !selectedConnector}
+                >
+                  {t_i18n('Create')}
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </Form>
+        );
+      }}
+    </Formik>
+  );
+};
+
+export default LaunchImportDialog;

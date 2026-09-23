@@ -1,0 +1,147 @@
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { graphql, useFragment } from 'react-relay';
+import { Typography } from '@mui/material';
+import { useTheme } from '@mui/styles';
+import Button from '@common/button/Button';
+import FintelTemplatePopover from './FintelTemplatePopover';
+import { FintelTemplateHeader_template$key } from './__generated__/FintelTemplateHeader_template.graphql';
+import FintelTemplateFormDrawer from './FintelTemplateFormDrawer';
+import useFintelTemplateEdit from './useFintelTemplateEdit';
+import { useFintelTemplateContext } from './FintelTemplateContext';
+import Breadcrumbs from '../../../../../components/Breadcrumbs';
+import { useFormatter } from '../../../../../components/i18n';
+import ErrorNotFound from '../../../../../components/ErrorNotFound';
+import type { Theme } from '../../../../../components/Theme';
+import ItemBoolean from '../../../../../components/ItemBoolean';
+import Tag from '@common/tag/Tag';
+
+const headerFragment = graphql`
+  fragment FintelTemplateHeader_template on FintelTemplate {
+    id
+    name
+    description
+    start_date
+    template_content
+    default
+    includeCoverPageByDefault
+    includeBackPageByDefault
+  }
+`;
+
+interface FintelTemplateHeaderProps {
+  entitySettingId: string;
+  data: FintelTemplateHeader_template$key;
+  currentDefaultName?: string;
+}
+
+const FintelTemplateHeader = ({ entitySettingId, data, currentDefaultName }: FintelTemplateHeaderProps) => {
+  const theme = useTheme<Theme>();
+  const navigate = useNavigate();
+  const { t_i18n } = useFormatter();
+  const { subTypeId } = useParams<{ subTypeId?: string }>();
+  const [commitEditMutation, editOnGoing] = useFintelTemplateEdit();
+  const { editorValue } = useFintelTemplateContext();
+
+  const [isFormOpen, setFormOpen] = useState(false);
+
+  const template = useFragment(headerFragment, data);
+
+  if (!subTypeId) return <ErrorNotFound />;
+
+  const customizationLink = '/dashboard/settings/customization/entity_types';
+  const subTypeLink = `${customizationLink}/${subTypeId}`;
+  const breadcrumb = [
+    { label: t_i18n('Settings') },
+    { label: t_i18n('Customization') },
+    { label: t_i18n('Entity types'), link: customizationLink },
+    { label: t_i18n(`entity_${subTypeId}`), link: subTypeLink },
+    { label: t_i18n('FINTEL Templates') },
+    { label: template.name, current: true },
+  ];
+
+  const onSubmit = () => {
+    const input = { key: 'template_content', value: [editorValue] };
+    commitEditMutation({
+      variables: { id: template.id, input: [input] },
+    });
+  };
+
+  return (
+    <>
+      <Breadcrumbs elements={breadcrumb} />
+
+      <div style={{ display: 'flex', gap: theme.spacing(1) }}>
+        <Typography variant="h1" sx={{ float: 'left' }}>
+          {template.name}
+        </Typography>
+
+        <div
+          style={{
+            float: 'left',
+            margin: '0 0 0 5px',
+          }}
+        >
+          <ItemBoolean
+            status={!!template.start_date}
+            label={template.start_date ? t_i18n('Published') : t_i18n('Not published')}
+          />
+        </div>
+        {template.default
+          && (
+            <div
+              style={{
+                float: 'left',
+                margin: '0 0 0 5px',
+              }}
+            >
+              <Tag
+                color={theme.palette.success.main}
+                label={t_i18n('Default')}
+              />
+            </div>
+          )
+        }
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: 'auto', gap: theme.spacing(1) }}>
+          <FintelTemplatePopover
+            entitySettingId={entitySettingId}
+            templateId={template.id}
+            isDefault={!!template.default}
+            inline={false}
+            onDeleteComplete={() => navigate(subTypeLink)}
+            currentDefaultName={template.default ? undefined : currentDefaultName}
+          />
+          <Button
+            onClick={onSubmit}
+            style={{ marginLeft: 'auto' }}
+            disabled={editorValue === template.template_content || editOnGoing}
+          >
+            {t_i18n('Save template')}
+          </Button>
+          <Button disableElevation onClick={() => setFormOpen(true)}>
+            {t_i18n('Update')}
+          </Button>
+        </div>
+      </div>
+
+      <FintelTemplateFormDrawer
+        entitySettingId={entitySettingId}
+        isOpen={isFormOpen}
+        entityType={subTypeId}
+        template={{
+          id: template.id,
+          name: template.name,
+          description: template.description ?? null,
+          published: !!template.start_date,
+          default: !!template.default,
+          include_cover_page_by_default: template.includeCoverPageByDefault ?? true,
+          include_back_page_by_default: template.includeBackPageByDefault ?? true,
+        }}
+        currentDefaultName={template.default ? undefined : currentDefaultName}
+        onClose={() => setFormOpen(false)}
+      />
+    </>
+  );
+};
+
+export default FintelTemplateHeader;

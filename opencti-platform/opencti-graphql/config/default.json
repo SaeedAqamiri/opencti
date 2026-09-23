@@ -1,0 +1,442 @@
+{
+  "app": {
+    "port": 4000,
+    "base_path": "",
+    "base_url": "http://localhost:4000/",
+    "enterprise_edition_license": "",
+    "enabled": true,
+    "enabled_ui": true,
+    "enabled_dev_features": [],
+    "https_cert": {
+      "ca": [],
+      "key": null,
+      "crt": null,
+      "reject_unauthorized": true,
+      "cookie_secure": false
+    },
+    "allow_unsecure_http_resources": true,
+    "uri_deny_list": [],
+    "public_dashboard_authorized_domains": "",
+    "app_logs": {
+      "logs_level": "info",
+      "logs_files": true,
+      "logs_console": true,
+      "logs_max_files": 7,
+      "logs_directory": "./logs",
+      "logs_redacted_inputs": [
+        "password",
+        "secret",
+        "token",
+        "api_tokens",
+        "authentication_value",
+        "enterprise_license"
+      ],
+      "extended_error_message": false
+    },
+    "filename_to_mimes": {
+      "pdf_report": "application/pdf",
+      ".yar": "text/yara+plain",
+      ".yara": "text/yara+plain"
+    },
+    "audit_logs": {
+      "logs_files": true,
+      "logs_console": true,
+      "logs_max_files": 7,
+      "logs_directory": "./logs",
+      "logs_in_transports": ["administration"],
+      "trace_request_headers": ["user-agent", "x-forwarded-for"]
+    },
+    "event_loop_logs": {
+      "enabled": false,
+      "max_time": 1000
+    },
+    "graphql": {
+      "armor_protection": {
+        "disabled": true,
+        "max_depth": 20,
+        "max_directives": 20,
+        "max_tokens": 100000,
+        "cost_limit": 50000000,
+        "block_field_suggestion": true
+      },
+      "batching_protection": {
+        "mutation_default": 1,
+        "query_default": 2,
+        "query_subtypes": 4
+      },
+      "playground": {
+        "enabled": true,
+        "force_disabled_introspection": true
+      }
+    },
+    "telemetry": {
+      "pyroscope": {
+        "enabled": false,
+        "identifier": "OpenCTI",
+        "exporter": ""
+      },
+      "tracing": {
+        "enabled": false,
+        "exporter_otlp": "",
+        "exporter_zipkin": ""
+      },
+      "metrics": {
+        "enabled": false,
+        "exporter_otlp": "",
+        "exporter_prometheus": 14269
+      }
+    },
+    "health_access_key": "ChangeMe",
+    "request_timeout": 1200000,
+    "keep_alive_timeout": 65000,
+    "session_timeout": 1200000,
+    "session_cookie": false,
+    "child_locking_process": {
+      "enabled": true
+    },
+    "locked_account_statuses": {
+      "Inactive": "Your account has been marked inactive. If you would like to reactivate your account, please contact your administrator.",
+      "Locked": "Your account has been locked for security reasons. Please contact your administrator."
+    },
+    "account_statuses_default": "Active",
+    "session_idle_timeout": 0,
+    "session_manager": "shared",
+    "rate_protection": {
+      "time_window": 1,
+      "max_requests": 10000
+    },
+    "concurrency": {
+      "retry_count": 100,
+      "retry_delay": 250,
+      "retry_jitter": 100,
+      "max_ttl": 60000,
+      "extension_threshold": 5000
+    },
+    "live_stream": {
+      "cache_max_size": 5000,
+      "cache_max_time": 2
+    },
+    "exclusion_list": {
+      "file_max_size": 10000000
+    },
+    "performance_logger": false,
+    "map_bundled_file_path": "./static/maps/world.pmtiles",
+    "translations": "{}",
+    "reference_attachment": false,
+    "python_execution": "native",
+    "python_execution_venv": "../../../.python-venv/lib/python3.12/site-packages",
+    "artifact_zip_password": "infected",
+    "admin": {
+      "email": "admin@opencti.io",
+      "password": "ChangeMe",
+      "token": "ChangeMe",
+      "externally_managed": false
+    },
+    "group_confidence_level": {
+      "max_confidence_default": 100
+    },
+    "trash": {
+      "enabled": true
+    },
+    "csv_ingestion": {
+      "max_bundle_size": 1000
+    },
+    "validation_mode": "draft",
+    "dissemination_list": {
+      "to_email": "no-reply@filigran.io",
+      "max_list_size": 500
+    },
+    "forgot_password": {
+      "otp_ttl_second": 600
+    }
+  },
+  "demo_mode": false,
+  "http_proxy": "",
+  "https_proxy": "",
+  "no_proxy": "",
+  "https_proxy_ca": [],
+  "https_proxy_reject_unauthorized": false,
+  "trust_proxy_addresses": [],
+  "relations_deduplication": {
+    "past_days": 30,
+    "next_days": 30,
+    "created_by_based": false
+  },
+  "protected_sensitive_config": {
+    "enabled": true,
+    "markings": {
+      "enabled": true,
+      "protected_definitions": [
+        "TLP:CLEAR",
+        "TLP:GREEN",
+        "TLP:AMBER",
+        "TLP:AMBER+STRICT",
+        "TLP:RED",
+        "PAP:CLEAR",
+        "PAP:GREEN",
+        "PAP:AMBER",
+        "PAP:RED"
+      ]
+    },
+    "groups": {
+      "enabled": true,
+      "protected_names": ["Administrators", "Connectors", "Default"]
+    },
+    "roles": {
+      "enabled": true,
+      "protected_names": ["Administrator", "Connector", "Default"]
+    },
+    "rules": {
+      "enabled": true
+    },
+    "ce_ee_toggle": {
+      "enabled": true
+    },
+    "connector_reset": {
+      "enabled": true
+    },
+    "file_indexing": {
+      "enabled": true
+    },
+    "platform_organization": {
+      "enabled": true
+    }
+  },
+  "ai": {
+    "type": "mistralai",
+    "endpoint": "",
+    "token": "",
+    "model": "",
+    "version": "",
+    "model_images": "",
+    "max_tokens": 30000,
+    "insights_refresh_timeout": 60,
+    "agents_refresh_timeout": 1440,
+    "ai_azure_instance": "",
+    "ai_azure_deployment": "",
+    "timeout": 60000
+  },
+  "xtm": {
+    "xtm_one_url": "https://common.xtm1.filigran.io",
+    "xtm_one_token": "",
+    "openaev_url": "",
+    "openaev_token": "",
+    "openaev_reject_unauthorized": false,
+    "opengrc_url": "",
+    "opengrc_token": "",
+    "xtmhub_url": "https://hub.filigran.io",
+    "xtmhub_to_email": "no-reply@filigran.io",
+    "xtmhub_connectivity_email_enabled": true,
+    "auth": {
+      "token_ttl": 600
+    }
+  },
+  "data_sharing": {
+    "max_csv_feed_result": 5000
+  },
+  "rule_engine": {
+    "enabled": true,
+    "lock_key": "rule_engine_lock"
+  },
+  "history_manager": {
+    "enabled": true,
+    "include_inferences": true,
+    "lock_key": "history_manager_lock"
+  },
+  "activity_manager": {
+    "enabled": true,
+    "lock_key": "activity_manager_lock"
+  },
+  "connector_manager": {
+    "enabled": true,
+    "lock_key": "connector_manager_lock",
+    "works_day_range": 7,
+    "batch_size": 10000,
+    "interval": 60000
+  },
+  "import_csv_built_in_connector": {
+    "enabled": true,
+    "interval": 10000,
+    "validate_before_import": false,
+    "bulk_creation_size": 5000
+  },
+  "task_scheduler": {
+    "enabled": true,
+    "lock_key": "task_manager_lock",
+    "interval": 10000
+  },
+  "expiration_scheduler": {
+    "enabled": true,
+    "lock_key": "expired_manager_lock",
+    "interval": 300000
+  },
+  "notification_manager": {
+    "enabled": true,
+    "lock_live_key": "notification_live_manager_lock",
+    "lock_digest_key": "notification_digest_manager_lock",
+    "interval": 10000
+  },
+  "telemetry_manager": {
+    "lock_key": "telemetry_manager_lock",
+    "tags": ""
+  },
+  "playbook_manager": {
+    "enabled": true,
+    "lock_key": "playbook_manager_lock",
+    "lock_cron_key": "playbook_cron_manager_lock",
+    "interval": 60000,
+    "cron_max_size": 500,
+    "log_max_size": 10000,
+    "realtime_priority": false
+  },
+  "hub_registration_manager": {
+    "enabled": true,
+    "lock_key": "hub_registration_manager_lock",
+    "interval": 3600000,
+    "news_feed_cleanup_interval_value": 180,
+    "news_feed_cleanup_interval_unit": "days"
+  },
+  "indicator_decay_manager": {
+    "enabled": true,
+    "lock_key": "indicator_decay_manager_lock",
+    "batch_size": 10000,
+    "interval": 60000
+  },
+  "garbage_collection_manager": {
+    "enabled": true,
+    "lock_key": "garbage_collection_manager_lock",
+    "batch_size": 10000,
+    "interval": 60000,
+    "deleted_retention_days": 7
+  },
+  "publisher_manager": {
+    "enabled": true,
+    "lock_key": "publisher_manager_lock",
+    "interval": 10000,
+    "enable_buffering": true,
+    "buffering_seconds": 60,
+    "webhook_timeout": 300000
+  },
+  "sync_manager": {
+    "enabled": true,
+    "lock_key": "sync_manager_lock",
+    "interval": 10000,
+    "file_fetch_timeout": 300000
+  },
+  "ingestion_manager": {
+    "enabled": true,
+    "lock_key": "ingestion_manager_lock",
+    "interval": 30000,
+    "feed": {
+      "request_timeout": 300000
+    },
+    "taxii_feed": {
+      "limit_per_request": 0
+    },
+    "rss_feed": {
+      "min_interval_minutes": 5,
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0"
+    },
+    "csv_feed": {
+      "min_interval_minutes": 5
+    }
+  },
+  "retention_manager": {
+    "enabled": true,
+    "lock_key": "retention_manager_lock",
+    "interval": 30000
+  },
+  "file_index_manager": {
+    "enabled": true,
+    "lock_key": "file_index_manager_lock",
+    "stream_lock_key": "file_index_manager_stream_lock",
+    "interval": 60000
+  },
+  "pir_manager": {
+    "enabled": true,
+    "lock_key": "pir_manager_lock",
+    "interval": 30000,
+    "stream_batch_size": 7500,
+    "max_concurrency": 5
+  },
+  "data_sanity_manager": {
+    "enabled": true,
+    "lock_key": "data_sanity_manager_lock",
+    "interval": 600000
+  },
+  "exclusion_list_cache_build_manager": {
+    "enabled": true,
+    "lock_key": "exclusion_list_cache_build_manager_lock",
+    "interval": 10000
+  },
+  "exclusion_list_cache_sync_manager": {
+    "lock_key": "exclusion_list_cache_sync_manager_lock",
+    "interval": 10000
+  },
+  "redis": {
+    "mode": "single",
+    "namespace": "",
+    "hostname": "localhost",
+    "use_ssl": false,
+    "ca": [],
+    "port": 6379,
+    "host_ip_family": 4,
+    "trimming": 2000000,
+    "max_event_length": 0
+  },
+  "elasticsearch": {
+    "index_prefix": "opencti",
+    "url": "http://localhost:9200",
+    "engine_selector": "auto",
+    "engine_check": true,
+    "index_creation_pattern": "-000001",
+    "max_pagination_result": 5000,
+    "default_pagination_result": 500,
+    "max_bulk_operations": 5000,
+    "max_runtime_resolutions": 5000,
+    "max_concurrency": 4
+  },
+  "minio": {
+    "bucket_name": "opencti-bucket",
+    "bucket_region": "us-east-1",
+    "endpoint": "localhost",
+    "port": 9000,
+    "use_ssl": false,
+    "access_key": "ChangeMe",
+    "secret_key": "ChangeMe",
+    "use_aws_role": false,
+    "excluded_files": [".DS_Store"],
+    "disable_checksum_validation": false
+  },
+  "rabbitmq": {
+    "queue_prefix": "",
+    "hostname": "localhost",
+    "vhost": "/",
+    "use_ssl": false,
+    "use_ssl_ca": [],
+    "port": 5672,
+    "port_management": 15672,
+    "management_ssl": false,
+    "username": "guest",
+    "password": "guest",
+    "queue_type": "classic"
+  },
+  "smtp": {
+    "hostname": "localhost",
+    "use_ssl": false,
+    "reject_unauthorized": false,
+    "port": 25,
+    "username": "",
+    "password": "",
+    "forced_sender_email": "",
+    "email_max_cc_size": 500
+  },
+  "aws": {
+    "proxy_enabled": false
+  },
+  "providers": {
+    "local": {
+      "strategy": "LocalStrategy"
+    }
+  }
+}

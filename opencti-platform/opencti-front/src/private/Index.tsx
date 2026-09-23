@@ -1,0 +1,177 @@
+import React, { lazy, Suspense, useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
+import Box from '@mui/material/Box';
+import CssBaseline from '@mui/material/CssBaseline';
+import { useTheme } from '@mui/styles';
+import { boundaryWrapper, NoMatch } from '@components/Error';
+import PlatformCriticalAlertDialog from '@components/settings/platform_alerts/PlatformCriticalAlertDialog';
+import TopBannersManager from '@components/TopBannersManager';
+import TopBar from './components/nav/TopBar';
+import NavBar from './components/nav/NavBar';
+import Message from '../components/Message';
+import NewsFeedToastManager from './components/nav/NewsFeedToastManager';
+import SystemBanners from '../public/components/SystemBanners';
+import TimeoutLock from './components/TimeoutLock';
+import useAuth from '../utils/hooks/useAuth';
+import useHelper from '../utils/hooks/useHelper';
+import SettingsMessagesBanner, { useSettingsMessagesBannerHeight } from './components/settings/settings_messages/SettingsMessagesBanner';
+import type { Theme } from '../components/Theme';
+import { RootSettings$data } from './__generated__/RootSettings.graphql';
+import Loader from '../components/Loader';
+import useDraftContext from '../utils/hooks/useDraftContext';
+import { Stack, SxProps } from '@mui/material';
+import DraftToolbar from './components/drafts/DraftToolbar';
+import { TooltipProvider } from '@filigran/design-system';
+import { TOOLTIP_DELAY_MS } from './components/nav/topBarConstants';
+import { ChatbotProvider } from './components/chatbox/ChatbotContext';
+import useTopBanner from '../utils/hooks/useTopBanner';
+
+const HomeDashboard = lazy(() => import('./components/HomeDashboard'));
+const StixObjectOrStixRelationship = lazy(() => import('./components/StixObjectOrStixRelationship'));
+const RootSearchBulk = lazy(() => import('./components/SearchBulkContainer'));
+const RootAnalyses = lazy(() => import('./components/analyses/Root'));
+const RootCases = lazy(() => import('./components/cases/Root'));
+const RootEvents = lazy(() => import('./components/events/Root'));
+const RootObservations = lazy(() => import('./components/observations/Root'));
+const RootProfile = lazy(() => import('./components/profile/Root'));
+const RootSearch = lazy(() => import('@components/RootSearch'));
+const RootThreats = lazy(() => import('./components/threats/Root'));
+const RootArsenal = lazy(() => import('./components/arsenal/Root'));
+const RootTechnique = lazy(() => import('./components/techniques/Root'));
+const RootEntities = lazy(() => import('./components/entities/Root'));
+const RootLocation = lazy(() => import('./components/locations/Root'));
+const RootData = lazy(() => import('@components/data/Root'));
+const RootIntegrations = lazy(() => import('@components/integrations/Root'));
+const RootTrash = lazy(() => import('./components/trash/Root'));
+const RootDrafts = lazy(() => import('./components/drafts/Root'));
+const RootWorkspaces = lazy(() => import('./components/workspaces/Root'));
+const RootSettings = lazy(() => import('./components/settings/Root'));
+const RootAudit = lazy(() => import('./components/settings/activity/audit/Root'));
+const RootPir = lazy(() => import('./components/pir/Root'));
+const RootXTMHub = lazy(() => import('@components/xtm_hub/Root'));
+const ForcePasswordChange = lazy(() => import('./components/profile/ForcePasswordChange'));
+const RootNewsFeed = lazy(() => import('./components/profile/NewsFeedPage'));
+
+interface IndexProps {
+  settings: RootSettings$data;
+}
+
+const Index = ({ settings }: IndexProps) => {
+  const location = useLocation();
+  const isForcePasswordChangeRoute = location.pathname.startsWith('/dashboard/change-password');
+  const theme = useTheme<Theme>();
+  const { isTrashEnable } = useHelper();
+  const {
+    bannerSettings: { bannerHeight },
+  } = useAuth();
+  const draftContext = useDraftContext();
+  const settingsMessagesBannerHeight = useSettingsMessagesBannerHeight();
+  const { height: topBannerHeight } = useTopBanner();
+
+  // Change the theme body attribute when the mode changes in
+  // the palette because some components like legacy editor uses this
+  // body attribute to display correct styles.
+  useEffect(() => {
+    const body = document.querySelector('body');
+    if (body) {
+      const bodyMode = body.getAttribute('data-theme');
+      const themeMode = `${theme.palette.mode}`;
+      if (bodyMode !== themeMode) {
+        body.setAttribute('data-theme', themeMode);
+      }
+    }
+  }, [theme]);
+
+  /** The bar is fixed and glassy (94% over a 4px backdrop blur), so the content has to travel UNDER it. */
+  const headerInset = isForcePasswordChangeRoute
+    ? 0
+    : `calc(16px + 64px + ${settingsMessagesBannerHeight ?? 0}px + ${topBannerHeight}px)`;
+
+  const mainSx: SxProps = {
+    transition: 'margin-right 225ms cubic-bezier(0.4, 0, 0.2, 1)',
+    flexGrow: 1,
+    overflowY: 'hidden',
+    height: '100vh',
+    marginRight: 'var(--chatbot-sidebar-width, 0px)',
+  };
+
+  const boxSx: SxProps = {
+    px: isForcePasswordChangeRoute ? 0 : 3,
+    paddingTop: headerInset,
+    flex: 1,
+    overflowY: isForcePasswordChangeRoute ? 'hidden' : 'auto',
+    minHeight: 0,
+  };
+
+  return (
+    // One provider for the whole private app: a library Tooltip throws without one, and bar
+    // controls such as the import button also render on their own screens.
+    <TooltipProvider delayDuration={TOOLTIP_DELAY_MS}>
+      <ChatbotProvider>
+        <SystemBanners settings={settings} />
+        <TopBannersManager />
+        {((settings.platform_session_idle_timeout ?? 0) > 0 || (settings.platform_session_timeout ?? 0) > 0) && <TimeoutLock />}
+        <SettingsMessagesBanner />
+        <PlatformCriticalAlertDialog alerts={settings.platform_critical_alerts} />
+        <Box
+          sx={{
+            display: 'flex',
+            minWidth: isForcePasswordChangeRoute ? 0 : 1400,
+            marginTop: `calc(${topBannerHeight}px + ${bannerHeight})`,
+            marginBottom: bannerHeight,
+          }}
+        >
+          <CssBaseline />
+          {!isForcePasswordChangeRoute && <TopBar />}
+          {!isForcePasswordChangeRoute && <NavBar />}
+          <Message />
+          <NewsFeedToastManager />
+          <Stack component="main" sx={mainSx}>
+            <Box sx={boxSx}>
+              <Suspense fallback={<Loader />}>
+                <Routes>
+                  <Route
+                    path="/"
+                    element={draftContext?.id
+                      ? (
+                          <Navigate to={`/dashboard/data/import/draft/${draftContext.id}/`} replace={true} />
+                        )
+                      : boundaryWrapper(HomeDashboard)}
+                  />
+                  <Route path="/search/*" element={boundaryWrapper(RootSearch)} />
+                  <Route path="/id/:id" element={boundaryWrapper(StixObjectOrStixRelationship)} />
+                  <Route path="/search_bulk" element={boundaryWrapper(RootSearchBulk)} />
+                  <Route path="/analyses/*" element={boundaryWrapper(RootAnalyses)} />
+                  <Route path="/cases/*" element={boundaryWrapper(RootCases)} />
+                  <Route path="/events/*" element={boundaryWrapper(RootEvents)} />
+                  <Route path="/threats/*" element={boundaryWrapper(RootThreats)} />
+                  <Route path="/arsenal/*" element={boundaryWrapper(RootArsenal)} />
+                  <Route path="/techniques/*" element={boundaryWrapper(RootTechnique)} />
+                  <Route path="/entities/*" element={boundaryWrapper(RootEntities)} />
+                  <Route path="/locations/*" element={boundaryWrapper(RootLocation)} />
+                  <Route path="/data/import/draft/*" element={boundaryWrapper(RootDrafts)} />
+                  <Route path="/data/*" element={boundaryWrapper(RootData)} />
+                  <Route path="/integrations/*" element={boundaryWrapper(RootIntegrations)} />
+                  {isTrashEnable() && (<Route path="/trash/*" element={boundaryWrapper(RootTrash)} />)}
+                  <Route path="/pirs/*" element={boundaryWrapper(RootPir)} />
+                  <Route path="/news-feed" element={boundaryWrapper(RootNewsFeed)} />
+                  <Route path="/workspaces/*" element={boundaryWrapper(RootWorkspaces)} />
+                  <Route path="/settings/*" element={boundaryWrapper(RootSettings)} />
+                  <Route path="/audits/*" element={boundaryWrapper(RootAudit)} />
+                  <Route path="/profile/*" element={boundaryWrapper(RootProfile)} />
+                  <Route path="/change-password" element={boundaryWrapper(ForcePasswordChange)} />
+                  <Route path="/observations/*" element={boundaryWrapper(RootObservations)} />
+                  <Route path="/xtm-hub/*" element={boundaryWrapper(RootXTMHub)} />
+                  <Route path="/*" element={<NoMatch />} />
+                </Routes>
+              </Suspense>
+            </Box>
+            {!isForcePasswordChangeRoute && <DraftToolbar />}
+          </Stack>
+        </Box>
+      </ChatbotProvider>
+    </TooltipProvider>
+  );
+};
+
+export default Index;

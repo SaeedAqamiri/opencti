@@ -1,0 +1,1059 @@
+import { Cluster, Redis } from 'ioredis';
+import type { ChainableCommander, CommonRedisOptions, ClusterOptions, RedisOptions, SentinelAddress, SentinelConnectionOptions } from 'ioredis';
+import { Redlock } from '@sesamecare-oss/redlock';
+import { RedisPubSub } from 'graphql-redis-subscriptions';
+import * as R from 'ramda';
+import conf, { booleanConf, configureCA, DEV_MODE, getStoppingState, loadCert, logApp, REDIS_PREFIX, TOPIC_PREFIX } from '../config/conf';
+import { isNotEmptyField } from './utils';
+import { DatabaseError, LockTimeoutError, TYPE_LOCK_ERROR } from '../config/errors';
+import { mergeDeepRightAll, now } from '../utils/format';
+import type { BasicStoreCommon } from '../types/store';
+import type { AuthUser } from '../types/user';
+import type { EditContext } from '../generated/graphql';
+import { filterEmpty } from '../types/type-utils';
+import type { ClusterConfig } from '../types/clusterConfig';
+import type { ExecutionEnvelop } from '../types/playbookExecution';
+import { INPUT_OBJECTS } from '../schema/general';
+import { enrichWithRemoteCredentials } from '../config/credentials';
+import type { ExclusionListCacheItem } from './exclusionListCache';
+import { refreshLocalCacheForEntity } from './cache';
+import { schemaRelationsRefDefinition } from '../schema/schema-relationsRef';
+
+const USE_SSL = booleanConf('redis:use_ssl', false);
+const REDIS_CA = conf.get('redis:ca').map((path: string) => loadCert(path));
+const PLAYBOOK_LOG_MAX_SIZE = conf.get('playbook_manager:log_max_size') || 10000;
+
+const connectionName = (provider: string) => `${REDIS_PREFIX}${provider.replaceAll(' ', '_')}`;
+
+const redisOptions = async (provider: string, autoReconnect = false): Promise<RedisOptions> => {
+  const baseAuth = { username: conf.get('redis:username'), password: conf.get('redis:password') };
+  const userPasswordAuth = await enrichWithRemoteCredentials('redis', baseAuth);
+  return {
+    connectionName: connectionName(provider),
+    keyPrefix: REDIS_PREFIX,
+    ...userPasswordAuth,
+    tls: USE_SSL ? { ...configureCA(REDIS_CA), servername: conf.get('redis:hostname') } : undefined,
+    retryStrategy: /* v8 ignore next */ (times) => {
+      if (getStoppingState()) {
+        return null;
+      }
+      if (autoReconnect) {
+        return Math.min(times * 50, 2000);
+      }
+      return null;
+    },
+    lazyConnect: true,
+    enableAutoPipelining: false,
+    enableOfflineQueue: true,
+    maxRetriesPerRequest: autoReconnect ? null : 1,
+    showFriendlyErrorStack: DEV_MODE,
+    family: conf.get('redis:host_ip_family') ?? 4,
+  };
+};
+
+// From "HOST:PORT" to { host, port }
+export const generateClusterNodes = (nodes: string[]): { host: string; port: number }[] => {
+  return nodes.map((h: string) => {
+    const [host, port] = h.split(':');
+    return { host, port: parseInt(port, 10) };
+  });
+};
+
+// From "HOST:PORT>HOST:PORT" to { ["HOST:PORT"]: { host, port } }
+export const generateNatMap = (mappings: string[]): Record<string, { host: string; port: number }> => {
+  const natMap: Record<string, { host: string; port: number }> = {};
+  for (let i = 0; i < mappings.length; i += 1) {
+    const mapping = mappings[i];
+    const [from, to] = mapping.split('>');
+    const [host, port] = to.split(':');
+    natMap[from] = { host, port: parseInt(port, 10) };
+  }
+  return natMap;
+};
+
+const clusterOptions = async (provider: string): Promise<ClusterOptions> => {
+  const redisOpts = await redisOptions(provider);
+  return {
+    keyPrefix: REDIS_PREFIX,
+    lazyConnect: true,
+    enableAutoPipelining: false,
+    enableOfflineQueue: true,
+    redisOptions: redisOpts,
+    scaleReads: conf.get('redis:scale_reads') ?? 'all',
+    natMap: generateNatMap(conf.get('redis:nat_map') ?? []),
+    showFriendlyErrorStack: DEV_MODE,
+  };
+};
+
+const sentinelOptions = async (provider: string, clusterNodes: Partial<SentinelAddress>[]): Promise<SentinelConnectionOptions & CommonRedisOptions> => {
+  const baseAuth = {
+    sentinelUsername: conf.get('redis:sentinel_username'),
+    sentinelPassword: conf.get('redis:sentinel_password'),
+    username: conf.get('redis:username'),
+    password: conf.get('redis:password'),
+  };
+  const passwordAuth = await enrichWithRemoteCredentials('redis', baseAuth);
+  return {
+    connectionName: connectionName(provider),
+    ...passwordAuth,
+    keyPrefix: REDIS_PREFIX,
+    name: conf.get('redis:sentinel_master_name'),
+    role: conf.get('redis:sentinel_role'),
+    preferredSlaves: conf.get('redis:sentinel_preferred_slaves'),
+    sentinels: clusterNodes,
+    enableTLSForSentinelMode: conf.get('redis:sentinel_tls') ?? false,
+    failoverDetector: conf.get('redis:sentinel_failover_detector') ?? false,
+    updateSentinels: conf.get('redis:sentinel_update_sentinels') ?? true,
+  };
+};
+
+export const createRedisClient = async (provider: string, autoReconnect = false): Promise<Cluster | Redis> => {
+  let client: Cluster | Redis;
+  const redisMode: string = conf.get('redis:mode');
+  const clusterNodes = generateClusterNodes(conf.get('redis:hostnames') ?? []);
+  if (redisMode === 'cluster') {
+    const clusterOpts = await clusterOptions(provider);
+    client = new Redis.Cluster(clusterNodes, clusterOpts);
+  } else if (redisMode === 'sentinel') {
+    const sentinelOpts = await sentinelOptions(provider, clusterNodes);
+    client = new Redis(sentinelOpts);
+  } else {
+    const singleOptions = await redisOptions(provider, autoReconnect);
+    client = new Redis({ ...singleOptions, db: conf.get('redis:database') ?? 0, port: conf.get('redis:port'), host: conf.get('redis:hostname') });
+  }
+
+  client.on('close', () => logApp.debug('[REDIS] Redis client closed', { provider }));
+  client.on('ready', () => logApp.debug('[REDIS] Redis client ready', { provider }));
+  client.on('error', (err) => logApp.error('Redis client connection fail', { cause: err, provider }));
+  client.on('reconnecting', () => logApp.debug('[REDIS] Redis client reconnecting', { provider }));
+  return client;
+};
+
+// region Initialization of clients
+type RedisConnection = Cluster | Redis;
+interface RedisClients { base: RedisConnection; xrange: RedisConnection; lock: RedisConnection; pubsub: RedisPubSub }
+
+let redisClients: RedisClients;
+// Method reserved for lock child process
+export const initializeOnlyRedisLockClient = async () => {
+  const lock = await createRedisClient('lock', true);
+  // Disable typescript check for this specific use case.
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  redisClients = { lock, base: null, pubsub: null, xrange: null };
+};
+export const initializeRedisClients = async () => {
+  const base = await createRedisClient('base', true);
+  const xrange = await createRedisClient('xrange', true);
+  const lock = await createRedisClient('lock', true);
+  const publisher = await createRedisClient('publisher', true);
+  const subscriber = await createRedisClient('subscriber', true);
+  redisClients = {
+    base,
+    xrange,
+    lock,
+    pubsub: new RedisPubSub({
+      publisher,
+      subscriber,
+      connectionListener: (err) => {
+        logApp.info('[REDIS] Redis pubsub client closed', { error: err });
+      },
+    }),
+  };
+};
+export const shutdownRedisClients = () => {
+  redisClients.base?.disconnect();
+  redisClients.lock?.disconnect();
+  redisClients.pubsub?.getPublisher()?.disconnect();
+  redisClients.pubsub?.getSubscriber()?.disconnect();
+};
+// endregion
+
+// region pubsub
+export const getClientBase = (): Cluster | Redis => redisClients.base;
+export const getClientXRANGE = (): Cluster | Redis => redisClients.xrange;
+const getClientLock = (): Cluster | Redis => redisClients.lock;
+const getClientPubSub = (): RedisPubSub => redisClients.pubsub;
+export const pubSubAsyncIterator = (topic: string | string[]) => {
+  return getClientPubSub().asyncIterator(topic);
+};
+export const pubSubSubscription = async <T>(topic: string, onMessage: (message: T) => void) => {
+  const subscription = await getClientPubSub().subscribe(topic, onMessage, { pattern: true });
+  const unsubscribe = () => getClientPubSub().unsubscribe(subscription);
+  return { topic, unsubscribe };
+};
+// endregion
+
+// region basic operations
+export const redisTx = async (client: Cluster | Redis, chain: (tx: ChainableCommander) => void) => {
+  const tx = client.multi();
+  try {
+    await chain(tx);
+    return await tx.exec();
+  } catch (e) {
+    throw DatabaseError('Redis transaction error', { cause: e });
+  }
+};
+const updateObjectRaw = async (tx: ChainableCommander, id: string, input: object) => {
+  const data = R.flatten(R.toPairs(input));
+  await tx.hset(id, data);
+};
+const updateObjectCounterRaw = async (tx: ChainableCommander, id: string, field: string, number: number) => {
+  await tx.hincrby(id, field, number);
+};
+const deleteOldestKeysFromList = async (listId: string, count: number) => {
+  const oldestKeys = await getClientBase().zrange(listId, 0, -(count + 1));
+  if (oldestKeys?.length > 0) {
+    await getClientBase().zrem(listId, oldestKeys);
+    await getClientBase().del(oldestKeys);
+  }
+};
+const setInList = async (listId: string, keyId: string, expirationTime: number, maxLength?: number) => {
+  await redisTx(getClientBase(), async (tx) => {
+    // add/update the instance with its creation date in the ordered list of instances
+    const time = new Date().getTime();
+    await tx.zadd(listId, time, keyId);
+    // remove the too old keys from the list of instances
+    await tx.zremrangebyscore(listId, '-inf', time - (expirationTime * 1000));
+  });
+  if (maxLength && maxLength > 0) {
+    // keep only the top maxLength elements
+    await deleteOldestKeysFromList(listId, maxLength);
+  }
+};
+const delKeyWithList = async (keyId: string, listIds: string[]) => {
+  const keyPromise = getClientBase().del(keyId);
+  const listsPromise = listIds.map((listId) => getClientBase().zrem(listId, keyId));
+  await Promise.all([keyPromise, ...listsPromise]);
+};
+const setKeyWithList = async (keyId: string, listIds: string[], keyData: any, expirationTime: number, maxLength?: number) => {
+  const keyPromise = getClientBase().set(keyId, JSON.stringify(keyData), 'EX', expirationTime);
+  const listsPromise = listIds.map((listId) => setInList(listId, keyId, expirationTime, maxLength));
+  await Promise.all([keyPromise, ...listsPromise]);
+  return keyData;
+};
+const keysFromList = async (listId: string, expirationTime?: number, maxLength?: number) => {
+  if (expirationTime) {
+    const time = new Date().getTime();
+    await getClientBase().zremrangebyscore(listId, '-inf', time - (expirationTime * 1000));
+  }
+  if (maxLength && maxLength > 0) {
+    await deleteOldestKeysFromList(listId, maxLength); // keep only the top maxLength elements
+  }
+  const instances = await getClientBase().zrange(listId, 0, -1);
+  if (instances && instances.length > 0) {
+    const fetchKey = (key: string) => getClientBase().multi().ttl(key).get(key).exec();
+    const instancesConfig = await Promise.all(instances.map((i) => fetchKey(i)
+      .then((results) => {
+        if (results === null || results.length !== 2) {
+          return null;
+        }
+        const [, ttl] = results[0];
+        const [, data] = results[1] as string[];
+        return data ? { id: i, ttl, data } : null;
+      })));
+    return instancesConfig.filter(filterEmpty).map((n) => {
+      return { redis_key_id: n.id, redis_key_ttl: n.ttl, ...JSON.parse(n.data) };
+    });
+  }
+  return [];
+};
+// endregion
+
+// region session
+export const clearSessions = async () => {
+  const contextIds = await getClientBase().zrange('platform_sessions', 0, -1);
+  return Promise.all(contextIds.map((id) => getClientBase().del(id)));
+};
+export const getSession = async (key: string) => {
+  const sessionInformation = await redisTx(getClientBase(), async (tx) => {
+    await tx.get(key);
+    await tx.ttl(key);
+  });
+  const session = sessionInformation?.at(0)?.at(1);
+  if (session) {
+    const ttl = Number(sessionInformation?.at(1)?.at(1));
+    return { ...JSON.parse(String(session)), expiration: ttl };
+  }
+  return undefined;
+};
+export const getSessionTtl = (key: string) => {
+  return getClientBase().ttl(key);
+};
+export const setSession = (key: string, value: any, expirationTime: number) => {
+  return setKeyWithList(key, ['platform_sessions'], value, expirationTime);
+};
+export const killSession = async (key: string) => {
+  const currentSession = await getSession(key);
+  await delKeyWithList(key, ['platform_sessions']);
+  return { sessionId: key, session: currentSession };
+};
+export const getSessionKeys = () => {
+  return getClientBase().zrange('platform_sessions', 0, -1);
+};
+export const getSessions = () => {
+  return keysFromList('platform_sessions');
+};
+export const extendSession = async (sessionId: string, extension: number) => {
+  const sessionExtensionPromise = getClientBase().expire(sessionId, extension);
+  const refreshListPromise = setInList('platform_sessions', sessionId, extension);
+  const [sessionExtension] = await Promise.all([sessionExtensionPromise, refreshListPromise]);
+  return sessionExtension;
+};
+// endregion
+export const redisIsAlive = async () => {
+  try {
+    await getClientBase().get('test-key');
+    return true;
+  } catch {
+    throw DatabaseError('Redis seems down');
+  }
+};
+export const redisInit = async () => {
+  logApp.info('[CHECK] Checking if Redis is available');
+  try {
+    await initializeRedisClients();
+    await redisIsAlive();
+    const redisMode: string = conf.get('redis:mode');
+    logApp.info('[REDIS] Clients initialized, Redis is alive', { redisMode });
+    return true;
+  } catch {
+    throw DatabaseError('Redis seems down');
+  }
+};
+export const getRedisVersion = async () => {
+  const serverInfo = await getClientBase().call('INFO') as string;
+  const versionString = serverInfo.split('\r\n')[1];
+  return versionString.split(':')[1];
+};
+
+export const CACHE_RESET_TOPIC = `${TOPIC_PREFIX}CACHE_RESET_TOPIC`;
+
+export const publishCacheResetEvent = async (entityType: string) => {
+  await getClientPubSub().publish(CACHE_RESET_TOPIC, { entityType });
+};
+
+/* v8 ignore next */
+export const notify = async (topic: string, instance: any, user: AuthUser) => {
+  // Instance can be empty if user is currently looking for a deleted instance
+  if (isNotEmptyField(instance)) {
+    let data;
+    // Resolved object_refs must be dissoc from original objects as not directly used for live update
+    // and can imply very large event message
+    if (Array.isArray(instance)) {
+      data = (instance as any[]).map(removeResolvedRefs);
+    } else {
+      data = removeResolvedRefs(instance);
+    }
+    // Direct refresh the current instance cache
+    await refreshLocalCacheForEntity(topic, data as unknown as BasicStoreCommon);
+    // Dispatch the event for cluster refresh
+    await getClientPubSub().publish(topic, { instance: data, user });
+  }
+  return instance;
+};
+
+export const removeResolvedRefs = (instance: any) => {
+  const refInputNames = new Set([INPUT_OBJECTS, ...schemaRelationsRefDefinition.getAllInputNames()]);
+  return Object.fromEntries(Object.entries(instance).filter(([k]) => !refInputNames.has(k)));
+};
+
+// region user context (clientContext)
+const FIVE_MINUTES = 5 * 60;
+export const setEditContext = async (user: AuthUser, instanceId: string, input: EditContext) => {
+  const data = R.assoc('name', user.user_email, input);
+  const listIds = [`context:instance:${instanceId}`, `context:user:${user.id}`];
+  await setKeyWithList(`edit:${instanceId}:${user.id}`, listIds, data, FIVE_MINUTES);
+};
+export const fetchEditContext = async (instanceId: string) => {
+  return keysFromList(`context:instance:${instanceId}`, FIVE_MINUTES);
+};
+export const delEditContext = async (user: AuthUser, instanceId: string) => {
+  const listIds = [`context:instance:${instanceId}`, `context:user:${user.id}`];
+  return delKeyWithList(`edit:${instanceId}:${user.id}`, listIds);
+};
+export const delUserContext = async (user: AuthUser) => {
+  const contextIds = await getClientBase().zrange(`context:user:${user.id}`, 0, -1);
+  return Promise.all(contextIds.map((id) => getClientBase().del(id)));
+};
+// endregion
+
+// region locking (clientContext)
+export const redisAddDeletions = async (internalIds: Array<string>, draftId: string | undefined = undefined) => {
+  let ids = Array.isArray(internalIds) ? internalIds : [internalIds];
+  if (draftId) {
+    ids = ids.map((id) => `${id}${draftId}`);
+  }
+  await redisTx(getClientLock(), async (tx) => {
+    const time = new Date().getTime();
+    // remove the too old keys from the list of instances
+    await tx.zremrangebyscore('platform-deletions', '-inf', time - (5 * 1000));
+    // add/update the instance with its creation date in the ordered list of instances
+    await tx.zadd('platform-deletions', time, ...ids);
+  });
+};
+export const redisFetchLatestDeletions = async () => {
+  const time = new Date().getTime();
+  await getClientLock().zremrangebyscore('platform-deletions', '-inf', time - (5 * 1000));
+  return getClientLock().zrange('platform-deletions', 0, -1);
+};
+interface LockOptions {
+  automaticExtension?: boolean;
+  retryCount?: number;
+  draftId?: string;
+  child_operation?: string;
+}
+const defaultLockOpts: LockOptions = { automaticExtension: true, retryCount: conf.get('app:concurrency:retry_count'), draftId: '' };
+const getStackTrace = () => {
+  const obj: any = {};
+  Error.captureStackTrace(obj, getStackTrace);
+  return obj.stack;
+};
+export const lockResource = async (resources: Array<string>, opts: LockOptions = defaultLockOpts) => {
+  let timeout: NodeJS.Timeout | undefined;
+  let extension: undefined | Promise<void>;
+  const { retryCount = defaultLockOpts.retryCount, automaticExtension = defaultLockOpts.automaticExtension, draftId = defaultLockOpts.draftId } = opts;
+  const initialCallStack = getStackTrace();
+  const resourcesId = R.uniq(resources).map((id) => `${id}${draftId}`);
+  const locks = R.uniq(resourcesId).map((id) => `{locks}:${id}${draftId}`);
+  const automaticExtensionThreshold = conf.get('app:concurrency:extension_threshold');
+  const retryDelay = conf.get('app:concurrency:retry_delay');
+  const retryJitter = conf.get('app:concurrency:retry_jitter');
+  const maxTtl = conf.get('app:concurrency:max_ttl');
+  const controller = new AbortController();
+  const { signal } = controller;
+  const redlock = new Redlock([getClientLock()], { retryCount, retryDelay, retryJitter });
+  // Get the lock
+  let lock = await redlock.acquire(locks, maxTtl); // Force unlock after maxTtl
+  const queue = () => {
+    timeout = setTimeout(
+      () => {
+        extension = extend();
+      },
+      lock.expiration - Date.now() - 2 * automaticExtensionThreshold,
+    );
+  };
+  const extend = async () => {
+    try {
+      if (retryCount !== 0) {
+        logApp.info('Extending resources for long processing task', { locks, stack: initialCallStack });
+      }
+      lock = await lock.extend(maxTtl);
+      queue();
+    } catch {
+      logApp.error('Execution timeout, error extending resources', { locks });
+      if (process.send) {
+        // If process.send, we use a child process
+        process.send({ operation: opts.child_operation, type: 'abort', success: false });
+      } else {
+        controller.abort({ name: TYPE_LOCK_ERROR });
+      }
+    }
+  };
+  // If lock succeed we need to be sure that delete not occurred just before the resolution/lock
+  // If we do not check for that, we could update an entity even though it was just deleted, resulting in the entity being created again
+  const latestDeletions = await redisFetchLatestDeletions();
+  const deletedParticipantsIds = resourcesId.filter((x) => latestDeletions.includes(x));
+  if (deletedParticipantsIds.length > 0) {
+    // noinspection ExceptionCaughtLocallyJS
+    await lock.release();
+    throw LockTimeoutError({ participantIds: deletedParticipantsIds });
+  }
+  // If everything seems good, start auto extension if needed
+  if (automaticExtension) {
+    queue();
+  }
+  // Return the lock and capable actions
+  return {
+    signal,
+    extend,
+    unlock: async () => {
+      // First, wait for an in-flight extension to finish.
+      if (extension) {
+        await extension.catch(() => {
+          // An error here doesn't matter at all, because the routine has
+          // already completed, and a release will be attempted regardless. The
+          // only reason for waiting here is to prevent possible contention
+          // between the extension and release.
+        });
+      }
+      // Second, clear the auto extends possibly starts by the first step
+      clearTimeout(timeout);
+      // Last, unlock in redis
+      try {
+        // Finally try to unlock
+        await lock.release();
+      } catch {
+        // Nothing to do here
+      }
+    },
+  };
+};
+// endregion
+
+// region work handling
+export const redisDeleteWorks = async (internalIds: Array<string>) => {
+  return Promise.all(internalIds.map((id) => getClientBase().del(id)));
+};
+export const redisGetWork = async (internalId: string) => {
+  return getClientBase().hgetall(internalId);
+};
+export const redisMarkWorkAsProcessed = async (workId: string) => {
+  const clientBase = getClientBase();
+  await redisTx(clientBase, async (tx) => {
+    await updateObjectRaw(tx, workId, { is_processed: true });
+  });
+};
+export const redisGetWorkCompletionState = async (workId: string) => {
+  const {
+    import_processed_number: pn,
+    import_expected_number: en,
+    is_processed,
+    is_multipart,
+  } = await redisGetWork(workId);
+  const total = pn ? parseInt(pn, 10) : 0;
+  const expected = en ? parseInt(en, 10) : 0;
+  const isProcessed = is_processed === 'true';
+  const isMultiPartWork = is_multipart === 'true';
+  return { total, expected, isProcessed, isMultiPartWork };
+};
+export const redisUpdateWorkFigures = async (workId: string) => {
+  const timestamp = now();
+  const clientBase = getClientBase();
+  if (workId.includes('_')) { // Handle a connector status.
+    const [, connectorId] = workId.split('_');
+    await clientBase.set(`work:${connectorId}`, workId);
+  }
+  await redisTx(clientBase, async (tx) => {
+    await updateObjectCounterRaw(tx, workId, 'import_processed_number', 1);
+    await updateObjectRaw(tx, workId, { import_last_processed: timestamp });
+  });
+};
+export const redisGetConnectorStatus = async (connectorId: string) => {
+  return getClientBase().get(`work:${connectorId}`);
+};
+export const redisUpdateActionExpectation = async (user: AuthUser, workId: string, expectation: number) => {
+  await redisTx(getClientBase(), async (tx) => {
+    await updateObjectCounterRaw(tx, workId, 'import_expected_number', expectation);
+  });
+  return workId;
+};
+export const redisInitializeWork = async (workId: string, isMultiPartWork: boolean) => {
+  await redisTx(getClientBase(), async (tx) => {
+    await updateObjectRaw(tx, workId, {
+      is_initialized: true,
+      is_multipart: isMultiPartWork,
+    });
+  });
+};
+// Atomic first-completion marker for a work: SET NX guarantees that exactly
+// one caller wins, whichever completion path (reportExpectation vs
+// updateProcessedTime) and whichever node observes the completion first.
+// A dedicated TTL-bounded key is used instead of a field on the work hash so
+// the marker can never recreate or orphan a deleted work key.
+const WORK_COMPLETION_FLAG_TTL = 86400; // 1 day, works complete well within it
+export const redisAcquireWorkCompletionFlag = async (workId: string): Promise<boolean> => {
+  const result = await getClientBase().set(`work_completion_counted:${workId}`, '1', 'EX', WORK_COMPLETION_FLAG_TTL, 'NX');
+  return result === 'OK';
+};
+// endregion
+// region async calls tracking
+const ASYNC_CALL_TTL = 300;
+const asyncCallKey = (id: string) => `async_status:${id}`;
+export const redisInitializeAsyncCall = async (asyncCallId: string) => {
+  await getClientBase().set(
+    asyncCallKey(asyncCallId),
+    '0',
+    'EX',
+    ASYNC_CALL_TTL,
+  );
+};
+export const redisGetAsyncCall = async (asyncCallId: string) => {
+  return getClientBase().get(asyncCallKey(asyncCallId));
+};
+export const redisFinishAsyncCall = async (asyncCallId: string) => {
+  await getClientBase().set(
+    asyncCallKey(asyncCallId),
+    '1',
+    'EX',
+    ASYNC_CALL_TTL,
+  );
+};
+// endregion
+// region cluster handling
+const CLUSTER_LIST_KEY = 'platform_cluster';
+const CLUSTER_NODE_EXPIRE = 2 * 60; // 2 minutes
+export const registerClusterInstance = async (instanceId: string, instanceConfig: ClusterConfig) => {
+  return setKeyWithList(instanceId, [CLUSTER_LIST_KEY], instanceConfig, CLUSTER_NODE_EXPIRE);
+};
+export const getClusterInstances = async () => {
+  return keysFromList(CLUSTER_LIST_KEY, CLUSTER_NODE_EXPIRE);
+};
+// endregion
+
+// playbook handling
+const PLAYBOOK_EXECUTION_TTL = 90 * 24 * 60 * 60; // 90 days
+export const PLAYBOOK_EXECUTIONS_MAX_LENGTH = 20;
+export const redisPlaybookUpdate = async (envelop: ExecutionEnvelop) => {
+  const clientBase = getClientBase();
+  const id = `playbook_execution_${envelop.playbook_execution_id}`;
+  const follow = await clientBase.get(id);
+  const objectFollow = follow ? JSON.parse(follow) : {};
+  const toUpdate = mergeDeepRightAll(objectFollow, envelop);
+  await setKeyWithList(id, [`playbook_executions_${envelop.playbook_id}`], toUpdate, PLAYBOOK_EXECUTION_TTL, PLAYBOOK_EXECUTIONS_MAX_LENGTH); // 5 minutes
+};
+export const getLastPlaybookExecutions = async (playbookId: string) => {
+  const executions = await keysFromList(`playbook_executions_${playbookId}`, PLAYBOOK_EXECUTION_TTL, PLAYBOOK_EXECUTIONS_MAX_LENGTH) as ExecutionEnvelop[];
+  return executions.map((e) => {
+    const steps = Object.entries(e).filter(([k, _]) => k.startsWith('step_')).map(([k, v]) => {
+      const fullData = v.bundle ? JSON.stringify([v.bundle], null, 2) : JSON.stringify(v.patch, null, 2);
+
+      const bundle_or_patch = fullData.length > PLAYBOOK_LOG_MAX_SIZE
+        ? `${fullData.substring(0, PLAYBOOK_LOG_MAX_SIZE)}\n\n... (displaying ${PLAYBOOK_LOG_MAX_SIZE} on ${fullData.length - PLAYBOOK_LOG_MAX_SIZE} chars)`
+        : fullData;
+
+      // beware, step key is the same for every execution, and we need to avoid id collision in Relay
+      const id = `${e.playbook_execution_id}-${k.split('step_')[1]}`;
+      return ({ id, bundle_or_patch, ...v });
+    });
+    return {
+      id: e.playbook_execution_id,
+      playbook_id: e.playbook_id,
+      execution_start: steps[0].in_timestamp,
+      steps,
+    };
+  });
+};
+export const deleteAllPlaybookExecutions = async (playbookId: string) => {
+  const playbookExecutionKeys = await getClientBase().zrange(`playbook_executions_${playbookId}`, 0, -1);
+  if (playbookExecutionKeys?.length > 0) {
+    await getClientBase().del(playbookExecutionKeys); // delete all keys
+  }
+  await getClientBase().del(`playbook_executions_${playbookId}`); // delete list
+};
+// endregion
+
+// region - support package handling
+export const SUPPORT_NODE_STATUS_IN_PROGRESS = 0;
+export const SUPPORT_NODE_STATUS_READY = 10;
+export const SUPPORT_NODE_STATUS_IN_ERROR = 100;
+
+/**
+ * Add or update for a given support package, one node status.
+ * @param supportPackageId
+ * @param nodeId
+ * @param nodeStatus one of SUPPORT_NODE_STATUS_IN_PROGRESS, SUPPORT_NODE_STATUS_READY, SUPPORT_NODE_STATUS_IN_ERROR
+ */
+export const redisStoreSupportPackageNodeStatus = (supportPackageId: string, nodeId: string, nodeStatus: number) => {
+  const setKeyId = `support:${supportPackageId}`;
+  // redis score =  nodeStatus
+  // redis member = nodeId
+  return getClientBase().zadd(setKeyId, nodeStatus, nodeId);
+};
+
+/**
+ * Count for a support package the number of node with a status.
+ * @param supportPackageId
+ * @param nodeStatus
+ */
+export const redisCountSupportPackageNodeWithStatus = (supportPackageId: string, nodeStatus: number) => {
+  const setKeyId = `support:${supportPackageId}`;
+  return getClientBase().zcount(setKeyId, nodeStatus, nodeStatus);
+};
+
+export const redisDeleteSupportPackageNodeStatus = (supportPackageId: string) => {
+  const setKeyId = `support:${supportPackageId}`;
+  return getClientBase().del(setKeyId);
+};
+// endregion - support package handling
+
+// region - exclusion list cache handling
+const EXCLUSION_LIST_STATUS_KEY = 'exclusion_list_status';
+const EXCLUSION_LIST_CACHE_KEY = 'exclusion_list_cache';
+export const redisUpdateExclusionListStatus = async (exclusionListStatus: object) => {
+  const clientBase = getClientBase();
+  await redisTx(clientBase, async (tx) => {
+    tx.hset(EXCLUSION_LIST_STATUS_KEY, exclusionListStatus);
+  });
+};
+export const redisGetExclusionListStatus = async () => {
+  return getClientBase().hgetall(EXCLUSION_LIST_STATUS_KEY);
+};
+
+export const redisGetExclusionListCache = async () => {
+  const rawCache = await getClientBase().get(EXCLUSION_LIST_CACHE_KEY);
+  try {
+    return rawCache ? JSON.parse(rawCache) : [];
+  } catch {
+    logApp.error('Exclusion cache could not be parsed properly. Asking for a cache refresh.', { rawCache });
+    await redisUpdateExclusionListStatus({ last_refresh_ask_date: (new Date()).toString() });
+    return [];
+  }
+};
+export const redisSetExclusionListCache = async (cache: ExclusionListCacheItem[]) => {
+  const stringifiedCache = JSON.stringify(cache);
+  await getClientBase().set(EXCLUSION_LIST_CACHE_KEY, stringifiedCache);
+};
+// endregion - exclusion list cache handling
+
+// region - forgot password handling
+
+export const OTP_TTL = conf.get('app:forgot_password:otp_ttl_second') || 600;
+
+export const redisSetForgotPasswordOtp = async (
+  transactionId: string,
+  data: { email: string; hashedOtp: string; mfa_activated: boolean; mfa_validated: boolean; userId: string },
+  ttl: number = OTP_TTL,
+) => {
+  const forgotPasswordOtpKeyName = `forgot_password_otp_${transactionId}`;
+  const pointerKey = `forgot_password_transactionId_${data.email}`;
+  await getClientBase().setex(forgotPasswordOtpKeyName, ttl, JSON.stringify(data));
+  await getClientBase().setex(pointerKey, ttl, transactionId);
+};
+export const redisGetForgotPasswordOtp = async (id: string) => {
+  const keyName = `forgot_password_otp_${id}`;
+  const str = await getClientBase().get(keyName) ?? '{}';
+  const values: { hashedOtp: string; email: string; mfa_activated: boolean; mfa_validated: boolean; userId: string } = JSON.parse(str);
+  const ttl = await getClientBase().ttl(keyName);
+  return { ...values, ttl };
+};
+export const redisGetForgotPasswordOtpPointer = async (email: string) => {
+  const pointerKey = `forgot_password_transactionId_${email}`;
+  const id = await getClientBase().get(pointerKey);
+  const ttl = await getClientBase().ttl(pointerKey);
+  return { id, ttl };
+};
+export const redisDelForgotPassword = async (id: string, email: string) => {
+  const otpKeyName = `forgot_password_otp_${id}`;
+  const pointerKeyName = `forgot_password_transactionId_${email}`;
+  await getClientBase().del(otpKeyName);
+  await getClientBase().del(pointerKeyName);
+};
+
+// endregion - forgot password handling
+
+// region - telemetry gauges
+const TELEMETRY_EVENT_KEY = 'telemetry_events';
+/**
+ * Increment a gauge by its name.
+ * HINCRBY is atomic: concurrent increments (multiple API instances, or
+ * fire-and-forget calls racing on the same node) can never lose updates,
+ * unlike the previous hget + hset read-modify-write.
+ * @param gaugeName
+ * @param countToAdd 1 or more to be added in count
+ */
+export const redisSetTelemetryAdd = async (gaugeName: string, countToAdd: number) => {
+  await getClientBase().hincrby(TELEMETRY_EVENT_KEY, gaugeName, countToAdd);
+};
+
+/**
+ * Get gauge value by name or 0 if not present in redis.
+ * @param gaugeName
+ */
+export const redisGetTelemetry = async (gaugeName: string) => {
+  const gaugeAsStr = await getClientBase().hget(TELEMETRY_EVENT_KEY, gaugeName);
+  const gaugeCount: number = gaugeAsStr ? +gaugeAsStr : 0;
+  return Number.isNaN(gaugeCount) ? 0 : gaugeCount;
+};
+
+/**
+ * delete the telemetry hset totally
+ */
+export const redisClearTelemetry = async () => {
+  return getClientBase().del(TELEMETRY_EVENT_KEY);
+};
+
+/**
+ * Delete specific gauge entry
+ */
+export const redisClearTelemetryGauge = async (gaugeName: string) => {
+  return getClientBase().hdel(TELEMETRY_EVENT_KEY, gaugeName);
+};
+// endregion - telemetry gauges
+
+// region - manager stream state
+const MANAGER_EVENT_STATE_KEY = 'manager_stream_state_';
+export const redisSetManagerEventState = async (managerName: string, event_state_id: string) => {
+  const managerEventStateKey = MANAGER_EVENT_STATE_KEY + managerName;
+  await getClientBase().set(managerEventStateKey, event_state_id);
+};
+export const redisGetManagerEventState = async (managerName: string) => {
+  const managerEventStateKey = MANAGER_EVENT_STATE_KEY + managerName;
+  return getClientBase().get(managerEventStateKey);
+};
+// endregion
+
+// region connector logs
+export interface FeedLog {
+  timestamp: string;
+  status: 'success' | 'error';
+  messages: string[];
+  count?: number;
+}
+
+export const redisSetConnectorLogs = async (connectorId: string, logs: string[]) => {
+  const data = JSON.stringify(logs);
+  await getClientBase().set(`connector-${connectorId}-logs`, data);
+};
+export const redisGetConnectorLogs = async (connectorId: string): Promise<string[]> => {
+  const rawLogs = await getClientBase().get(`connector-${connectorId}-logs`);
+  return rawLogs ? JSON.parse(rawLogs) : [];
+};
+
+const getIngestionLogKey = (feedId: string) => `ingestion-${feedId}-history`;
+
+const INGESTION_DEDUP_MAX_COUNT = 100;
+const INGESTION_HISTORY_MAX_LENGTH = 20;
+const INGESTION_HISTORY_UPDATE_RETRIES = 5;
+
+export const redisAddIngestionHistory = async (feedId: string, log: FeedLog) => {
+  const clientBase = getClientBase();
+  const key = getIngestionLogKey(feedId);
+  const incomingMessages = JSON.stringify(log.messages);
+
+  for (let attempt = 0; attempt < INGESTION_HISTORY_UPDATE_RETRIES; attempt += 1) {
+    await clientBase.watch(key);
+    try {
+      const latestLogData = await clientBase.lindex(key, 0);
+      const tx = clientBase.multi();
+
+      if (latestLogData) {
+        const latestLog: FeedLog = JSON.parse(latestLogData);
+        const isSameStatus = latestLog.status === log.status;
+        const isSameMessage = JSON.stringify(latestLog.messages) === incomingMessages;
+        const count = latestLog.count ?? 1;
+
+        if (isSameStatus && isSameMessage && count < INGESTION_DEDUP_MAX_COUNT) {
+          const updatedLog: FeedLog = {
+            ...latestLog,
+            count: count + 1,
+            timestamp: log.timestamp,
+          };
+          tx.lset(key, 0, JSON.stringify(updatedLog));
+        } else {
+          tx.lpush(key, JSON.stringify(log));
+          tx.ltrim(key, 0, INGESTION_HISTORY_MAX_LENGTH - 1);
+        }
+      } else {
+        tx.lpush(key, JSON.stringify(log));
+        tx.ltrim(key, 0, INGESTION_HISTORY_MAX_LENGTH - 1);
+      }
+
+      const result = await tx.exec();
+      if (result !== null) {
+        return;
+      }
+    } finally {
+      await clientBase.unwatch();
+    }
+  }
+
+  throw DatabaseError('Redis transaction conflict while updating ingestion history', {
+    feedId,
+  });
+};
+
+export const redisGetIngestionHistory = async (feedId: string): Promise<FeedLog[]> => {
+  const rawLogs = await getClientBase().lrange(getIngestionLogKey(feedId), 0, -1);
+  return rawLogs.map((entry) => JSON.parse(entry) as FeedLog);
+};
+// endregion
+
+// region connector health metrics
+export interface ConnectorHealthMetrics {
+  restart_count: number;
+  started_at: string;
+  last_update: string;
+  is_in_reboot_loop: boolean;
+}
+
+export const redisSetConnectorHealthMetrics = async (connectorId: string, metrics: ConnectorHealthMetrics) => {
+  const data = JSON.stringify(metrics);
+  // TTL of 5 minutes (300 seconds)
+  await getClientBase().set(`connector-${connectorId}-health`, data, 'EX', 300);
+};
+
+export const redisGetConnectorHealthMetrics = async (connectorId: string): Promise<ConnectorHealthMetrics | null> => {
+  const rawMetrics = await getClientBase().get(`connector-${connectorId}-health`);
+  return rawMetrics ? JSON.parse(rawMetrics) : null;
+};
+// endregion
+
+// region auth log history (FIFO, last 50 per provider)
+const AUTH_LOG_LIST_KEY_PREFIX = 'auth_logs:';
+const AUTH_LOG_MAX_SIZE = 50;
+
+export interface AuthLogEntry {
+  timestamp: number;
+  level: 'success' | 'info' | 'warn' | 'error';
+  type: string;
+  identifier: string;
+  message: string;
+  meta?: Record<string, unknown>;
+}
+
+const authLogListKey = (id: string) => `${AUTH_LOG_LIST_KEY_PREFIX}${id}`;
+
+export const redisPushAuthLog = async (id: string, entry: Omit<AuthLogEntry, 'timestamp'>) => {
+  try {
+    const key = authLogListKey(id);
+    const value = JSON.stringify({ timestamp: Date.now(), ...entry });
+    await redisTx(getClientBase(), async (tx) => {
+      tx.lpush(key, value);
+      tx.ltrim(key, 0, AUTH_LOG_MAX_SIZE - 1);
+    });
+  } catch (err) {
+    logApp.error('Failed to push auth log entry to Redis', { cause: err });
+  }
+};
+
+export const redisGetAuthLogHistory = async (id: string): Promise<AuthLogEntry[]> => {
+  const listKey = authLogListKey(id);
+  const rawList = await getClientBase().lrange(listKey, 0, AUTH_LOG_MAX_SIZE - 1);
+  return rawList.map((s) => {
+    try {
+      return JSON.parse(s) as AuthLogEntry;
+    } catch {
+      return null;
+    }
+  }).filter((e): e is AuthLogEntry => e !== null);
+};
+
+export const redisDeleteAuthLogHistory = async (id: string): Promise<void> => {
+  try {
+    await getClientBase().del(authLogListKey(id));
+  } catch (err) {
+    logApp.error('Failed to delete auth log history from Redis', { cause: err });
+  }
+};
+
+// region ingestion log history (FIFO, last 20 per feed)
+const INGESTION_LOG_KEY_PREFIX = 'ingestion-log-';
+const INGESTION_LOG_MAX_SIZE = 20;
+
+export interface IngestionLogEntry {
+  timestamp: number;
+  level: 'success' | 'info' | 'warn' | 'error';
+  type: string;
+  identifier: string;
+  message: string;
+  meta?: Record<string, unknown>;
+}
+
+const ingestionLogListKey = (feedId: string) => `${INGESTION_LOG_KEY_PREFIX}${feedId}-history`;
+
+export const redisPushIngestionLog = async (feedId: string, entry: Omit<IngestionLogEntry, 'timestamp'>) => {
+  try {
+    const key = ingestionLogListKey(feedId);
+    const value = JSON.stringify({ timestamp: Date.now(), ...entry });
+    await redisTx(getClientBase(), async (tx) => {
+      tx.lpush(key, value);
+      tx.ltrim(key, 0, INGESTION_LOG_MAX_SIZE - 1);
+    });
+  } catch (err) {
+    logApp.error('Failed to push ingestion log entry to Redis', { cause: err });
+  }
+};
+
+export const redisGetIngestionLogHistory = async (feedId: string): Promise<IngestionLogEntry[]> => {
+  const listKey = ingestionLogListKey(feedId);
+  const rawList = await getClientBase().lrange(listKey, 0, INGESTION_LOG_MAX_SIZE - 1);
+  return rawList.map((s) => {
+    try {
+      return JSON.parse(s) as IngestionLogEntry;
+    } catch {
+      return null;
+    }
+  }).filter((e): e is IngestionLogEntry => e !== null);
+};
+
+export const redisDeleteIngestionLogHistory = async (feedId: string): Promise<void> => {
+  try {
+    await getClientBase().del(ingestionLogListKey(feedId));
+  } catch (err) {
+    logApp.error('Failed to delete ingestion log history from Redis', { cause: err });
+  }
+};
+// endregion
+
+// region - XTM One registration result
+const XTM_REGISTRATION_RESULT_KEY = 'xtm_registration_result';
+
+export const redisSetXtmRegistrationResult = async (result: object, ttlSeconds: number) => {
+  await getClientBase().set(XTM_REGISTRATION_RESULT_KEY, JSON.stringify(result), 'EX', ttlSeconds);
+};
+
+export const redisGetXtmRegistrationResult = async (): Promise<object | null> => {
+  const raw = await getClientBase().get(XTM_REGISTRATION_RESULT_KEY);
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    logApp.error('[XTM One] Registration result in Redis could not be parsed', { raw });
+    return null;
+  }
+};
+// endregion - XTM One registration result
+
+// region - XTM agent response cache
+// Caches the full content returned by an XTM One agent stream call so that
+// reopening AI Insights for the same entity within the TTL window returns
+// instantly instead of re-running an expensive agent execution.
+const XTM_AGENT_CACHE_KEY_PREFIX = 'xtm_agent_cache:';
+
+export interface XtmAgentCachedResponse {
+  content: string;
+  cached_at: string;
+}
+
+const isXtmAgentCachedResponse = (value: unknown): value is XtmAgentCachedResponse => {
+  return !!value
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && typeof (value as XtmAgentCachedResponse).content === 'string'
+    && typeof (value as XtmAgentCachedResponse).cached_at === 'string';
+};
+
+export const redisGetXtmAgentResponse = async (cacheKey: string): Promise<XtmAgentCachedResponse | null> => {
+  try {
+    const raw = await getClientBase().get(`${XTM_AGENT_CACHE_KEY_PREFIX}${cacheKey}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Defensive shape check — Redis can hold any JSON the writer puts in
+    // (legacy entries, manual edits, attacker-set keys), so refuse to
+    // replay anything that isn't a `{ content: string, cached_at: string }`
+    // object instead of letting the consumer emit a `done` SSE event with
+    // `content: undefined`.
+    if (!isXtmAgentCachedResponse(parsed)) {
+      logApp.warn('[XTM One] Agent response cache payload has unexpected shape, ignoring', { cacheKey });
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    logApp.warn('[XTM One] Agent response cache read failed', { cause: err });
+    return null;
+  }
+};
+
+export const redisSetXtmAgentResponse = async (cacheKey: string, content: string, ttlSeconds: number): Promise<void> => {
+  if (ttlSeconds <= 0) return;
+  try {
+    const value: XtmAgentCachedResponse = { content, cached_at: new Date().toISOString() };
+    await getClientBase().set(
+      `${XTM_AGENT_CACHE_KEY_PREFIX}${cacheKey}`,
+      JSON.stringify(value),
+      'EX',
+      ttlSeconds,
+    );
+  } catch (err) {
+    logApp.warn('[XTM One] Agent response cache write failed', { cause: err });
+  }
+};
+
+export const redisDeleteXtmAgentResponse = async (cacheKey: string): Promise<void> => {
+  try {
+    await getClientBase().del(`${XTM_AGENT_CACHE_KEY_PREFIX}${cacheKey}`);
+  } catch (err) {
+    logApp.warn('[XTM One] Agent response cache eviction failed', { cause: err });
+  }
+};
+// endregion - XTM agent response cache

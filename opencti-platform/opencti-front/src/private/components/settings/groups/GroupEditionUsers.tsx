@@ -1,0 +1,130 @@
+import React, { FunctionComponent, ReactNode } from 'react';
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import { GroupEditionContainer_group$data } from '@components/settings/groups/__generated__/GroupEditionContainer_group.graphql';
+import { GroupUsersLinesQuery$variables } from '@components/settings/users/__generated__/GroupUsersLinesQuery.graphql';
+import { toolBarUsersLinesSearchQuery } from '@components/data/DataTableToolBar';
+import { DataTableToolBarUsersLinesSearchQuery } from '@components/data/__generated__/DataTableToolBarUsersLinesSearchQuery.graphql';
+import { deleteNodeFromId, insertNode } from '../../../../utils/store';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import DataTableWithoutFragment from '../../../../components/dataGrid/DataTableWithoutFragment';
+import { DataTableVariant } from '../../../../components/dataGrid/dataTableTypes';
+import { Checkbox } from '@filigran/design-system';
+
+const userMutationRelationAdd = graphql`
+  mutation GroupEditionUsersRelationAddMutation(
+    $id: ID!
+    $input: InternalRelationshipAddInput!
+  ) {
+    groupEdit(id: $id) {
+      relationAdd(input: $input) {
+        to {
+          ...GroupEditionContainer_group
+        }
+        from {
+          ...UserLine_node
+        }
+      }
+    }
+  }
+`;
+
+const userMutationRelationDelete = graphql`
+  mutation GroupEditionUsersRelationDeleteMutation(
+    $id: ID!
+    $fromId: StixRef!
+    $relationship_type: String!
+  ) {
+    groupEdit(id: $id) {
+      relationDelete(fromId: $fromId, relationship_type: $relationship_type) {
+        id
+        ...GroupEditionContainer_group
+      }
+    }
+  }
+`;
+
+interface GroupEditionUsersProps {
+  group: GroupEditionContainer_group$data;
+  queryRef: PreloadedQuery<DataTableToolBarUsersLinesSearchQuery>;
+  paginationOptionsForUpdater: GroupUsersLinesQuery$variables;
+  children: ReactNode;
+  storageKey: string;
+}
+
+const GroupEditionUsers: FunctionComponent<GroupEditionUsersProps> = ({ group, queryRef, paginationOptionsForUpdater, children, storageKey }) => {
+  const groupId = group.id;
+  const groupUsers = group.members?.edges?.map((n) => ({ id: n.node.id })) ?? [];
+  const usersData = usePreloadedQuery<DataTableToolBarUsersLinesSearchQuery>(toolBarUsersLinesSearchQuery, queryRef);
+  const users = usersData.users?.edges.map((n) => n.node) ?? [];
+
+  const [commitAddUser] = useApiMutation(userMutationRelationAdd);
+  const [commitRemoveUser] = useApiMutation(userMutationRelationDelete);
+  const handleToggle = (userId: string, groupUser: { id: string } | undefined, checked: boolean) => {
+    const input = {
+      fromId: userId,
+      relationship_type: 'member-of',
+    };
+    if (checked) {
+      commitAddUser({
+        variables: {
+          id: groupId,
+          input,
+        },
+        updater: (store) => {
+          insertNode(
+            store,
+            'Pagination_group_members',
+            paginationOptionsForUpdater,
+            'groupEdit',
+            groupId,
+            'relationAdd',
+            { input },
+            'from',
+          );
+        },
+      });
+    } else if (groupUser !== undefined) {
+      commitRemoveUser({
+        variables: {
+          id: groupId,
+          fromId: groupUser.id,
+          relationship_type: 'member-of',
+        },
+        updater: (store) => {
+          deleteNodeFromId(store, groupId, 'Pagination_group_members', paginationOptionsForUpdater, groupUser.id);
+        },
+      });
+    }
+  };
+
+  return (
+    <DataTableWithoutFragment
+      dataColumns={{
+        name: { percentWidth: 50, isSortable: true },
+        user_email: { isSortable: true },
+      }}
+      storageKey={storageKey}
+      data={users}
+      globalCount={users.length}
+      filtersComponent={children}
+      variant={DataTableVariant.inline}
+      disableNavigation
+      actions={(user) => {
+        const groupUser = groupUsers.find((g) => g.id === user.id);
+        return (
+          <Checkbox
+            aria-label={user.name}
+            onCheckedChange={(state) => handleToggle(
+              user.id,
+              groupUser,
+              state === true,
+            )}
+            checked={groupUser !== undefined}
+          />
+        );
+      }}
+    />
+  );
+};
+
+export default GroupEditionUsers;

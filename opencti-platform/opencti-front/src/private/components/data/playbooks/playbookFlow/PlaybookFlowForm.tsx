@@ -1,0 +1,377 @@
+/*
+Copyright (c) 2021-2025 Filigran SAS
+
+This file is part of the OpenCTI Enterprise Edition ("EE") and is
+licensed under the OpenCTI Enterprise Edition License (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+https://github.com/OpenCTI-Platform/opencti/blob/master/LICENSE
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*/
+
+import Button from '@common/button/Button';
+import OpenVocabField from '@components/common/form/OpenVocabField';
+import { Field, Form, Formik, FormikConfig } from 'formik';
+import * as Yup from 'yup';
+import TextField from '../../../../../components/TextField';
+import FormButtonContainer from '../../../../../components/common/form/FormButtonContainer';
+import PeriodicityField from '../../../../../components/fields/PeriodicityField';
+import SelectFieldFds, { SelectItem } from '../../../../../components/fields/SelectFieldFds';
+import { useFormatter } from '../../../../../components/i18n';
+import { parse } from '../../../../../utils/Time';
+import { fieldSpacingContainerStyle } from '../../../../../utils/field';
+import { deserializeFilterGroupForFrontend, emptyFilterGroup, serializeFilterGroupForBackend } from '../../../../../utils/filters/filtersUtils';
+import useFiltersState from '../../../../../utils/filters/useFiltersState';
+import type { PlaybookBundleElementsToApply, PlaybookComponentConfigSchema, PlaybookComponents, PlaybookConfig, PlaybookNode } from '../types/playbook-types';
+import PlaybookFlowFieldAccessRestrictions from './playbookFlowFields/PlaybookFlowFieldAccessRestrictions';
+import PlaybookFlowFieldArray, { PlaybookFlowFieldArrayProps } from './playbookFlowFields/PlaybookFlowFieldArray';
+import PlaybookFlowFieldAuthorizedMembers from './playbookFlowFields/PlaybookFlowFieldAuthorizedMembers';
+import PlaybookFlowFieldBoolean from './playbookFlowFields/PlaybookFlowFieldBoolean';
+import PlaybookFlowFieldCaseTemplates from './playbookFlowFields/PlaybookFlowFieldCaseTemplates';
+import PlaybookFlowFieldFilters from './playbookFlowFields/PlaybookFlowFieldFilters';
+import PlaybookFlowFieldInPirFilters from './playbookFlowFields/PlaybookFlowFieldInPirFilters';
+import PlaybookFlowFieldNumber from './playbookFlowFields/PlaybookFlowFieldNumber';
+import PlaybookFlowFieldOrganizations from './playbookFlowFields/PlaybookFlowFieldOrganizations';
+import PlaybookFlowFieldPeriod from './playbookFlowFields/PlaybookFlowFieldPeriod';
+import PlaybookFlowFieldRunAs from './playbookFlowFields/PlaybookFlowFieldRunAs';
+import PlaybookFlowFieldString from './playbookFlowFields/PlaybookFlowFieldString';
+import PlaybookFlowFieldTargets from './playbookFlowFields/PlaybookFlowFieldTargets';
+import PlaybookFlowFieldTriggerTime from './playbookFlowFields/PlaybookFlowFieldTriggerTime';
+import PlaybookFlowFieldActions from './playbookFlowFields/playbookFlowFieldsActions/PlaybookFlowFieldActions';
+import { PlaybookUpdateActionsForm } from './playbookFlowFields/playbookFlowFieldsActions/playbookAction-types';
+import { computeInitialComponentConfigValues } from './playbookComponents-utils';
+
+export type PlaybookFlowFormData
+  // Component: update knowledge
+  = PlaybookUpdateActionsForm
+    & {
+    // Common for several components
+      name: string;
+      description?: string;
+      applyToElements?: PlaybookBundleElementsToApply;
+      filters?: string;
+      // Component: CRON
+      time?: string;
+      period?: string;
+      day?: string;
+      triggerTime?: string;
+      // Component: Container wrapper
+      newContainer?: boolean;
+      // Component : create indicator and create observable
+      wrap_in_container?: boolean;
+    };
+
+interface PlaybookFlowFormProps {
+  action: string | null;
+  selectedNode: PlaybookNode | null;
+  playbookComponents: PlaybookComponents;
+  componentId: string | null;
+  onConfigAdd: (component: unknown, name: string, config: unknown, description?: string) => void;
+  onConfigReplace: (component: unknown, name: string, config: unknown, description?: string) => void;
+  handleClose: () => void;
+}
+
+const PlaybookFlowForm = ({
+  action,
+  selectedNode,
+  playbookComponents,
+  componentId,
+  onConfigAdd,
+  onConfigReplace,
+  handleClose,
+}: PlaybookFlowFormProps) => {
+  const { t_i18n } = useFormatter();
+  const nodeData = (action === 'config' || action === 'replace') ? selectedNode?.data : undefined;
+  const currentConfig = nodeData?.configuration ?? null;
+
+  const filtersState = useFiltersState(currentConfig?.filters
+    ? deserializeFilterGroupForFrontend(currentConfig.filters)
+    : emptyFilterGroup,
+  );
+
+  const elementsFiltersState = useFiltersState(currentConfig?.applyWithFilters
+    ? deserializeFilterGroupForFrontend(currentConfig.applyWithFilters)
+    : emptyFilterGroup,
+  );
+
+  const selectedComponent = playbookComponents.find((c) => c?.id === componentId);
+  const configurationSchema = selectedComponent?.configuration_schema
+    ? JSON.parse(selectedComponent.configuration_schema) as PlaybookComponentConfigSchema
+    : null;
+
+  // Submit function that formats correctly the data for the backend.
+  const onSubmit: FormikConfig<PlaybookFlowFormData>['onSubmit'] = (values, { resetForm }) => {
+    const { name, description, actionsFormValues, ...config } = values;
+    let finalConfig: PlaybookConfig = config;
+
+    // Special work in case of filters,
+    // (get filters from React state and and them in config).
+    if (configurationSchema?.properties?.filters) {
+      const jsonFilters = serializeFilterGroupForBackend(filtersState[0]);
+      finalConfig = { ...finalConfig, filters: jsonFilters };
+    }
+    if (configurationSchema?.properties?.applyWithFilters) {
+      const jsonFilters = serializeFilterGroupForBackend(elementsFiltersState[0]);
+      finalConfig = { ...finalConfig, applyWithFilters: jsonFilters };
+    }
+    // Special work in case of CRON component,
+    // (format trigger time to have correct format).
+    if (configurationSchema?.properties?.triggerTime && values.time) {
+      // Important to translate to UTC before formatting
+      let triggerTime = `${parse(values.time).utc().format('HH:mm:00.000')}Z`;
+      if (values.period !== 'minute' && values.period !== 'hour' && values.period !== 'day') {
+        const day = values.day && values.day.length > 0 ? values.day : '1';
+        triggerTime = `${day}-${triggerTime}`;
+      }
+      finalConfig = { ...finalConfig, triggerTime };
+    }
+    // Special work in case of update knowledge actions,
+    // (transform the array to object keys, needed to keep same format as before refactoring).
+    if (actionsFormValues) {
+      actionsFormValues.forEach((value, i) => {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        finalConfig[`actions-${i}-value`] = value;
+      });
+    }
+
+    resetForm();
+    if (nodeData?.component?.id && (action === 'config' || action === 'replace')) {
+      onConfigReplace(selectedComponent, name, finalConfig, description);
+    } else {
+      onConfigAdd(selectedComponent, name, finalConfig, description);
+    }
+  };
+
+  const requiredProperties = configurationSchema?.required ?? [];
+
+  const addComponentValidation = Yup.object().shape({
+    name: Yup.string().trim().required(t_i18n('This field is required')),
+  });
+
+  const initialValues = computeInitialComponentConfigValues({ action, currentConfig, configurationSchema, nodeData, selectedComponent });
+
+  return (
+    <div style={{ padding: '0px 0px 20px 0px' }}>
+      <Formik
+        initialValues={initialValues}
+        validationSchema={addComponentValidation}
+        onSubmit={onSubmit}
+        onReset={handleClose}
+      >
+        {({ submitForm, handleReset, isSubmitting, values }) => {
+          const actionsAreValid = (values.actions ?? []).every((a) => {
+            if (a.attribute === 'x_opencti_detection') return true;
+            return a.op && a.attribute && a.value && a.value.length > 0;
+          });
+
+          return (
+            <Form>
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="name"
+                value={values.name ? t_i18n(values.name) : ''}
+                label={t_i18n('Name')}
+                fullWidth
+                required
+              />
+              <Field
+                component={TextField}
+                variant="outlined"
+                name="description"
+                label={t_i18n('Description')}
+                placeholder={t_i18n(selectedComponent?.description ?? '')}
+                fullWidth
+                multiline
+                style={fieldSpacingContainerStyle}
+              />
+              {Object.entries(configurationSchema?.properties ?? {}).map(
+                ([propName, property]) => {
+                  if (propName === 'access_restrictions') {
+                    return <PlaybookFlowFieldAccessRestrictions key={propName} />;
+                  }
+                  if (propName === 'authorized_members') {
+                    return <PlaybookFlowFieldAuthorizedMembers key={propName} />;
+                  }
+                  if (propName === 'run_as') {
+                    return (
+                      <PlaybookFlowFieldRunAs
+                        key={propName}
+                        name={propName}
+                        label={property.$ref ?? 'Run as'}
+                        style={fieldSpacingContainerStyle}
+                      />
+                    );
+                  }
+                  if (propName === 'periodicity' || propName === 'duration') {
+                    return (
+                      <PeriodicityField
+                        key={propName}
+                        name={propName}
+                        label={t_i18n(property.$ref)}
+                        style={fieldSpacingContainerStyle}
+                      />
+                    );
+                  }
+                  if (propName === 'type_affinity') {
+                    return (
+                      <Field
+                        key={propName}
+                        component={SelectFieldFds}
+                        variant="outlined"
+                        name="type_affinity"
+                        label={t_i18n('Type affinity')}
+                        fullWidth={true}
+                        containerstyle={{ width: '100%', marginTop: 20 }}
+                      >
+                        <SelectItem key="ENDPOINT" value="ENDPOINT">
+                          {t_i18n('Endpoint')}
+                        </SelectItem>
+                      </Field>
+                    );
+                  }
+                  if (propName === 'platforms_affinity') {
+                    return (
+                      <OpenVocabField
+                        key={propName}
+                        name={propName}
+                        type="platforms_ov"
+                        label={t_i18n(property.$ref)}
+                        containerStyle={fieldSpacingContainerStyle}
+                        multiple={true}
+                      />
+                    );
+                  }
+                  if (propName === 'organizations') {
+                    return <PlaybookFlowFieldOrganizations key={propName} />;
+                  }
+                  if (propName === 'inPirFilters') {
+                    return <PlaybookFlowFieldInPirFilters key={propName} />;
+                  }
+                  if (propName === 'targets') {
+                    return <PlaybookFlowFieldTargets key={propName} />;
+                  }
+                  if (propName === 'caseTemplates') {
+                    return <PlaybookFlowFieldCaseTemplates key={propName} />;
+                  }
+                  if (propName === 'filters') {
+                    return (
+                      <PlaybookFlowFieldFilters
+                        key={propName}
+                        componentId={componentId}
+                        filtersState={filtersState}
+                      />
+                    );
+                  }
+                  if (propName === 'applyWithFilters') {
+                    return (
+                      <PlaybookFlowFieldFilters
+                        label={t_i18n('Apply when')}
+                        key={propName}
+                        componentId={componentId}
+                        filtersState={elementsFiltersState}
+                      />
+                    );
+                  }
+                  if (propName === 'period') {
+                    return <PlaybookFlowFieldPeriod key={propName} />;
+                  }
+                  if (propName === 'triggerTime') {
+                    return <PlaybookFlowFieldTriggerTime key={propName} />;
+                  }
+                  if (propName === 'actions') {
+                    return (
+                      <PlaybookFlowFieldActions
+                        key={propName}
+                        operations={property.items?.properties?.op?.enum}
+                      />
+                    );
+                  }
+                  if (property.type === 'number') {
+                    return (
+                      <PlaybookFlowFieldNumber
+                        key={propName}
+                        name={propName}
+                        label={t_i18n(property.$ref ?? propName)}
+                      />
+                    );
+                  }
+                  if (property.type === 'boolean') {
+                    let helperText = '';
+                    if (propName === 'create_rel') {
+                      helperText = t_i18n('If both entities are of interest for selected PIR, then the target is kept');
+                    }
+                    return (
+                      <PlaybookFlowFieldBoolean
+                        key={propName}
+                        name={propName}
+                        helperText={helperText}
+                        label={t_i18n(property.$ref ?? propName)}
+                      />
+                    );
+                  }
+                  if (property.type === 'string' && property.oneOf) {
+                    return (
+                      <PlaybookFlowFieldArray
+                        key={propName}
+                        name={propName}
+                        label={t_i18n(property.$ref ?? propName)}
+                        options={property.oneOf as PlaybookFlowFieldArrayProps['options']}
+                        required={requiredProperties.includes(propName)}
+                      />
+                    );
+                  }
+                  if (property.type === 'array') {
+                    return (
+                      <PlaybookFlowFieldArray
+                        key={propName}
+                        name={propName}
+                        label={t_i18n(property.$ref ?? propName)}
+                        options={(property.items?.oneOf ?? []) as PlaybookFlowFieldArrayProps['options']}
+                        multiple
+                      />
+                    );
+                  }
+                  const isTextarea = property.format === 'textarea';
+                  return (
+                    <PlaybookFlowFieldString
+                      key={propName}
+                      name={propName}
+                      label={t_i18n(property.$ref ?? propName)}
+                      multiline={isTextarea}
+                      rows={isTextarea ? 3 : undefined}
+                    />
+                  );
+                },
+              )}
+              <FormButtonContainer>
+                <Button
+                  variant="secondary"
+                  onClick={handleReset}
+                  disabled={isSubmitting}
+                >
+                  {t_i18n('Cancel')}
+                </Button>
+                <Button
+                  onClick={submitForm}
+                  disabled={!actionsAreValid || isSubmitting}
+                >
+                  {selectedNode?.data?.component?.id
+                    ? t_i18n('Update')
+                    : t_i18n('Create')}
+                </Button>
+              </FormButtonContainer>
+            </Form>
+          );
+        }}
+      </Formik>
+    </div>
+  );
+};
+
+export default PlaybookFlowForm;

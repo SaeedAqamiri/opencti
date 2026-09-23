@@ -1,0 +1,365 @@
+import moment from 'moment';
+import * as R from 'ramda';
+import {
+  ENTITY_AUTONOMOUS_SYSTEM,
+  ENTITY_BANK_ACCOUNT,
+  ENTITY_DIRECTORY,
+  ENTITY_EMAIL_MESSAGE,
+  ENTITY_HASHED_OBSERVABLE_ARTIFACT,
+  ENTITY_HASHED_OBSERVABLE_STIX_FILE,
+  ENTITY_HASHED_OBSERVABLE_X509_CERTIFICATE,
+  ENTITY_MEDIA_CONTENT,
+  ENTITY_MUTEX,
+  ENTITY_NETWORK_TRAFFIC,
+  ENTITY_PAYMENT_CARD,
+  ENTITY_PERSONA,
+  ENTITY_PROCESS,
+  ENTITY_SOFTWARE,
+  ENTITY_SSH_KEY,
+  ENTITY_USER_ACCOUNT,
+  ENTITY_WINDOWS_REGISTRY_KEY,
+  ENTITY_WINDOWS_REGISTRY_VALUE_TYPE,
+} from '../schema/stixCyberObservable';
+import { ValidationError } from '../config/errors';
+
+const DEFAULT_TRUNCATE_LIMIT = 64;
+
+// ----------------------------------------------------------------------------------------------------------------------
+// Scheduling period formatting
+export const schedulingPeriodToMs = (scheduling_period) => {
+  let schedulingPeriod;
+  switch (scheduling_period) {
+    case 'PT1D':
+      schedulingPeriod = 86400000;
+      break;
+    case 'PT12H':
+      schedulingPeriod = 43200000;
+      break;
+    case 'PT6H':
+      schedulingPeriod = 21600000;
+      break;
+    case 'PT1H':
+      schedulingPeriod = 3600000;
+      break;
+    case 'PT30M':
+      schedulingPeriod = 1800000;
+      break;
+    case 'PT15M':
+      schedulingPeriod = 900000;
+      break;
+    case 'PT5M':
+      schedulingPeriod = 300000;
+      break;
+    default:
+      schedulingPeriod = 0;
+      break;
+  }
+  return schedulingPeriod;
+};
+
+// ----------------------------------------------------------------------------------------------------------------------
+// Date formatting
+
+export const FROM_START = 0;
+export const FROM_START_STR = '1970-01-01T00:00:00.000Z';
+export const UNTIL_END = 100000000000000;
+export const UNTIL_END_STR = '5138-11-16T09:46:40.000Z';
+
+const dateFormat = 'YYYY-MM-DDTHH:mm:ss.SSS';
+
+const isValidDuration = (duration) => {
+  const durationObj = moment.duration(duration);
+  return durationObj !== null && !Number.isNaN(durationObj.asMilliseconds());
+};
+
+export const utcDate = (date) => (date ? moment(date).utc() : moment().utc());
+export const utcEpochTime = (date = null) => utcDate(date).toDate().getTime();
+export const isDateInRange = (startDate, duration, specificDate) => {
+  if (!isValidDuration(duration)) {
+    return true;
+  }
+  const start = moment(startDate);
+  if (!start.isValid()) {
+    return true;
+  }
+  const durationObj = moment.duration(duration);
+  const end = moment(start).add(durationObj);
+  const specific = moment(specificDate);
+  return specific.isBetween(start, end, null, '[]');
+};
+export const computeDateFromEventId = (eventId) => {
+  return utcDate(parseInt(eventId.split('-')[0], 10)).toISOString();
+};
+export const streamEventId = (date = null, index = 0) => `${utcEpochTime(date)}-${index}`;
+export const now = () => utcDate().toISOString();
+export const nowTime = () => timeFormat(now());
+export const sinceNowInMinutes = (lastModified) => {
+  const diff = utcDate().diff(utcDate(lastModified));
+  const duration = moment.duration(diff);
+  return Math.floor(duration.asMinutes());
+};
+export const sinceNowInDays = (lastModified) => {
+  return sinceNowInMinutes(lastModified) / 1440;
+};
+export const prepareDate = (date) => utcDate(date).format(dateFormat);
+export const yearFormat = (date) => utcDate(date).format('YYYY');
+export const monthFormat = (date) => utcDate(date).format('YYYY-MM');
+export const dayFormat = (date) => utcDate(date).format('YYYY-MM-DD');
+export const timeFormat = (date) => utcDate(date).format('YYYY-MM-DD HH:mm');
+
+export const escape = (chars) => {
+  const toEscape = chars && typeof chars === 'string';
+  if (toEscape) {
+    return chars.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,');
+  }
+  return chars;
+};
+
+// An undefined bound means "unbounded": widen it to the min/max date a JS Date can hold,
+// so that a period without a start or a stop still contains every other period.
+const MIN_DATE = -8640000000000000;
+const MAX_DATE = 8640000000000000;
+
+export const buildPeriodFromDates = (a, b) => ({
+  start: a || a === 0 ? moment(a) : moment(MIN_DATE),
+  end: b || b === 0 ? moment(b) : moment(MAX_DATE),
+});
+
+// Intersection of two periods, null when they do not overlap.
+// Two periods that only touch on a single instant are not considered as overlapping,
+// except when one of them is a single instant strictly inside the other.
+const intersectPeriods = (a, b) => {
+  const aStart = a.start.valueOf();
+  const aEnd = a.end.valueOf();
+  const bStart = b.start.valueOf();
+  const bEnd = b.end.valueOf();
+  if (aStart === aEnd) {
+    if (aStart === bStart || aStart === bEnd) {
+      return null;
+    }
+    if (aStart > bStart && aStart < bEnd) {
+      return { start: a.start, end: a.end };
+    }
+  } else if (bStart === bEnd) {
+    if (bStart === aStart || bStart === aEnd) {
+      return null;
+    }
+    if (bStart > aStart && bStart < aEnd) {
+      return { start: b.start, end: b.end };
+    }
+  }
+  if (aStart < bEnd && bStart < aEnd) {
+    return {
+      start: aStart <= bStart ? b.start : a.start,
+      end: aEnd <= bEnd ? a.end : b.end,
+    };
+  }
+  return null;
+};
+
+export const computeRangeIntersection = (a, b) => {
+  const range = intersectPeriods(a, b);
+  if (range) {
+    return { start: range.start.toISOString(), end: range.end.toISOString() };
+  }
+  // No range intersection, get min/max to build the range
+  const minStart = moment.min([a.start, b.start]);
+  const maxStop = moment.max([a.end, b.end]);
+  return { start: minStart.toISOString(), end: maxStop.toISOString() };
+};
+
+export const minutesAgo = (minutes) => moment().utc().subtract(minutes, 'minutes');
+export const hoursAgo = (hours) => moment().utc().subtract(hours, 'hours');
+
+/**
+ * @param {number} days Number of days
+ * @return {string} ISO Date string
+ */
+export const daysAgo = (days) => {
+  const currentDate = new Date();
+  currentDate.setDate(currentDate.getDate() - days);
+  return currentDate.toISOString().split('T')[0];
+};
+
+export const dayStartDate = (date = null, fromStart = true) => {
+  let start = new Date();
+  if (date) {
+    start = utcDate(date).toDate();
+  }
+  if (fromStart) {
+    start.setHours(0, 0, 0, 0);
+  }
+  return start;
+};
+
+export const monthsAgo = (number) => moment(dayStartDate()).subtract(number, 'months').format();
+
+export const yearsAgo = (number) => moment(dayStartDate()).subtract(number, 'years').format();
+
+const hashes = ['SHA-512', 'SHA-256', 'SHA-1', 'MD5'];
+export const hashValue = (stixCyberObservable) => {
+  if (stixCyberObservable.hashes) {
+    for (let index = 0; index < hashes.length; index += 1) {
+      const algo = hashes[index];
+      if (stixCyberObservable.hashes[algo]) {
+        return stixCyberObservable.hashes[algo];
+      }
+    }
+  }
+  return null;
+};
+
+// Moment.js parsing is only compatible with ISO-8601 and RFC-2822 date formats
+// see https://momentjs.com/docs/#/parsing/string/
+// We handle cases that might happen in the platform (data ingestion for instance)
+export const sanitizeForMomentParsing = (date) => date
+  .replace('CET', '+0100') // reported in RSS feeds
+  .replace('CEST', '+0200'); // reported in RSS feeds
+  // add more if needed.
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+export const truncate = (str, limit = DEFAULT_TRUNCATE_LIMIT, withPoints = true) => {
+  if (str === undefined || str === null || str.length <= limit) {
+    return str;
+  }
+  const trimmedStr = str.substr(0, limit);
+  if (!withPoints) {
+    return trimmedStr;
+  }
+  if (!trimmedStr.includes(' ')) {
+    return `${trimmedStr}...`;
+  }
+  return `${trimmedStr.substr(0, Math.min(trimmedStr.length, trimmedStr.lastIndexOf(' ')))}...`;
+};
+
+const formatSoftware = (stixCyberObservable) => {
+  const value = stixCyberObservable.name || stixCyberObservable.cpe || stixCyberObservable.swid || 'Unknown';
+  if (value !== 'Unknown' && !!stixCyberObservable.version) {
+    return `${value} (${stixCyberObservable.version})`;
+  }
+  return value;
+};
+
+// TODO for now this list is duplicated in Front, think about updating it aswell
+export const observableValue = (stixCyberObservable) => {
+  switch (stixCyberObservable.entity_type) {
+    case ENTITY_AUTONOMOUS_SYSTEM:
+      return stixCyberObservable.name || stixCyberObservable.number || 'Unknown';
+    case ENTITY_DIRECTORY:
+      return stixCyberObservable.path || 'Unknown';
+    case ENTITY_EMAIL_MESSAGE:
+      return stixCyberObservable.body || stixCyberObservable.subject;
+    case ENTITY_HASHED_OBSERVABLE_ARTIFACT:
+      return hashValue(stixCyberObservable) || stixCyberObservable.payload_bin || stixCyberObservable.url || 'Unknown';
+    case ENTITY_HASHED_OBSERVABLE_STIX_FILE:
+      return hashValue(stixCyberObservable) || stixCyberObservable.name || 'Unknown';
+    case ENTITY_HASHED_OBSERVABLE_X509_CERTIFICATE:
+      return hashValue(stixCyberObservable) || stixCyberObservable.subject || stixCyberObservable.issuer || 'Unknown';
+    case ENTITY_MUTEX:
+      return stixCyberObservable.name || 'Unknown';
+    case ENTITY_NETWORK_TRAFFIC:
+      return stixCyberObservable.src_port || stixCyberObservable.dst_port || 'Unknown';
+    case ENTITY_PROCESS:
+      return stixCyberObservable.pid || stixCyberObservable.command_line || 'Unknown';
+    case ENTITY_SOFTWARE:
+      return formatSoftware(stixCyberObservable);
+    case ENTITY_USER_ACCOUNT:
+      return stixCyberObservable.account_login || stixCyberObservable.user_id || 'Unknown';
+    case ENTITY_BANK_ACCOUNT:
+      return stixCyberObservable.iban || stixCyberObservable.number || 'Unknown';
+    case ENTITY_PAYMENT_CARD:
+      return stixCyberObservable.card_number || stixCyberObservable.holder_name || 'Unknown';
+    case ENTITY_WINDOWS_REGISTRY_KEY:
+      return stixCyberObservable.attribute_key || 'Unknown';
+    case ENTITY_WINDOWS_REGISTRY_VALUE_TYPE:
+      return stixCyberObservable.name || stixCyberObservable.data || 'Unknown';
+    case ENTITY_MEDIA_CONTENT:
+      return stixCyberObservable.content || stixCyberObservable.title || stixCyberObservable.url || 'Unknown';
+    case ENTITY_PERSONA:
+      return stixCyberObservable.persona_name || 'Unknown';
+    case ENTITY_SSH_KEY:
+      return stixCyberObservable.fingerprint_sha256 || stixCyberObservable.fingerprint_md5 || stixCyberObservable.key_type || 'Unknown';
+    default:
+      return stixCyberObservable.value || stixCyberObservable.name || 'Unknown';
+  }
+};
+
+export const checkScore = (newScore) => {
+  if (newScore) {
+    const parsedScore = parseFloat(newScore);
+    if (parsedScore < 0 || parsedScore > 100 || !Number.isInteger(parsedScore)) {
+      throw ValidationError('The score should be an integer between 0 and 100', 'x_opencti_score');
+    }
+  }
+  return true;
+};
+
+// Be careful to align this script with the previous function
+export const runtimeFieldObservableValueScript = () => {
+  return `
+    def getFieldValue(def doc, def key) {
+      if (!doc.containsKey(key)) {
+        return 'Unknown';
+      }
+      if (doc.containsKey(key + '.keyword')) {
+        if (doc[key + '.keyword'].size()!=0) {
+          return doc[key + '.keyword'].value;
+        }
+      } else if (doc[key].size()!=0) {
+        return String.valueOf(doc[key].value);
+      }
+      return 'Unknown';
+    }
+    def getFieldsValue(def doc, def fields) {
+      def value = 'Unknown';
+      for (def field : fields) {
+        value = getFieldValue(doc, field);
+        if (value != 'Unknown') {
+          return value;
+        }
+      }
+      return value;
+    }
+    def type = doc['entity_type.keyword'].value;
+    if (type == 'autonomous-system') {
+      emit(getFieldsValue(doc, ['name', 'number']))
+    } else if (type == 'directory') {
+      emit(getFieldValue(doc, 'path'))
+    } else if (type == 'email-message') {
+      emit(getFieldsValue(doc, ['body', 'subject']))
+    } else if (type == 'artifact') {
+      emit(getFieldsValue(doc, ['hashes.SHA-256','hashes.SHA-512', 'hashes.SHA-1', 'hashes.MD5', 'payload_bin']))
+    } else if (type == 'stixfile') {
+      emit(getFieldsValue(doc, ['hashes.SHA-256','hashes.SHA-512', 'hashes.SHA-1', 'hashes.MD5', 'name']))
+    } else if (type == 'x509-certificate') {
+      emit(getFieldsValue(doc, ['hashes.SHA-256','hashes.SHA-512', 'hashes.SHA-1', 'hashes.MD5', 'subject', 'issuer']))
+    } else if (type == 'mutex') {
+      emit(getFieldValue(doc, 'name'))
+    } else if (type == 'network-traffic') {
+      emit(getFieldValue(doc, 'dst_port'))
+    } else if (type == 'process') {
+      emit(getFieldsValue(doc, ['pid', 'command_line']))
+    } else if (type == 'software') {
+      emit(getFieldValue(doc, 'name'))
+    } else if (type == 'user-account') {
+      emit(getFieldsValue(doc, ['account_login', 'user_id']))
+    } else if (type == 'bank-account') {
+      emit(getFieldValue(doc, 'iban'))
+    } else if (type == 'payment-card') {
+      emit(getFieldValue(doc, 'card_number'))
+    } else if (type == 'media-content') {
+      emit(getFieldsValue(doc, ['content', 'title', 'url']))
+    } else if (type == 'windows-registry-key') {
+      emit(getFieldValue(doc, 'attribute_key'))
+    } else if (type == 'windows-registry-value-type') {
+      emit(getFieldsValue(doc, ['name', 'data']))
+    } else {
+      emit(getFieldValue(doc, 'value'))
+    }
+  `;
+};
+
+// ----------------------------------------------------------------------------------------------------------------------
+
+export const mergeDeepRightAll = R.unapply(R.reduce(R.mergeDeepRight, {}));

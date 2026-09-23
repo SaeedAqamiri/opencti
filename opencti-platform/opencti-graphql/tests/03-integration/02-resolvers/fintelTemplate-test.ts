@@ -1,0 +1,506 @@
+import { describe, expect, it, vi } from 'vitest';
+import gql from 'graphql-tag';
+import { queryAsAdmin } from '../../utils/testQueryHelper';
+import { addFilter } from '../../../src/utils/filtering/filtering-utils';
+import { type FintelTemplateWidgetAddInput, WidgetPerspective } from '../../../src/generated/graphql';
+import { SELF_ID } from '../../../src/utils/fintelTemplate/__fintelTemplateWidgets';
+import * as entrepriseEdition from '../../../src/enterprise-edition/ee';
+
+const FINTEL_TEMPLATE_SETTINGS_LIST_QUERY = gql`
+  query entitySettings(
+    $filters: FilterGroup
+  ) {
+    entitySettings(
+      filters: $filters
+    ) {
+      edges {
+        node {
+          id
+          target_type
+          fintelTemplates {
+            edges {
+              node {
+                id
+                name
+                settings_types
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const SDO_RESOLVERS_QUERY = gql`
+  query stixDomainObjectResolvers($id: String!) {
+    stixDomainObject(id: $id) {
+      id
+      ... on StixDomainObject {
+        fintelTemplates {
+          id
+          name
+        }
+        filesFromTemplate(first: 5) {
+          edges {
+            node {
+              id
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const SET_DEFAULT_QUERY = gql`
+  mutation fintelTemplateFieldPatchSetDefault($id: ID!, $input: [EditInput!]!) {
+    fintelTemplateFieldPatch(id: $id, input: $input) {
+      id
+      default
+    }
+  }
+`;
+
+const READ_QUERY = gql`
+  query fintelTemplate($id: ID!) {
+    fintelTemplate(id: $id) {
+      id
+      standard_id
+      name
+      description
+      template_content
+      instance_filters
+      settings_types
+      start_date
+      default
+      includeCoverPageByDefault
+      includeBackPageByDefault
+      fintel_template_widgets {
+        variable_name
+        widget {
+          type
+          dataSelection {
+            perspective
+            filters
+            columns {
+              variableName
+              label
+              attribute
+            }
+          }
+          parameters {
+            title
+          }
+        }
+      }
+    }
+  }
+`;
+
+const CREATE_QUERY = gql`
+  mutation FintelTemplateAdd($input: FintelTemplateAddInput!) {
+    fintelTemplateAdd(input: $input) {
+      id
+      name
+      description
+      includeCoverPageByDefault
+      includeBackPageByDefault
+    }
+  }
+`;
+
+const EDIT_QUERY = gql`
+  mutation FintelTemplateEdit($id: ID!, $input: [EditInput!]!) {
+    fintelTemplateFieldPatch(id: $id, input: $input) {
+      id
+      name
+      description
+      fintel_template_widgets {
+        variable_name
+        widget {
+          type
+          dataSelection {
+            perspective
+            filters
+            columns {
+              variableName
+              label
+              attribute
+            }
+          }
+          parameters {
+            title
+          }
+        }
+      }
+    }
+  }
+`;
+
+describe('Fintel template resolver standard behavior', () => {
+  let fintelTemplateInternalId: string;
+  const FINTEL_TEMPLATE_TO_CREATE = {
+    input: {
+      name: 'Fintel template 1',
+      description: 'My fintel template description',
+      start_date: '2025-01-01T19:00:05.000Z',
+      settings_types: ['Report'],
+      default: false,
+    },
+  };
+  it('should fintel template created', async () => {
+    // Activate EE for this test
+    vi.spyOn(entrepriseEdition, 'checkEnterpriseEdition').mockResolvedValue();
+    vi.spyOn(entrepriseEdition, 'isEnterpriseEdition').mockResolvedValue(true);
+    // Create the fintel template
+    const fintelTemplate = await queryAsAdmin({
+      query: CREATE_QUERY,
+      variables: FINTEL_TEMPLATE_TO_CREATE,
+    });
+    expect(fintelTemplate).not.toBeNull();
+    expect(fintelTemplate.data?.fintelTemplateAdd).not.toBeNull();
+    expect(fintelTemplate.data?.fintelTemplateAdd.name).toEqual('Fintel template 1');
+    expect(fintelTemplate.data?.fintelTemplateAdd.includeCoverPageByDefault).toEqual(true);
+    expect(fintelTemplate.data?.fintelTemplateAdd.includeBackPageByDefault).toEqual(true);
+    fintelTemplateInternalId = fintelTemplate.data?.fintelTemplateAdd.id;
+  });
+  it('should fintel template loaded by internal id', async () => {
+    const queryResult = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(queryResult).not.toBeNull();
+    expect(queryResult.data?.fintelTemplate).not.toBeNull();
+    expect(queryResult.data?.fintelTemplate.id).toEqual(fintelTemplateInternalId);
+    expect(queryResult.data?.fintelTemplate.name).toEqual('Fintel template 1');
+    expect(queryResult.data?.fintelTemplate.includeCoverPageByDefault).toEqual(true);
+    expect(queryResult.data?.fintelTemplate.includeBackPageByDefault).toEqual(true);
+  });
+  it('should fintel template created with built-in widgets', async () => {
+    const queryResult = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(queryResult.data?.fintelTemplate.fintel_template_widgets.length).toEqual(4); // the 4 built-in widgets
+    expect(queryResult.data?.fintelTemplate.fintel_template_widgets[0].variable_name).toEqual('widgetSelfAttributes');
+    expect(queryResult.data?.fintelTemplate.fintel_template_widgets[1].variable_name).toEqual('observables');
+  });
+  it('should list fintel templates in entity settings', async () => {
+    const queryResult = await queryAsAdmin({
+      query: FINTEL_TEMPLATE_SETTINGS_LIST_QUERY,
+      variables: { filters: addFilter(undefined, 'target_type', ['Report']) },
+    });
+    const fintelTemplatesEdges = queryResult.data?.entitySettings.edges[0].node.fintelTemplates.edges;
+    expect(fintelTemplatesEdges.length).toEqual(1);
+    expect(fintelTemplatesEdges[0].node.id).toEqual(fintelTemplateInternalId);
+    const queryResult2 = await queryAsAdmin({
+      query: FINTEL_TEMPLATE_SETTINGS_LIST_QUERY,
+      variables: { filters: addFilter(undefined, 'target_type', ['Grouping']) },
+    });
+    const fintelTemplatesEdges2 = queryResult2.data?.entitySettings.edges[0].node.fintelTemplates.edges;
+    expect(fintelTemplatesEdges2.length).toEqual(0);
+  });
+  it('should fintel template edited', async () => {
+    const queryResult = await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [{ key: 'description', value: ['new description'] }],
+      },
+    });
+    const fintelTemplateDescription = queryResult.data?.fintelTemplateFieldPatch.description;
+    expect(fintelTemplateDescription).toEqual('new description');
+    const queryResult2 = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(queryResult2.data?.fintelTemplate.description).toEqual('new description');
+  });
+  it('should fintel template export defaults edited and persisted', async () => {
+    await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [
+          { key: 'include_cover_page_by_default', value: [false] },
+          { key: 'include_back_page_by_default', value: [false] },
+        ],
+      },
+    });
+    const readAfterFalse = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(readAfterFalse.data?.fintelTemplate.includeCoverPageByDefault).toEqual(false);
+    expect(readAfterFalse.data?.fintelTemplate.includeBackPageByDefault).toEqual(false);
+
+    await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [
+          { key: 'include_cover_page_by_default', value: [true] },
+          { key: 'include_back_page_by_default', value: [true] },
+        ],
+      },
+    });
+    const readAfterTrue = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(readAfterTrue.data?.fintelTemplate.includeCoverPageByDefault).toEqual(true);
+    expect(readAfterTrue.data?.fintelTemplate.includeBackPageByDefault).toEqual(true);
+  });
+  it('should retrieve fintel templates and files from template on a STIX object', async () => {
+    vi.spyOn(entrepriseEdition, 'isEnterpriseEdition').mockResolvedValue(true);
+    vi.spyOn(entrepriseEdition, 'checkEnterpriseEdition').mockResolvedValue();
+
+    const CREATE_REPORT_QUERY = gql`
+      mutation ReportAdd($input: ReportAddInput!) {
+        reportAdd(input: $input) {
+          id
+        }
+      }
+    `;
+    const reportResponse = await queryAsAdmin({
+      query: CREATE_REPORT_QUERY,
+      variables: {
+        input: {
+          name: 'Test Report for Templates',
+          published: '2025-03-01T00:00:00.000Z',
+        },
+      },
+    });
+    const reportId = reportResponse.data?.reportAdd.id;
+
+    const queryResult = await queryAsAdmin({
+      query: SDO_RESOLVERS_QUERY,
+      variables: { id: reportId },
+    });
+
+    if (queryResult.errors) {
+      throw new Error(`GraphQL Error: ${queryResult.errors[0].message}`);
+    }
+
+    const sdo = queryResult.data?.stixDomainObject;
+    expect(sdo).not.toBeNull();
+
+    expect(Array.isArray(sdo.fintelTemplates)).toBe(true);
+    const hasTemplate = sdo.fintelTemplates.some((t: any) => t.id === fintelTemplateInternalId);
+    expect(hasTemplate).toBe(true);
+
+    expect(sdo.filesFromTemplate).not.toBeNull();
+    expect(sdo.filesFromTemplate.edges).toBeDefined();
+    expect(Array.isArray(sdo.filesFromTemplate.edges)).toBe(true);
+  });
+  it('should add a fintel template widgets', async () => {
+    const fintelTemplateWidgetAddInput: FintelTemplateWidgetAddInput = {
+      variable_name: 'containerObservables',
+      widget: {
+        type: 'list',
+        perspective: WidgetPerspective.Entities,
+        dataSelection: [
+          {
+            perspective: WidgetPerspective.Entities,
+            filters: JSON.stringify({
+              mode: 'and',
+              filters: [
+                { key: ['entity_type'], values: ['Stix-Cyber-Observable'] },
+                { key: ['objects'], values: [SELF_ID] },
+              ],
+              filterGroups: [],
+            }),
+            columns: [
+              { label: 'Observable type', attribute: 'entity_type' },
+              { label: 'Value', attribute: 'representative.main' },
+            ],
+          },
+        ],
+      },
+    };
+    const queryResult = await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [{ key: 'fintel_template_widgets', object_path: 'fintel_template_widgets/1', value: [fintelTemplateWidgetAddInput] }],
+      },
+    });
+    const fintelTemplateWidgets = queryResult.data?.fintelTemplateFieldPatch.fintel_template_widgets;
+    expect(fintelTemplateWidgets.length).toEqual(4); // 4 widgets : the modified one and the built-in
+    expect(fintelTemplateWidgets[1].variable_name).toEqual('containerObservables');
+    expect(fintelTemplateWidgets[1].widget.type).toEqual('list');
+    const queryResult2 = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(queryResult2).not.toBeNull();
+    expect(queryResult2.data?.fintelTemplate.fintel_template_widgets.length).toEqual(4);
+    expect(queryResult2.data?.fintelTemplate.fintel_template_widgets[1].variable_name).toEqual('containerObservables');
+    expect(queryResult2.data?.fintelTemplate.fintel_template_widgets[1].widget.type).toEqual('list');
+    expect(queryResult2.data?.fintelTemplate.fintel_template_widgets[1].widget.dataSelection[0].perspective).toEqual(WidgetPerspective.Entities);
+    expect(queryResult2.data?.fintelTemplate.fintel_template_widgets[1].widget.dataSelection[0].columns.length).toEqual(2);
+  });
+  it('should check fintel template widgets variable names: variable names are mandatory for every column in attribute widgets', async () => {
+    const fintelTemplateAttributeWidgetAddInput: FintelTemplateWidgetAddInput = {
+      variable_name: 'MyAttributes',
+      widget: {
+        type: 'attribute',
+        perspective: WidgetPerspective.Entities,
+        dataSelection: [
+          {
+            perspective: WidgetPerspective.Entities,
+            columns: [
+              { label: 'Entity type', attribute: 'entity_type' },
+              { label: 'Representative', attribute: 'representative.main' },
+            ],
+          },
+        ],
+      },
+    };
+    const attributeQueryResult = await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [{ key: 'fintel_template_widgets', value: [fintelTemplateAttributeWidgetAddInput], operation: 'add' }],
+      },
+    });
+    expect(attributeQueryResult.errors?.length).toBe(1);
+    expect(attributeQueryResult.errors?.[0].message).toEqual('Attributes should all have a variable name');
+  });
+  it('should check fintel template widgets variable names: no spaces and no special characters', async () => {
+    // list widget
+    const fintelTemplateWidgetAddInput: FintelTemplateWidgetAddInput = {
+      variable_name: 'container of observables',
+      widget: {
+        type: 'list',
+        perspective: WidgetPerspective.Entities,
+        dataSelection: [
+          {
+            perspective: WidgetPerspective.Entities,
+          },
+        ],
+      },
+    };
+    const queryResult = await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [{ key: 'fintel_template_widgets', value: [fintelTemplateWidgetAddInput], operation: 'add' }],
+
+      },
+    });
+    expect(queryResult.errors?.length).toBe(1);
+    expect(queryResult.errors?.[0].message).toEqual('Variable names should not contain spaces or special chars (except - and _)');
+    // attribute widget
+    const fintelTemplateAttributeWidgetAddInput: FintelTemplateWidgetAddInput = {
+      variable_name: 'MyAttributes',
+      widget: {
+        type: 'attribute',
+        perspective: WidgetPerspective.Entities,
+        dataSelection: [
+          {
+            perspective: WidgetPerspective.Entities,
+            columns: [
+              { label: 'Entity type', attribute: 'entity_type', variableName: 'EntityType' },
+              { label: 'Representative', attribute: 'representative.main', variableName: '$representative' },
+            ],
+          },
+        ],
+      },
+    };
+    const attributeQueryResult = await queryAsAdmin({
+      query: EDIT_QUERY,
+      variables: {
+        id: fintelTemplateInternalId,
+        input: [{ key: 'fintel_template_widgets', value: [fintelTemplateAttributeWidgetAddInput], operation: 'add' }],
+      },
+    });
+    expect(attributeQueryResult.errors?.length).toBe(1);
+    expect(attributeQueryResult.errors?.[0].message).toEqual('Variable names should not contain spaces or special chars (except - and _)');
+  });
+  it('should be automatically set as default when created with default: true', async () => {
+    // First set template 1 as current default
+    await queryAsAdmin({
+      query: SET_DEFAULT_QUERY,
+      variables: { id: fintelTemplateInternalId, input: [{ key: 'default', value: ['true'] }] },
+    });
+    const beforeRead = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(beforeRead.data?.fintelTemplate.default).toBe(true);
+
+    // Create a new template with default: true
+    const newDefault = await queryAsAdmin({
+      query: CREATE_QUERY,
+      variables: {
+        input: {
+          name: 'Fintel template created as default',
+          description: 'Created with default=true',
+          start_date: '2025-01-01T19:00:05.000Z',
+          settings_types: ['Report'],
+          default: true,
+        },
+      },
+    });
+    const newDefaultId = newDefault.data?.fintelTemplateAdd.id;
+    expect(newDefaultId).toBeDefined();
+
+    // New template should be default
+    const newRead = await queryAsAdmin({ query: READ_QUERY, variables: { id: newDefaultId } });
+    expect(newRead.data?.fintelTemplate.default).toBe(true);
+
+    // Previous default should have been de-defaulted
+    const prevRead = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(prevRead.data?.fintelTemplate.default).toBe(false);
+
+    // Cleanup
+    const DELETE_QUERY = gql`
+      mutation fintelTemplateDelete($id: ID!) {
+        fintelTemplateDelete(id: $id)
+      }
+    `;
+    await queryAsAdmin({ query: DELETE_QUERY, variables: { id: newDefaultId } });
+  });
+  it('should set fintel template as default', async () => {
+    const queryResult = await queryAsAdmin({
+      query: SET_DEFAULT_QUERY,
+      variables: { id: fintelTemplateInternalId, input: [{ key: 'default', value: ['true'] }] },
+    });
+    expect(queryResult.data?.fintelTemplateFieldPatch.id).toEqual(fintelTemplateInternalId);
+    expect(queryResult.data?.fintelTemplateFieldPatch.default).toBe(true);
+    const readResult = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(readResult.data?.fintelTemplate.default).toBe(true);
+  });
+  it('should enforce uniqueness: setting a new default removes the previous one', async () => {
+    // Create a second template
+    const secondTemplate = await queryAsAdmin({
+      query: CREATE_QUERY,
+      variables: {
+        input: {
+          name: 'Fintel template 2',
+          description: 'Second template',
+          start_date: '2025-01-01T19:00:05.000Z',
+          settings_types: ['Report'],
+          default: false,
+        },
+      },
+    });
+    const secondTemplateId = secondTemplate.data?.fintelTemplateAdd.id;
+    // Set the second template as default
+    await queryAsAdmin({
+      query: SET_DEFAULT_QUERY,
+      variables: { id: secondTemplateId, input: [{ key: 'default', value: ['true'] }] },
+    });
+    // First template should no longer be default
+    const firstRead = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(firstRead.data?.fintelTemplate.default).toBe(false);
+    // Second template should be default
+    const secondRead = await queryAsAdmin({ query: READ_QUERY, variables: { id: secondTemplateId } });
+    expect(secondRead.data?.fintelTemplate.default).toBe(true);
+    // Cleanup second template
+    const DELETE_QUERY = gql`
+      mutation fintelTemplateDelete($id: ID!) {
+        fintelTemplateDelete(id: $id)
+      }
+    `;
+    await queryAsAdmin({ query: DELETE_QUERY, variables: { id: secondTemplateId } });
+  });
+  it('should fintel template deleted', async () => {
+    const DELETE_QUERY = gql`
+      mutation fintelTemplateDelete($id: ID!) {
+        fintelTemplateDelete(id: $id)
+      }
+    `;
+    // Delete the fintel template
+    await queryAsAdmin({
+      query: DELETE_QUERY,
+      variables: { id: fintelTemplateInternalId },
+    });
+    // Verify is no longer found
+    const queryResult = await queryAsAdmin({ query: READ_QUERY, variables: { id: fintelTemplateInternalId } });
+    expect(queryResult).not.toBeNull();
+    expect(queryResult.data?.fintelTemplate).toBeNull();
+  });
+});

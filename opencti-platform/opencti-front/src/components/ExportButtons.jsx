@@ -1,0 +1,377 @@
+import React, { Component } from 'react';
+import { CSVLink } from 'react-csv';
+import { ExploreOutlined, GetAppOutlined, ImageOutlined } from '@mui/icons-material';
+import { FileDelimitedOutline, FileExportOutline, FilePdfBox } from 'mdi-material-ui';
+import withTheme from '@mui/styles/withTheme';
+import withStyles from '@mui/styles/withStyles';
+import * as R from 'ramda';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import Tooltip from '@mui/material/Tooltip';
+import ToggleButton from '@mui/material/ToggleButton';
+import { MESSAGING$ } from '../relay/environment';
+import { exportImage, exportPdf } from '../utils/Image';
+import inject18n from './i18n';
+import Loader from './Loader';
+import { UserContext } from '../utils/hooks/useAuth';
+import withRouter from '../utils/compat_router/withRouter';
+import { KNOWLEDGE_KNFRONTENDEXPORT } from '../utils/hooks/useGranted';
+import Security from '../utils/Security';
+import { useExportTheme } from '../utils/ExportThemeContext';
+import { DASHBOARD_BUTTONS_STYLE } from '../private/components/workspaces/workspaceHeader/WorkspaceHeader';
+import { SURFACE_LAYER, fdsLayerClass, layerInputVars } from '../utils/fdsLayer';
+
+const styles = () => ({
+  exportButtons: {
+    display: 'flex',
+  },
+  loader: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+});
+
+const DELAY = 1000;
+
+export const EXPORT_BUTTONS_STYLE = { display: 'flex', gap: '8px' };
+
+// Reset an element's inline style and re-apply the given style object
+const restoreStyle = (element, style) => {
+  element.removeAttribute('style');
+  Object.assign(element.style, style);
+};
+
+const wait = async (delay = DELAY) => {
+  await new Promise((resolve) => {
+    setTimeout(resolve, delay);
+  });
+};
+
+export class ExportButtons extends Component {
+  constructor(props) {
+    super(props);
+    this.adjust = props.adjust;
+    this.csvLink = React.createRef();
+
+    this.state = {
+      anchorElImage: null,
+      anchorElPdf: null,
+      exporting: false,
+    };
+  }
+
+  handleOpenImage(event) {
+    this.setState({ anchorElImage: event.currentTarget });
+  }
+
+  handleCloseImage() {
+    this.setState({ anchorElImage: null });
+  }
+
+  async exportImage({ domElementId, name, themeNode, background }) {
+    const { pixelRatio = 1, t, setExportTheme } = this.props;
+    const exportButtons = document.getElementById('export-buttons');
+    const viewButtons = document.getElementById('container-view-buttons');
+    const dashboardButtons = document.getElementById('dashboard-buttons');
+    const dashboardRefreshControl = document.getElementById('dashboard-refresh-control');
+
+    try {
+      this.setState({ exporting: true });
+      this.handleCloseImage();
+
+      // let some delay to display the loading state
+      await wait();
+
+      setExportTheme(themeNode);
+
+      const container = document.getElementById(domElementId);
+
+      // Hide buttons: dashboard-buttons wraps everything (including export-buttons) on dashboards
+      if (dashboardRefreshControl) {
+        dashboardRefreshControl.setAttribute('style', 'display: none');
+      }
+      if (dashboardButtons) {
+        dashboardButtons.setAttribute('style', 'display: none');
+      } else {
+        exportButtons?.setAttribute('style', 'display: none');
+        viewButtons?.setAttribute('style', 'display: none');
+      }
+
+      const { offsetWidth, offsetHeight } = container;
+      if (this.adjust) {
+        container.setAttribute('style', 'width:3840px; height:2160px');
+        this.adjust(true);
+      }
+
+      // add some delay to permit the ui to re-render with the selected theme
+      await wait();
+
+      await exportImage(
+        domElementId,
+        offsetWidth,
+        offsetHeight,
+        name,
+        background ? themeNode?.theme_background : null,
+        pixelRatio,
+        this.adjust,
+      );
+    } catch {
+      MESSAGING$.notifyError(t('Dashboard cannot be exported to image'));
+    } finally {
+      if (dashboardRefreshControl) {
+        restoreStyle(dashboardRefreshControl, { display: 'flex' });
+      }
+      if (dashboardButtons) {
+        restoreStyle(dashboardButtons, DASHBOARD_BUTTONS_STYLE);
+      } else {
+        if (exportButtons) restoreStyle(exportButtons, EXPORT_BUTTONS_STYLE);
+        viewButtons?.setAttribute('style', '');
+      }
+      setExportTheme(null);
+
+      this.setState({ exporting: false });
+    }
+  }
+
+  handleOpenPdf(event) {
+    this.setState({ anchorElPdf: event.currentTarget });
+  }
+
+  handleClosePdf() {
+    this.setState({ anchorElPdf: null });
+  }
+
+  async exportPdf({ domElementId, name, themeNode, background }) {
+    const { pixelRatio = 1, t, setExportTheme } = this.props;
+    const exportButtons = document.getElementById('export-buttons');
+    const dashboardButtons = document.getElementById('dashboard-buttons');
+    const dashbaordRefreshControl = document.getElementById('dashboard-refresh-control');
+
+    try {
+      this.setState({ exporting: true });
+      this.handleClosePdf();
+
+      // Let some delay to display the loading state
+      await wait();
+
+      setExportTheme(themeNode);
+
+      // Hide buttons: dashboard-buttons wraps everything on dashboards
+      if (dashbaordRefreshControl) {
+        dashbaordRefreshControl.setAttribute('style', 'display: none');
+      }
+
+      if (dashboardButtons) {
+        dashboardButtons.setAttribute('style', 'display: none');
+      } else {
+        exportButtons?.setAttribute('style', 'display: none');
+      }
+
+      // add some delay to permit the ui to re-render with the selected theme
+      await wait();
+
+      await exportPdf(
+        domElementId,
+        name,
+        background ? themeNode?.theme_background : null,
+        pixelRatio,
+        this.adjust,
+      );
+    } catch (_e) {
+      MESSAGING$.notifyError(t('Dashboard cannot be exported to pdf'));
+    } finally {
+      setExportTheme(null);
+      this.setState({ exporting: false });
+
+      if (dashbaordRefreshControl) {
+        restoreStyle(dashbaordRefreshControl, { display: 'flex' });
+      }
+      if (dashboardButtons) {
+        restoreStyle(dashboardButtons, DASHBOARD_BUTTONS_STYLE);
+      } else {
+        if (exportButtons) restoreStyle(exportButtons, EXPORT_BUTTONS_STYLE);
+      }
+    }
+  }
+
+  render() {
+    const { anchorElImage, anchorElPdf, exporting } = this.state;
+    const {
+      classes,
+      t,
+      domElementId,
+      name,
+      type,
+      csvData,
+      csvFileName,
+      containerId,
+      handleDownloadAsStixReport,
+      handleExportDashboard,
+      investigationAddFromContainer,
+      navigate,
+      exportToImage = true,
+      exportToPdf = true,
+    } = this.props;
+    return (
+      <UserContext.Consumer>
+        {({ me, themes }) => {
+          const isInDraft = me.draftContext;
+          return (
+            <div
+              className={classes.exportButtons}
+              id="export-buttons"
+              style={EXPORT_BUTTONS_STYLE}
+            >
+              {exportToImage && (
+                <Security needs={[KNOWLEDGE_KNFRONTENDEXPORT]}>
+                  <Tooltip title={t('Export to image')}>
+                    <ToggleButton size="small" onClick={this.handleOpenImage.bind(this)} value="Export-to-image">
+                      <ImageOutlined fontSize="small" color="primary" />
+                    </ToggleButton>
+                  </Tooltip>
+                </Security>
+              )}
+              {exportToPdf && (
+                <Security needs={[KNOWLEDGE_KNFRONTENDEXPORT]}>
+                  <Tooltip title={t('Export to PDF')}>
+                    <ToggleButton size="small" onClick={this.handleOpenPdf.bind(this)} value="Export-to-PDF">
+                      <FilePdfBox fontSize="small" color="primary" />
+                    </ToggleButton>
+                  </Tooltip>
+                </Security>
+              )}
+              {type === 'dashboard' && handleExportDashboard && (
+                <Tooltip title={t('Export')}>
+                  <ToggleButton
+                    size="small"
+                    onClick={handleExportDashboard.bind(this)}
+                    value="Export-to-JSON"
+                  >
+                    <FileExportOutline fontSize="small" color="primary" />
+                  </ToggleButton>
+                </Tooltip>
+              )}
+              {investigationAddFromContainer && (
+                <Tooltip title={isInDraft ? t('Not available in draft') : t('Start an investigation')}>
+                  <ToggleButton
+                    size="small"
+                    value={isInDraft ? 'Not available in draft' : 'Start-an-investigation'}
+                    onClick={!isInDraft && investigationAddFromContainer.bind(
+                      this,
+                      containerId,
+                      navigate,
+                    )}
+                  >
+                    <ExploreOutlined fontSize="small" color={!isInDraft ? 'primary' : 'disabled'} />
+                  </ToggleButton>
+                </Tooltip>
+              )}
+              {type === 'investigation' && handleDownloadAsStixReport && (
+                <Tooltip title={t('Download as STIX report')}>
+                  <ToggleButton size="small" onClick={handleDownloadAsStixReport.bind(this)} value="Download-as-STIX-report">
+                    <GetAppOutlined fontSize="small" color="primary" />
+                  </ToggleButton>
+                </Tooltip>
+              )}
+              {csvData && (
+                <Tooltip title={t('Export to CSV')}>
+                  <ToggleButton size="small" onClick={() => this.csvLink.current.link.click()} value="Export-to-CSV">
+                    <FileDelimitedOutline fontSize="small" color="primary" />
+                  </ToggleButton>
+                </Tooltip>
+              )}
+              <Menu
+                anchorEl={anchorElImage}
+                open={Boolean(anchorElImage)}
+                onClose={this.handleCloseImage.bind(this)}
+              >
+                {themes.edges.flatMap(({ node }) => [
+                  <MenuItem
+                    key={`${node.id}-with-bg`}
+                    onClick={() => this.exportImage({
+                      domElementId,
+                      name,
+                      themeNode: node,
+                      background: true,
+                    })}
+                  >
+                    {node.name} {t('(with background)')}
+                  </MenuItem>,
+                  <MenuItem
+                    key={`${node.id}-without-bg`}
+                    onClick={() => this.exportImage({
+                      domElementId,
+                      name,
+                      themeNode: node,
+                      background: false,
+                    })}
+                  >
+                    {node.name} {t('(without background)')}
+                  </MenuItem>,
+                ])}
+              </Menu>
+
+              <Menu
+                anchorEl={anchorElPdf}
+                open={Boolean(anchorElPdf)}
+                onClose={this.handleClosePdf.bind(this)}
+              >
+                {
+                  themes.edges.map(({ node }) => (
+                    <MenuItem
+                      key={node.id}
+                      onClick={() => this.exportPdf({
+                        domElementId,
+                        name,
+                        themeNode: node,
+                        background: true,
+                      })}
+                    >
+                      {node.name}
+                    </MenuItem>
+                  ))
+                }
+              </Menu>
+              <Dialog
+                // Layer 2 like every other dialog paper, so the theme's
+                // `--bg-elevation-default` resolves to the same surface.
+                slotProps={{ paper: { elevation: 1, className: fdsLayerClass(SURFACE_LAYER), sx: { ...layerInputVars } } }}
+                open={exporting}
+                keepMounted={true}
+                fullScreen={true}
+                classes={{ paper: classes.loader }}
+              >
+                <Loader />
+              </Dialog>
+              {csvData && (
+                <CSVLink
+                  filename={csvFileName || `${t('CSV data.')}.csv`}
+                  ref={this.csvLink}
+                  data={csvData}
+                />
+              )}
+            </div>
+          );
+        }}
+      </UserContext.Consumer>
+    );
+  }
+}
+
+// HOC to inject setExportTheme from ExportThemeContext into the class component
+const withExportTheme = (WrappedComponent) => {
+  const WithExportTheme = (props) => {
+    const { setExportTheme } = useExportTheme();
+    return <WrappedComponent {...props} setExportTheme={setExportTheme} />;
+  };
+  WithExportTheme.displayName = `withExportTheme(${WrappedComponent.displayName || WrappedComponent.name})`;
+  return WithExportTheme;
+};
+
+export default R.compose(
+  withExportTheme,
+  inject18n,
+  withTheme,
+  withRouter,
+  withStyles(styles),
+)(ExportButtons);

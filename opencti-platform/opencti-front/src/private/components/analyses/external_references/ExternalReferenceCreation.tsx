@@ -1,0 +1,385 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import Drawer, { DrawerControlledDialProps } from '@components/common/drawer/Drawer';
+import DialogActions from '@mui/material/DialogActions';
+import { Field, Form, Formik } from 'formik';
+import { FormikConfig } from 'formik/dist/types';
+import * as R from 'ramda';
+import { FunctionComponent, useState } from 'react';
+import { graphql } from 'react-relay';
+import { RecordSourceSelectorProxy } from 'relay-runtime';
+import useApiMutation from 'src/utils/hooks/useApiMutation';
+import * as Yup from 'yup';
+import CreateEntityControlledDial from '../../../../components/CreateEntityControlledDial';
+import TextField from '../../../../components/TextField';
+import FormButtonContainer from '../../../../components/common/form/FormButtonContainer';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import { useFormatter } from '../../../../components/i18n';
+import { handleErrorInForm } from '../../../../relay/environment';
+import useMarkdownCreationFilesInput from '../../../../utils/markdown/useMarkdownCreationFilesInput';
+import { insertNode } from '../../../../utils/store';
+import CustomFileUploader from '../../common/files/CustomFileUploader';
+import { ExternalReferencesLinesPaginationQuery$variables } from '../__generated__/ExternalReferencesLinesPaginationQuery.graphql';
+import { ExternalReferenceAddInput, ExternalReferenceCreationMutation, ExternalReferenceCreationMutation$data } from './__generated__/ExternalReferenceCreationMutation.graphql';
+
+const externalReferenceCreationMutation = graphql`
+  mutation ExternalReferenceCreationMutation(
+    $input: ExternalReferenceAddInput!
+  ) {
+    externalReferenceAdd(input: $input) {
+      id
+      standard_id
+      entity_type
+      source_name
+      description
+      url
+      external_id
+      url
+      created
+      fileId
+      draftVersion {
+          draft_id
+          draft_operation
+      }
+      creators {
+          id
+          name
+      }
+    }
+  }
+`;
+
+const externalReferenceValidation = (t: (value: string) => string) => Yup.object().shape({
+  source_name: Yup.string().required(t('This field is required')),
+  external_id: Yup.string().nullable(),
+  url: Yup.string()
+    .nullable()
+    .matches(
+      /^https?:\/\/[^\s/$.?#].[^\s]*$/,
+      t('The value must be an URL'),
+    ),
+  description: Yup.string().nullable(),
+  file: Yup.mixed().nullable(),
+});
+
+interface ExternalReferenceCreationProps {
+  paginationOptions?: ExternalReferencesLinesPaginationQuery$variables;
+  display?: boolean;
+  contextual?: boolean;
+  inputValue?: string;
+  onCreate?: (
+    externalReference: ExternalReferenceAddInput | null | undefined,
+    onlyCreate: boolean,
+  ) => void;
+  openContextual: boolean;
+  handleCloseContextual?: () => void;
+  creationCallback?: (data: ExternalReferenceCreationMutation$data) => void;
+  dryrun?: boolean;
+}
+
+const ExternalReferenceCreation: FunctionComponent<ExternalReferenceCreationProps> = ({
+  contextual,
+  paginationOptions,
+  display,
+  inputValue,
+  onCreate,
+  handleCloseContextual,
+  creationCallback,
+  openContextual,
+  dryrun,
+}) => {
+  const { t_i18n } = useFormatter();
+
+  const [open, setOpen] = useState(false);
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const [commit] = useApiMutation<ExternalReferenceCreationMutation>(
+    externalReferenceCreationMutation,
+    undefined,
+    { successMessage: `${t_i18n('entity_External-Reference')} ${t_i18n('successfully created')}` },
+  );
+
+  const { buildCreationFilesInput, registerMarkdownImagesController } = useMarkdownCreationFilesInput();
+
+  const onSubmit: FormikConfig<ExternalReferenceAddInput>['onSubmit'] = (
+    values,
+    { setSubmitting, setErrors, resetForm },
+  ) => {
+    const uploadedFile = typeof values.file === 'string' || !values.file ? [] : [values.file];
+    const finalValues = {
+      ...R.dissoc('file', values),
+      ...buildCreationFilesInput(uploadedFile),
+    };
+    if (dryrun && onCreate) {
+      onCreate(values, true);
+      handleClose();
+      return;
+    }
+    commit({
+      variables: {
+        input: finalValues,
+      },
+      updater: (store: RecordSourceSelectorProxy) => insertNode(
+        store,
+        'Pagination_externalReferences',
+        paginationOptions,
+        'externalReferenceAdd',
+      ),
+      onError: (error: Error) => {
+        handleErrorInForm(error, setErrors);
+        setSubmitting(false);
+      },
+      onCompleted: (response: ExternalReferenceCreationMutation$data) => {
+        setSubmitting(false);
+        resetForm();
+        handleClose();
+        if (onCreate) {
+          onCreate(response.externalReferenceAdd, true);
+        }
+      },
+      optimisticUpdater: undefined,
+      optimisticResponse: undefined,
+    });
+  };
+
+  const onSubmitContextual: FormikConfig<ExternalReferenceAddInput>['onSubmit'] = (values, { setSubmitting, setErrors, resetForm }) => {
+    const uploadedFile = typeof values.file === 'string' || !values.file ? [] : [values.file];
+    const finalValues = {
+      ...R.dissoc('file', values),
+      ...buildCreationFilesInput(uploadedFile),
+    };
+    if (dryrun && creationCallback && handleCloseContextual) {
+      creationCallback({
+        externalReferenceAdd: values,
+      } as ExternalReferenceCreationMutation$data);
+      handleCloseContextual();
+      return;
+    }
+    commit({
+      variables: {
+        input: finalValues,
+      },
+      updater: (store: RecordSourceSelectorProxy) => {
+        if (!creationCallback) {
+          insertNode(
+            store,
+            'Pagination_externalReferences',
+            paginationOptions,
+            'externalReferenceAdd',
+          );
+        }
+      },
+      onError: (error: Error) => {
+        handleErrorInForm(error, setErrors);
+        setSubmitting(false);
+      },
+      onCompleted: (response: ExternalReferenceCreationMutation$data) => {
+        setSubmitting(false);
+        resetForm();
+        if (creationCallback && handleCloseContextual) {
+          creationCallback(response);
+          handleCloseContextual();
+        }
+      },
+      optimisticUpdater: undefined,
+      optimisticResponse: undefined,
+    });
+  };
+
+  const onResetClassic = () => {
+    handleClose();
+  };
+
+  const onResetContextual = () => {
+    if (handleCloseContextual) {
+      handleCloseContextual();
+    } else {
+      handleClose();
+    }
+  };
+
+  const isEmbeddedInExternalReferenceCreation = true;
+  const CreateExternalReferenceControlledDial = (props: DrawerControlledDialProps) => (
+    <CreateEntityControlledDial entityType="External-Reference" {...props} />
+  );
+  const renderClassic = () => {
+    return (
+      <Drawer
+        title={t_i18n('Create an external reference')}
+        controlledDial={CreateExternalReferenceControlledDial}
+      >
+        {({ onClose }) => (
+          <Formik<ExternalReferenceAddInput>
+            initialValues={{
+              source_name: '',
+              external_id: '',
+              url: '',
+              description: '',
+              file: '',
+            }}
+            validationSchema={externalReferenceValidation(t_i18n)}
+            validateOnChange={true}
+            validateOnBlur={true}
+            onSubmit={onSubmit}
+            onReset={() => {
+              onResetClassic();
+              onClose();
+            }}
+          >
+            {({ submitForm, handleReset, isSubmitting, setFieldValue }) => (
+              <Form>
+                <Field
+                  component={TextField}
+                  name="source_name"
+                  label={t_i18n('Source name')}
+                  fullWidth={true}
+                />
+                <Field
+                  component={TextField}
+                  name="external_id"
+                  id="external_id"
+                  label={t_i18n('External ID')}
+                  fullWidth={true}
+                  className="mt-5"
+                />
+                <Field
+                  component={TextField}
+                  name="url"
+                  label={t_i18n('URL')}
+                  fullWidth={true}
+                  className="mt-5"
+                />
+                {!dryrun && (
+                  <CustomFileUploader
+                    setFieldValue={setFieldValue}
+                    isEmbeddedInExternalReferenceCreation={isEmbeddedInExternalReferenceCreation}
+                  />
+                )}
+                <Field
+                  component={MarkdownField}
+                  name="description"
+                  label={t_i18n('Description')}
+                  fullWidth={true}
+                  multiline={true}
+                  rows="4"
+                  style={{ marginTop: 20 }}
+                  autoPersistOnBlur={false}
+                  registerMarkdownImagesController={registerMarkdownImagesController}
+                />
+                <FormButtonContainer>
+                  <Button
+                    variant="secondary"
+                    onClick={handleReset}
+                    disabled={isSubmitting}
+                  >
+                    {t_i18n('Cancel')}
+                  </Button>
+                  <Button
+                    onClick={submitForm}
+                    disabled={isSubmitting}
+                  >
+                    {t_i18n('Create')}
+                  </Button>
+                </FormButtonContainer>
+              </Form>
+            )}
+          </Formik>
+        )}
+      </Drawer>
+    );
+  };
+
+  const renderContextual = () => {
+    return (
+      <div style={{ display: display ? 'block' : 'none' }}>
+        <Dialog
+          slotProps={{ paper: { elevation: 1 } }}
+          open={handleCloseContextual ? openContextual : open}
+          onClose={handleCloseContextual || handleClose}
+          title={t_i18n('Create an external reference')}
+        >
+          <Formik<ExternalReferenceAddInput>
+            enableReinitialize={true}
+            onSubmit={!creationCallback && !handleCloseContextual ? onSubmit : onSubmitContextual}
+            initialValues={{
+              source_name: inputValue ?? '',
+              external_id: '',
+              url: '',
+              description: '',
+              file: '',
+            }}
+            validationSchema={externalReferenceValidation(t_i18n)}
+            validateOnChange={true}
+            validateOnBlur={true}
+            onReset={onResetContextual}
+          >
+            {({ submitForm, handleReset, isSubmitting, setFieldValue }) => (
+              <Form>
+                <Field
+                  component={TextField}
+                  name="source_name"
+                  label={t_i18n('Source name')}
+                  fullWidth={true}
+                />
+                <Field
+                  component={TextField}
+                  name="external_id"
+                  id="external_id"
+                  label={t_i18n('External ID')}
+                  fullWidth={true}
+                  className="mt-5"
+                />
+                <Field
+                  component={TextField}
+                  name="url"
+                  label={t_i18n('URL')}
+                  fullWidth={true}
+                  className="mt-5"
+                />
+                {!dryrun && (
+                  <CustomFileUploader
+                    setFieldValue={setFieldValue}
+                    isEmbeddedInExternalReferenceCreation={isEmbeddedInExternalReferenceCreation}
+                  />
+                )}
+                <Field
+                  component={MarkdownField}
+                  name="description"
+                  label={t_i18n('Description')}
+                  fullWidth={true}
+                  multiline={true}
+                  rows="4"
+                  style={{ marginTop: 20, marginBottom: 20 }}
+                  autoPersistOnBlur={false}
+                  registerMarkdownImagesController={registerMarkdownImagesController}
+                />
+                <DialogActions>
+                  <Button
+                    variant="secondary"
+                    onClick={handleCloseContextual || handleReset}
+                    disabled={isSubmitting}
+                  >
+                    {t_i18n('Cancel')}
+                  </Button>
+                  <Button
+                    onClick={submitForm}
+                    disabled={isSubmitting}
+                  >
+                    {t_i18n('Create')}
+                  </Button>
+                </DialogActions>
+              </Form>
+            )}
+          </Formik>
+        </Dialog>
+      </div>
+    );
+  };
+
+  return contextual ? renderContextual() : renderClassic();
+};
+
+export default ExternalReferenceCreation;

@@ -1,0 +1,380 @@
+import * as R from 'ramda';
+import { Checklist, FormatShapesOutlined, MapOutlined, PieChartOutlined, ViewQuiltOutlined } from '@mui/icons-material';
+import {
+  AlignHorizontalLeft,
+  ChartAreasplineVariant,
+  ChartBar,
+  ChartBubble,
+  ChartDonut,
+  ChartLine,
+  ChartTimeline,
+  ChartTree,
+  Counter,
+  FormatListNumberedRtl,
+  Radar,
+  StarSettingsOutline,
+  TagTextOutline,
+  ViewListOutline,
+} from 'mdi-material-ui';
+import React from 'react';
+
+import type { WidgetDataSelection, WidgetMultiTimeSeries, WidgetParameters } from './widget';
+import { isNotEmptyField } from '../utils';
+import useEntityTranslation from 'src/utils/hooks/useEntityTranslation';
+
+const widgetVisualizationTypes = [
+  {
+    key: 'attribute',
+    name: 'Attribute',
+    dataSelectionLimit: undefined,
+    category: 'attribute',
+    availableParameters: [],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: false,
+  },
+  {
+    key: 'text',
+    name: 'Text',
+    dataSelectionLimit: undefined,
+    category: 'text',
+    availableParameters: [],
+    isRelationships: false,
+    isEntities: false,
+    isAudits: false,
+  },
+  {
+    key: 'number',
+    name: 'Number',
+    dataSelectionLimit: 1,
+    category: 'number',
+    availableParameters: [],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'list',
+    name: 'List',
+    dataSelectionLimit: 1,
+    category: 'list',
+    availableParameters: [],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'distribution-list',
+    name: 'List (distribution)',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'vertical-bar',
+    name: 'Vertical Bar',
+    dataSelectionLimit: 5,
+    category: 'timeseries',
+    availableParameters: ['stacked', 'legend'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'line',
+    name: 'Line',
+    dataSelectionLimit: 5,
+    category: 'timeseries',
+    availableParameters: ['legend'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'area',
+    name: 'Area',
+    dataSelectionLimit: 5,
+    category: 'timeseries',
+    availableParameters: ['stacked', 'legend'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'timeline',
+    name: 'Timeline',
+    dataSelectionLimit: 1,
+    category: 'list',
+    availableParameters: [],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: false,
+  },
+  {
+    key: 'donut',
+    name: 'Donut',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'horizontal-bar',
+    name: 'Horizontal Bar',
+    dataSelectionLimit: 2,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'radar',
+    name: 'Radar',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'polar-area',
+    name: 'Polar Area',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'heatmap',
+    name: 'Heatmap',
+    dataSelectionLimit: 5,
+    category: 'timeseries',
+    availableParameters: [],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'tree',
+    name: 'Tree',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute', 'distributed'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+  {
+    key: 'map',
+    name: 'Map',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: false,
+    isAudits: false,
+  },
+  {
+    key: 'bookmark',
+    name: 'Bookmark',
+    dataSelectionLimit: 1,
+    category: 'list',
+    availableParameters: [],
+    isRelationships: false,
+    isEntities: true,
+    isAudits: false,
+  },
+  {
+    key: 'wordcloud',
+    name: 'Word Cloud',
+    dataSelectionLimit: 1,
+    category: 'distribution',
+    availableParameters: ['attribute'],
+    isRelationships: true,
+    isEntities: true,
+    isAudits: true,
+  },
+] as const;
+
+const customAttributesVisualizationType = {
+  key: 'custom-attributes',
+  name: 'Attributes',
+  dataSelectionLimit: undefined,
+  category: 'custom-attributes',
+  availableParameters: [],
+  isRelationships: false,
+  isEntities: false,
+  isAudits: false,
+} as const;
+
+export type WidgetVisualizationTypes
+  = (typeof widgetVisualizationTypes)[number]['key']
+    | typeof customAttributesVisualizationType['key'];
+
+export const RELATIONSHIP_WIDGETS_TYPES = ['stix-core-relationship', 'stix-sighting-relationship', 'object', 'object-label'];
+
+export const workspacesWidgetVisualizationTypes = widgetVisualizationTypes.filter((w) => w.key !== 'attribute');
+
+export const fintelTemplatesWidgetVisualizationTypes = widgetVisualizationTypes.filter((w) => ['list'].includes(w.key));
+
+export const customViewsWidgetVisualizationTypes = [
+  customAttributesVisualizationType,
+  ...workspacesWidgetVisualizationTypes,
+];
+
+const allVisualizationTypes = [
+  ...widgetVisualizationTypes,
+  customAttributesVisualizationType,
+];
+
+export const indexedVisualizationTypes = R.indexBy(R.prop('key'), allVisualizationTypes);
+
+export const getCurrentCategory = (type: string | null) => {
+  if (!type) return 'none';
+  return indexedVisualizationTypes[type as WidgetVisualizationTypes]?.category ?? 'none';
+};
+
+export const getCurrentAvailableParameters = (type: string | null): string[] => {
+  if (!type) return [];
+  return [...(indexedVisualizationTypes[type as WidgetVisualizationTypes]?.availableParameters ?? [])];
+};
+
+export const getCurrentDataSelectionLimit = (type: string) => {
+  return indexedVisualizationTypes[type as WidgetVisualizationTypes]?.dataSelectionLimit ?? 0;
+};
+
+export const getCurrentIsRelationships = (type: string) => {
+  return indexedVisualizationTypes[type as WidgetVisualizationTypes]?.isRelationships ?? false;
+};
+
+export const isWidgetListOrTimeline = (type: string) => {
+  return indexedVisualizationTypes[type as WidgetVisualizationTypes]?.key === 'list' || indexedVisualizationTypes[type as WidgetVisualizationTypes]?.key === 'timeline';
+};
+
+/**
+ * Returns the time interval to use in a widget.
+ */
+export const getWidgetInterval = (params?: WidgetParameters) => params?.interval ?? 'day';
+
+/**
+ * Construct the label title for a number widget.
+ */
+export const useGetNumberWidgetTitle = (parameters: WidgetParameters, defaultTitle: string) => {
+  const { translateEntityType } = useEntityTranslation();
+  const numberLabel = isNotEmptyField(parameters.title) ? parameters.title : defaultTitle;
+  return translateEntityType(numberLabel);
+};
+
+export const renderWidgetIcon = (key: string, fontSize: 'large' | 'small' | 'medium') => {
+  switch (key) {
+    case 'custom-attributes':
+      return <Checklist fontSize={fontSize} color="primary" />;
+    case 'attribute':
+      return <TagTextOutline fontSize={fontSize} color="primary" />;
+    case 'map':
+      return <MapOutlined fontSize={fontSize} color="primary" />;
+    case 'horizontal-bar':
+      return <AlignHorizontalLeft fontSize={fontSize} color="primary" />;
+    case 'vertical-bar':
+      return <ChartBar fontSize={fontSize} color="primary" />;
+    case 'donut':
+      return <ChartDonut fontSize={fontSize} color="primary" />;
+    case 'area':
+      return <ChartAreasplineVariant fontSize={fontSize} color="primary" />;
+    case 'timeline':
+      return <ChartTimeline fontSize={fontSize} color="primary" />;
+    case 'list':
+      return <ViewListOutline fontSize={fontSize} color="primary" />;
+    case 'distribution-list':
+      return <FormatListNumberedRtl fontSize={fontSize} color="primary" />;
+    case 'number':
+      return <Counter fontSize={fontSize} color="primary" />;
+    case 'text':
+      return <FormatShapesOutlined fontSize={fontSize} color="primary" />;
+    case 'heatmap':
+      return <ChartBubble fontSize={fontSize} color="primary" />;
+    case 'line':
+      return <ChartLine fontSize={fontSize} color="primary" />;
+    case 'radar':
+      return <Radar fontSize={fontSize} color="primary" />;
+    case 'polar-area':
+      return <PieChartOutlined fontSize={fontSize} color="primary" />;
+    case 'tree':
+      return <ChartTree fontSize={fontSize} color="primary" />;
+    case 'bookmark':
+      return <StarSettingsOutline fontSize={fontSize} color="primary" />;
+    case 'wordcloud':
+      return <ViewQuiltOutlined fontSize={fontSize} color="primary" />;
+    default:
+      return <div />;
+  }
+};
+
+export const getMaxResultCount = (type: string) => {
+  let maxResultCount = 100;
+
+  if (type === 'list') {
+    maxResultCount = 500;
+  }
+
+  return maxResultCount;
+};
+
+export const isDataSelectionNumberValid = (type: string, dataSelection: WidgetDataSelection[]) => {
+  if (type === 'list'
+    || type === 'distribution-list'
+    || type === 'timeline'
+    || type === 'donut'
+    || type === 'horizontal-bar'
+    || type === 'radar'
+    || type === 'polar-area'
+    || type === 'tree'
+    || type === 'map'
+    || type === 'wordcloud'
+  ) {
+    return dataSelection.every((selection) => !selection.number || selection.number <= getMaxResultCount(type));
+  }
+  return true;
+};
+
+export const isWidgetUsingRelationsAggregation = (
+  widgetType: WidgetVisualizationTypes,
+): boolean => {
+  const widgetTypesWithRelationsAggregation: Array<WidgetVisualizationTypes> = [
+    'wordcloud',
+    'map',
+    'radar',
+    'polar-area',
+    'horizontal-bar',
+    'donut',
+    'distribution-list',
+    'tree',
+  ];
+
+  return widgetTypesWithRelationsAggregation.includes(widgetType);
+};
+
+// value above which the unique count is estimated and may differ from the actual number of distinct values
+export const UNIQUE_COUNT_ESTIMATION_THRESHOLD = 40000;
+export const UNIQUE_COUNT_ESTIMATION_WARNING = 'Datasets with more than 40000 distinct values have estimated counts and may differ slightly from the amount of actual distinct values';
+
+/**
+ * Determines whether the estimation warning should be displayed for the given widget data.
+ * Returns `true` if any data selection flagged as `unique` contains at least one data point
+ * whose value exceeds `UNIQUE_COUNT_ESTIMATION_THRESHOLD`, indicating that counts are
+ * approximated and may differ from the actual number of distinct values.
+ */
+export const showEstimationWarningForUniqCount = (dataSelection: WidgetDataSelection[], data: WidgetMultiTimeSeries[]) => {
+  return dataSelection.some((selection, i) => (
+    selection.unique && data[i]?.data.some((d) => d.value > UNIQUE_COUNT_ESTIMATION_THRESHOLD)
+  ));
+};

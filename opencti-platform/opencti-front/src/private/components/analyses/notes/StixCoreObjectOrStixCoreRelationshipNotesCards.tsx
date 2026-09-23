@@ -1,0 +1,464 @@
+import { FunctionComponent, useRef, useState } from 'react';
+import { graphql, PreloadedQuery } from 'react-relay';
+import Typography from '@mui/material/Typography';
+import { FormikConfig, FormikHelpers } from 'formik/dist/types';
+import * as Yup from 'yup';
+import { ExpandLessOutlined, ExpandMoreOutlined, RateReviewOutlined } from '@mui/icons-material';
+import { Field, Formik } from 'formik';
+import Button from '@common/button/Button';
+import { Stack, Box } from '@mui/material';
+import { NOTE_TYPE, noteCreationMutation, noteCreationUserMutation } from './NoteCreation';
+import { insertNode } from '../../../../utils/store';
+import usePreloadedFragment from '../../../../utils/hooks/usePreloadedFragment';
+import { useFormatter } from '../../../../components/i18n';
+import Security from '../../../../utils/Security';
+import useGranted, { KNOWLEDGE_KNPARTICIPATE, KNOWLEDGE_KNUPDATE } from '../../../../utils/hooks/useGranted';
+import StixCoreObjectOrStixCoreRelationshipNoteCard from './StixCoreObjectOrStixCoreRelationshipNoteCard';
+import TextField from '../../../../components/TextField';
+import MarkdownField from '../../../../components/fields/markdownField/MarkdownField';
+import type { MarkdownImagesController } from '../../../../components/fields/markdownField/core/markdownImagesController';
+import OpenVocabField from '../../common/form/OpenVocabField';
+import { FieldOption, fieldSpacingContainerStyle } from '../../../../utils/field';
+import ConfidenceField from '../../common/form/ConfidenceField';
+import ObjectLabelField from '../../common/form/ObjectLabelField';
+import ObjectMarkingField from '../../common/form/ObjectMarkingField';
+import {
+  StixCoreObjectOrStixCoreRelationshipNotesCardsQuery,
+  StixCoreObjectOrStixCoreRelationshipNotesCardsQuery$variables,
+} from './__generated__/StixCoreObjectOrStixCoreRelationshipNotesCardsQuery.graphql';
+import {
+  StixCoreObjectOrStixCoreRelationshipNotesCards_data$data,
+  StixCoreObjectOrStixCoreRelationshipNotesCards_data$key,
+} from './__generated__/StixCoreObjectOrStixCoreRelationshipNotesCards_data.graphql';
+import SliderField from '../../../../components/fields/SliderField';
+import useDefaultValues from '../../../../utils/hooks/useDefaultValues';
+import { convertMarking } from '../../../../utils/edition';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import AddNotes from './AddNotes';
+import { yupShapeConditionalRequired, useDynamicSchemaCreationValidation, useIsMandatoryAttribute } from '../../../../utils/hooks/useEntitySettings';
+import CardTitle from '../../../../components/common/card/CardTitle';
+import CardAccordion from '../../../../components/common/card/CardAccordion';
+import { DefaultMarking } from './../../settings/marking_definitions/markingDefinition.types';
+import useMarkdownCreationFilesInput from '../../../../utils/markdown/useMarkdownCreationFilesInput';
+
+export const stixCoreObjectOrStixCoreRelationshipNotesCardsQuery = graphql`
+  query StixCoreObjectOrStixCoreRelationshipNotesCardsQuery(
+    $count: Int!
+    $orderBy: NotesOrdering
+    $orderMode: OrderingMode
+    $filters: FilterGroup
+  ) {
+    ...StixCoreObjectOrStixCoreRelationshipNotesCards_data
+      @arguments(
+        count: $count
+        orderBy: $orderBy
+        orderMode: $orderMode
+        filters: $filters
+      )
+  }
+`;
+
+const stixCoreObjectOrStixCoreRelationshipNotesCardsFragment = graphql`
+  fragment StixCoreObjectOrStixCoreRelationshipNotesCards_data on Query
+  @argumentDefinitions(
+    count: { type: "Int", defaultValue: 25 }
+    orderBy: { type: "NotesOrdering" }
+    orderMode: { type: "OrderingMode" }
+    filters: { type: "FilterGroup" }
+  ) {
+    notes(
+      first: $count
+      orderBy: $orderBy
+      orderMode: $orderMode
+      filters: $filters
+    ) @connection(key: "Pagination_notes") {
+      edges {
+        node {
+          id
+          ...StixCoreObjectOrStixCoreRelationshipNoteCard_node
+          objectMarking {
+            id
+            definition_type
+            definition
+            x_opencti_order
+            x_opencti_color
+          }
+        }
+      }
+    }
+  }
+`;
+
+const toFinalValues = (values: NoteAddInput, id: string) => {
+  return {
+    attribute_abstract: values.attribute_abstract,
+    content: values.content,
+    confidence: parseInt(String(values.confidence), 10),
+    note_types: values.note_types,
+    likelihood: parseInt(String(values.likelihood), 10),
+    objectMarking: values.objectMarking.map((v) => v.value),
+    objectLabel: values.objectLabel.map((v) => v.value),
+    objects: [id],
+  };
+};
+
+const toOptions = (
+  objectMarkings: readonly DefaultMarking[] | undefined = [],
+) => (objectMarkings ?? []).map(convertMarking);
+
+export interface NoteAddInput {
+  attribute_abstract: string;
+  content: string;
+  confidence: number | undefined;
+  note_types: string[];
+  likelihood?: number;
+  objectMarking: FieldOption[];
+  objectLabel: FieldOption[];
+}
+
+interface StixCoreObjectOrStixCoreRelationshipNotesCardsProps {
+  id: string;
+  marginTop?: number;
+  queryRef: PreloadedQuery<StixCoreObjectOrStixCoreRelationshipNotesCardsQuery>;
+  paginationOptions: StixCoreObjectOrStixCoreRelationshipNotesCardsQuery$variables;
+  readonly defaultMarkings?: readonly DefaultMarking[];
+  title: string;
+}
+
+type HeaderProps = {
+  id: string;
+  data: StixCoreObjectOrStixCoreRelationshipNotesCards_data$data;
+} & Pick<StixCoreObjectOrStixCoreRelationshipNotesCardsProps, 'paginationOptions' | 'title'>;
+
+const Header = ({ title, id, data, paginationOptions }: HeaderProps) => {
+  const actions = (
+    <Security needs={[KNOWLEDGE_KNPARTICIPATE]}>
+      <AddNotes
+        stixCoreObjectOrStixCoreRelationshipId={id}
+        stixCoreObjectOrStixCoreRelationshipNotes={data}
+        paginationOptions={paginationOptions}
+      />
+    </Security>
+  );
+
+  return (
+    <CardTitle action={actions}>
+      {title}
+    </CardTitle>
+  );
+};
+
+type NoteFormProps = {
+  onSubmit: (values: NoteAddInput, formikHelpers: FormikHelpers<NoteAddInput>) => void;
+  onCancel: () => void;
+  onToggleMore: (value: boolean) => void;
+  registerMarkdownImagesController: (controller: MarkdownImagesController) => void;
+} & Pick<StixCoreObjectOrStixCoreRelationshipNotesCardsProps, 'defaultMarkings'>;
+
+const NoteForm = ({
+  defaultMarkings,
+  onCancel,
+  onToggleMore,
+  onSubmit,
+  registerMarkdownImagesController,
+}: NoteFormProps) => {
+  const { t_i18n } = useFormatter();
+  const [more, setMore] = useState<boolean>(false);
+  const { mandatoryAttributes } = useIsMandatoryAttribute(NOTE_TYPE);
+
+  const initialValues = useDefaultValues<NoteAddInput>(NOTE_TYPE, {
+    attribute_abstract: '',
+    content: '',
+    likelihood: 50,
+    confidence: undefined,
+    note_types: [],
+    objectMarking: toOptions(defaultMarkings),
+    objectLabel: [],
+  });
+
+  const basicShape = yupShapeConditionalRequired({
+    content: Yup.string().trim().min(2),
+    attribute_abstract: Yup.string().nullable(),
+    confidence: Yup.number(),
+    note_types: Yup.array(),
+    likelihood: Yup.number().min(0).max(100),
+  }, mandatoryAttributes);
+
+  // created & createdBy must be excluded from the validation, it will be handled directly by the backend
+  const noteValidator = useDynamicSchemaCreationValidation(
+    mandatoryAttributes,
+    basicShape,
+    ['created', 'createdBy'],
+  );
+
+  const handleToggleMore = () => {
+    setMore((oldValue) => {
+      const newValue = !oldValue;
+      onToggleMore(newValue);
+      return newValue;
+    });
+  };
+
+  return (
+    <Formik<NoteAddInput>
+      initialValues={initialValues}
+      validationSchema={noteValidator}
+      onSubmit={onSubmit}
+      onReset={onCancel}
+    >
+      {({
+        submitForm,
+        handleReset,
+        setFieldValue,
+        values,
+        isSubmitting,
+      }) => (
+        <Stack gap={2}>
+          <Box>
+            <Field
+              component={MarkdownField}
+              name="content"
+              label={t_i18n('Content')}
+              required={(mandatoryAttributes.includes('content'))}
+              fullWidth={true}
+              multiline={true}
+              rows="4"
+              autoPersistOnBlur={false}
+              registerMarkdownImagesController={registerMarkdownImagesController}
+              uploadFileMarkings={values.objectMarking.map((v) => v.value)}
+            />
+            <ObjectMarkingField
+              name="objectMarking"
+              required={(mandatoryAttributes.includes('objectMarking'))}
+              style={fieldSpacingContainerStyle}
+              setFieldValue={setFieldValue}
+            />
+            {
+              more && (
+                <>
+                  <Field
+                    component={TextField}
+                    name="attribute_abstract"
+                    label={t_i18n('Abstract')}
+                    required={(mandatoryAttributes.includes('attribute_abstract'))}
+                    fullWidth={true}
+                    className="mt-5"
+                  />
+                  <OpenVocabField
+                    label={t_i18n('Note types')}
+                    type="note_types_ov"
+                    name="note_types"
+                    required={(mandatoryAttributes.includes('note_types'))}
+                    onChange={(name, value) => setFieldValue(name, value)}
+                    containerStyle={fieldSpacingContainerStyle}
+                    multiple={true}
+                  />
+                  <ConfidenceField
+                    entityType="Note"
+                    containerStyle={fieldSpacingContainerStyle}
+                  />
+                  <div style={fieldSpacingContainerStyle}>
+                    <Field
+                      component={SliderField}
+                      name="likelihood"
+                      label={t_i18n('Likelihood')}
+                    />
+                  </div>
+                  <ObjectLabelField
+                    name="objectLabel"
+                    required={(mandatoryAttributes.includes('objectLabel'))}
+                    style={{ marginTop: 20, width: '100%' }}
+                    setFieldValue={setFieldValue}
+                    values={values.objectLabel}
+                  />
+                </>
+              )
+            }
+          </Box>
+
+          <Stack direction="row" justifyContent="space-between">
+            <Button
+              onClick={handleToggleMore}
+              disabled={isSubmitting}
+              size="small"
+              aria-expanded={more}
+              endIcon={
+                more ? <ExpandLessOutlined /> : <ExpandMoreOutlined />
+              }
+            >
+              {more ? t_i18n('Less fields') : t_i18n('More fields')}
+            </Button>
+
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="secondary"
+                onClick={handleReset}
+                disabled={isSubmitting}
+                size="small"
+              >
+                {t_i18n('Cancel')}
+              </Button>
+              <Button
+                onClick={submitForm}
+                disabled={isSubmitting}
+                size="small"
+              >
+                {t_i18n('Create')}
+              </Button>
+            </Stack>
+          </Stack>
+        </Stack>
+      )}
+    </Formik>
+  );
+};
+
+const StixCoreObjectOrStixCoreRelationshipNotesCards: FunctionComponent<
+  StixCoreObjectOrStixCoreRelationshipNotesCardsProps
+> = ({
+  id,
+  marginTop = 0,
+  queryRef,
+  paginationOptions,
+  defaultMarkings,
+  title,
+}) => {
+  const { t_i18n } = useFormatter();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const data = usePreloadedFragment<
+    StixCoreObjectOrStixCoreRelationshipNotesCardsQuery,
+    StixCoreObjectOrStixCoreRelationshipNotesCards_data$key
+  >({
+    queryDef: stixCoreObjectOrStixCoreRelationshipNotesCardsQuery,
+    fragmentDef: stixCoreObjectOrStixCoreRelationshipNotesCardsFragment,
+    queryRef,
+  });
+
+  const notes = data?.notes?.edges ?? [];
+
+  const scrollToBottom = () => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    setTimeout(() => {
+      const rect = element.getBoundingClientRect();
+      const targetPosition = rect.bottom + window.pageYOffset + marginTop;
+
+      window.scrollTo({
+        top: targetPosition,
+        behavior: 'smooth',
+      });
+    }, 300);
+  };
+
+  const scrollToTop = () => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    setTimeout(() => {
+      const rect = element.getBoundingClientRect();
+      const OFFSET_TITLE_BLOCK = 100; // arbitrary offset to see the title block
+      const targetPosition = rect.top + window.pageYOffset - marginTop - OFFSET_TITLE_BLOCK;
+
+      window.scrollTo({
+        top: targetPosition,
+        behavior: 'smooth',
+      });
+    }, 100);
+  };
+
+  const handleMore = () => {
+    scrollToBottom();
+  };
+
+  const userIsKnowledgeEditor = useGranted([KNOWLEDGE_KNUPDATE]);
+  const [commit] = useApiMutation(userIsKnowledgeEditor ? noteCreationMutation : noteCreationUserMutation);
+  const markdownControllerRef = useRef<MarkdownImagesController | null>(null);
+  const { buildMarkdownFilesInput, registerMarkdownImagesController } = useMarkdownCreationFilesInput();
+
+  const registerMarkdownController = (controller: MarkdownImagesController) => {
+    markdownControllerRef.current = controller;
+    registerMarkdownImagesController(controller);
+  };
+
+  const onSubmit: FormikConfig<NoteAddInput>['onSubmit'] = async (
+    values,
+    { setSubmitting, resetForm },
+  ) => {
+    const content = userIsKnowledgeEditor
+      ? values.content
+      : (await markdownControllerRef.current?.persistTempImages(id) ?? values.content);
+
+    const finalValues = {
+      ...toFinalValues({ ...values, content }, id),
+      ...(userIsKnowledgeEditor ? buildMarkdownFilesInput() : {}),
+    };
+    commit({
+      variables: {
+        input: finalValues,
+      },
+      updater: (store) => {
+        insertNode(store, 'Pagination_notes', paginationOptions, userIsKnowledgeEditor ? 'noteAdd' : 'userNoteAdd');
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        scrollToTop();
+      },
+      onError: () => {
+        setSubmitting(false);
+      },
+    });
+  };
+
+  return (
+    <div style={{ marginTop, marginBottom: 20 }} ref={containerRef}>
+      <Header
+        data={data}
+        id={id}
+        paginationOptions={paginationOptions}
+        title={title}
+      />
+
+      <Stack spacing={2}>
+        {notes.map(({ node }) => (
+          <StixCoreObjectOrStixCoreRelationshipNoteCard
+            key={node.id}
+            data={node}
+            stixCoreObjectOrStixCoreRelationshipId={id}
+            paginationOptions={paginationOptions}
+          />
+        ))}
+
+        <Security needs={[KNOWLEDGE_KNPARTICIPATE]}>
+          <CardAccordion
+            onStateChange={(open) => {
+              if (containerRef.current && open) {
+                scrollToBottom();
+              }
+            }}
+            preview={(
+              <Stack direction="row" spacing={1}>
+                <RateReviewOutlined />
+                <Typography>{t_i18n('Write a note')}</Typography>
+              </Stack>
+            )}
+          >
+            {({ changeState }) => (
+              <NoteForm
+                defaultMarkings={defaultMarkings}
+                onCancel={() => changeState(false)}
+                onToggleMore={handleMore}
+                onSubmit={onSubmit}
+                registerMarkdownImagesController={registerMarkdownController}
+              />
+            )}
+          </CardAccordion>
+        </Security>
+      </Stack>
+    </div>
+  );
+};
+
+export default StixCoreObjectOrStixCoreRelationshipNotesCards;

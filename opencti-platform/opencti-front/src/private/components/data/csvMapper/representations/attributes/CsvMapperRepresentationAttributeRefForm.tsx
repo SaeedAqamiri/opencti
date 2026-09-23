@@ -1,0 +1,249 @@
+import React, { FunctionComponent, useEffect, useState } from 'react';
+import { Combobox, ComboboxChips, ComboboxContent, ComboboxControls, ComboboxField, ComboboxInput, ComboboxLabel, ComboboxTrigger } from '@filigran/design-system';
+import { representationLabel } from '@components/data/csvMapper/representations/RepresentationUtils';
+import * as R from 'ramda';
+import { getBasedOnRepresentations, getInfoForRef } from '@components/data/csvMapper/representations/attributes/AttributeUtils';
+import makeStyles from '@mui/styles/makeStyles';
+import { FieldProps } from 'formik';
+import { CsvMapperFormData } from '@components/data/csvMapper/CsvMapper';
+import CsvMapperRepresentationDialogOption from '@components/data/csvMapper/representations/attributes/CsvMapperRepresentationDialogOption';
+import CsvMapperRepresentationAttributeOptions from '@components/data/csvMapper/representations/attributes/CsvMapperRepresentationAttributeOptions';
+import { CsvMapperRepresentationAttributeFormData } from '@components/data/csvMapper/representations/attributes/Attribute';
+import { CsvMapperRepresentationFormData } from '@components/data/csvMapper/representations/Representation';
+import { SchemaAttribute } from '@components/data/csvMapper/representations/attributes/CsvMapperRepresentationAttributesForm';
+import { isEmptyField } from '../../../../../../utils/utils';
+import useAuth from '../../../../../../utils/hooks/useAuth';
+import { resolveTypesForRelationship, resolveTypesForRelationshipRef } from '../../../../../../utils/Relation';
+import { useFormatter } from '../../../../../../components/i18n';
+import { isStixCoreObjects, isStixCoreRelationships } from '../../../../../../utils/stixTypeUtils';
+import { useTheme } from '@mui/styles';
+import { Theme } from '../../../../../../components/Theme';
+
+export type RepresentationAttributeForm = CsvMapperRepresentationAttributeFormData | undefined;
+
+interface CsvMapperRepresentationAttributeRefFormProps
+  extends FieldProps<RepresentationAttributeForm, CsvMapperFormData> {
+  representation: CsvMapperRepresentationFormData;
+  schemaAttribute: SchemaAttribute;
+  label: string;
+  handleErrors: (key: string, value: string | null) => void;
+}
+
+const CsvMapperRepresentationAttributeRefForm: FunctionComponent<
+  CsvMapperRepresentationAttributeRefFormProps
+> = ({ form, field, representation, schemaAttribute, label, handleErrors }) => {
+  const theme = useTheme<Theme>();
+  // Deprecated - https://mui.com/system/styles/basics/
+  // Do not use it for new code.
+  const useStyles = makeStyles(() => ({
+    container: {
+      width: '100%',
+      display: 'inline-grid',
+      gridTemplateColumns: '2fr 3fr 50px',
+      alignItems: 'center',
+      marginTop: '10px',
+      gap: '10px',
+    },
+    redStar: {
+      color: theme.palette.designSystem.tertiary.red[400],
+      marginLeft: '5px',
+    },
+  }));
+  const classes = useStyles();
+  const { t_i18n } = useFormatter();
+
+  const { name, value } = field;
+  const { setFieldValue, values } = form;
+  const { entity_representations, relationship_representations } = values;
+
+  const [fromType, fromId] = getInfoForRef(
+    Object.values(representation.attributes),
+    entity_representations,
+    'from',
+  );
+  const [toType, toId] = getInfoForRef(
+    Object.values(representation.attributes),
+    entity_representations,
+    'to',
+  );
+
+  const multiple = schemaAttribute.multiple ?? false;
+
+  const { schema } = useAuth();
+  const { schemaRelationsTypesMapping, schemaRelationsRefTypesMapping } = schema;
+
+  const filterOptions = (representationsOptions: CsvMapperRepresentationFormData[]) => {
+    return representationsOptions
+      .filter((r) => r.id !== representation.id)
+      .filter((r) => {
+        if (schemaAttribute.name === 'from' && toId) {
+          return r.id !== toId;
+        }
+        if (schemaAttribute.name === 'to' && fromId) {
+          return r.id !== fromId;
+        }
+        return true;
+      });
+  };
+
+  let options: CsvMapperRepresentationFormData[] = [];
+
+  // We don't need to resolve those different types, as they can link any entity between them.
+  if (representation.target_type === 'related-to' || representation.target_type === 'revoked-by' || representation.target_type === 'stix-sighting-relationship') {
+    options = filterOptions(entity_representations);
+  } else if (representation.target_type) {
+    const relationshipTypes = resolveTypesForRelationship(
+      schemaRelationsTypesMapping,
+      representation.target_type,
+      schemaAttribute.name,
+      fromType,
+      toType,
+    );
+    const relationshipRefTypes = resolveTypesForRelationshipRef(
+      schemaRelationsRefTypesMapping,
+      representation.target_type,
+      schemaAttribute.name,
+    );
+    const everyRepresentationTypes = [
+      ...relationshipTypes,
+      ...relationshipRefTypes,
+    ];
+    if (isStixCoreObjects(everyRepresentationTypes)) {
+      schema.sdos.map((sdo) => sdo.label).forEach((sdoType) => everyRepresentationTypes.push(sdoType));
+      schema.scos.map((sco) => sco.label).forEach((scoType) => everyRepresentationTypes.push(scoType));
+    }
+    if (isStixCoreRelationships(everyRepresentationTypes)) {
+      schema.scrs.map((sco) => sco.label).forEach((srcType) => everyRepresentationTypes.push(srcType));
+    }
+    const allElements = [...entity_representations, ...relationship_representations];
+    options = filterOptions(
+      allElements
+        .filter((r) => r.target_type && everyRepresentationTypes.includes(r.target_type)),
+    );
+  }
+
+  // -- ERRORS --
+
+  const hasErrors = () => {
+    const missMandatoryValue = schemaAttribute.mandatory && isEmptyField(value?.based_on);
+    const missSettingsDefaultValue = isEmptyField(schemaAttribute.defaultValues);
+    const missDefaultValue = isEmptyField(value?.default_values);
+    return missMandatoryValue && missSettingsDefaultValue && missDefaultValue;
+  };
+
+  const [errors, setErrors] = useState(hasErrors());
+
+  // -- EVENTS --
+
+  useEffect(() => {
+    setErrors(hasErrors());
+  }, [value, schemaAttribute]);
+
+  useEffect(() => {
+    if (errors) {
+      handleErrors(schemaAttribute.name, 'This attribute is required');
+    } else {
+      handleErrors(schemaAttribute.name, null);
+    }
+  }, [errors]);
+
+  const onValueChange = async (
+    val: CsvMapperRepresentationFormData[] | CsvMapperRepresentationFormData | null,
+  ) => {
+    let ids: string[] | undefined;
+    if (multiple) {
+      ids = val ? (val as CsvMapperRepresentationFormData[]).map((r) => r.id) : undefined;
+    } else {
+      // internally, it's always an array
+      ids = val ? [(val as CsvMapperRepresentationFormData).id] : undefined;
+    }
+
+    if (!value) {
+      // this attribute was not set yet, initialize
+      const newAttribute: CsvMapperRepresentationAttributeFormData = {
+        key: schemaAttribute.name,
+        based_on: ids,
+      };
+      await setFieldValue(name, newAttribute);
+    } else {
+      const updateAttribute: CsvMapperRepresentationAttributeFormData = {
+        ...value,
+        based_on: ids,
+      };
+      await setFieldValue(name, updateAttribute);
+    }
+  };
+
+  return (
+    <div className={classes.container}>
+      <div>
+        {label}
+        {schemaAttribute.mandatory && <span className={classes.redStar}>*</span>}
+      </div>
+      <div>
+        {multiple && (
+          <Combobox<CsvMapperRepresentationFormData>
+            selectOnFocus
+            openOnFocus
+            multiple
+            getOptionLabel={(option) => {
+              const optionIndex = entity_representations.indexOf(option) >= 0 ? entity_representations.indexOf(option) : relationship_representations.indexOf(option);
+              return representationLabel(optionIndex, option, t_i18n);
+            }}
+            options={options}
+            value={getBasedOnRepresentations(value, options) || null}
+            onValueChange={(val) => onValueChange(val)}
+            error={errors}
+          >
+            <ComboboxLabel>{t_i18n('Representation entity')}</ComboboxLabel>
+            <ComboboxField>
+              <ComboboxChips aria-label={t_i18n('Representation entity')} />
+              <ComboboxInput />
+              <ComboboxControls>
+                <ComboboxTrigger />
+              </ComboboxControls>
+            </ComboboxField>
+            <ComboboxContent
+              listAriaLabel={t_i18n('Representation entity')}
+            />
+          </Combobox>
+        )}
+        {!multiple && (
+          <Combobox<CsvMapperRepresentationFormData>
+            selectOnFocus
+            openOnFocus
+            getOptionLabel={(option) => representationLabel(entity_representations.indexOf(option), option, t_i18n)}
+            options={options}
+            value={R.head(getBasedOnRepresentations(value, options)) || null}
+            onValueChange={(val) => onValueChange(val)}
+            error={errors}
+          >
+            <ComboboxLabel>{t_i18n('Representation entity')}</ComboboxLabel>
+            <ComboboxField>
+              <ComboboxInput />
+              <ComboboxControls>
+                <ComboboxTrigger />
+              </ComboboxControls>
+            </ComboboxField>
+            <ComboboxContent
+              listAriaLabel={t_i18n('Representation entity')}
+            />
+          </Combobox>
+        )}
+      </div>
+      <div style={{ alignSelf: 'end', marginBottom: '0px' }}>
+        {schemaAttribute.editDefault && (
+          <CsvMapperRepresentationDialogOption configuration={value}>
+            <CsvMapperRepresentationAttributeOptions
+              schemaAttribute={schemaAttribute}
+              attributeName={name}
+              form={form}
+            />
+          </CsvMapperRepresentationDialogOption>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CsvMapperRepresentationAttributeRefForm;

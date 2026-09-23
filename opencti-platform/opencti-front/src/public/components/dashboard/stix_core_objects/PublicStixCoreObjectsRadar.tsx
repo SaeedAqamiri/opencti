@@ -1,0 +1,138 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React from 'react';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import { useFormatter } from '../../../../components/i18n';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { PublicStixCoreObjectsRadarQuery } from './__generated__/PublicStixCoreObjectsRadarQuery.graphql';
+import WidgetRadar from '../../../../components/dashboard/WidgetRadar';
+import type { Widget } from '../../../../utils/widget/widget';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+
+const publicStixCoreObjectsRadarQuery = graphql`
+  query PublicStixCoreObjectsRadarQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixCoreObjectsDistribution(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      label
+      value
+      entity {
+        ... on BasicObject {
+          id
+          entity_type
+        }
+        ... on BasicRelationship {
+          id
+          entity_type
+        }
+        ... on StixObject {
+          representative {
+            main
+          }
+        }
+        ... on StixRelationship {
+          representative {
+            main
+          }
+        }
+        # internal objects
+        ... on Creator {
+          name
+        }
+        ... on Group {
+          name
+        }
+        # need colors when available
+        ... on Label {
+          color
+        }
+        ... on MarkingDefinition {
+          x_opencti_color
+        }
+        ... on Status {
+          template {
+            name
+            color
+          }
+        }
+      }
+    }
+  }
+`;
+
+interface PublicStixCoreObjectsRadarComponentProps {
+  dataSelection: Widget['dataSelection'];
+  queryRef: PreloadedQuery<PublicStixCoreObjectsRadarQuery>;
+}
+
+const PublicStixCoreObjectsRadarComponent = ({
+  dataSelection,
+  queryRef,
+}: PublicStixCoreObjectsRadarComponentProps) => {
+  const { publicStixCoreObjectsDistribution } = usePreloadedQuery(
+    publicStixCoreObjectsRadarQuery,
+    queryRef,
+  );
+
+  if (
+    publicStixCoreObjectsDistribution
+    && publicStixCoreObjectsDistribution.length > 0
+  ) {
+    return (
+      <WidgetRadar
+        data={[...publicStixCoreObjectsDistribution]}
+        label={dataSelection[0].label ?? ''}
+        groupBy={dataSelection[0].attribute ?? 'entity_type'}
+      />
+    );
+  }
+  return <WidgetNoData />;
+};
+
+const PublicStixCoreObjectsRadar = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters, dataSelection } = widget;
+  const queryRef = usePublicDashboardViz<PublicStixCoreObjectsRadarQuery>(
+    publicStixCoreObjectsRadarQuery,
+    {
+      uriKey,
+      widgetId: id,
+      startDate,
+      endDate,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      title={parameters?.title ?? title ?? t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixCoreObjectsRadarComponent
+            queryRef={queryRef}
+            dataSelection={dataSelection}
+          />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixCoreObjectsRadar;

@@ -1,0 +1,138 @@
+import type { Moment } from 'moment';
+import { MARKING_TLP_AMBER, MARKING_TLP_AMBER_STRICT, MARKING_TLP_CLEAR, MARKING_TLP_GREEN, MARKING_TLP_RED, STATIC_MARKING_IDS } from '../../schema/identifier';
+import { getEntitiesMapFromCache } from '../../database/cache';
+import { ENTITY_TYPE_MARKING_DEFINITION } from '../../schema/stixMetaObject';
+import type { AuthContext, AuthUser } from '../../types/user';
+import type { BasicStoreEntity } from '../../types/store';
+import { isEmptyField, isNotEmptyField } from '../../database/utils';
+import { utcDate } from '../../utils/format';
+import { ValidationError } from '../../config/errors';
+import type { IndicatorAddInput } from '../../generated/graphql';
+import type { DecayHistory } from '../decayRule/decayRule-domain';
+import { isModuleActivated } from '../../database/cluster-module';
+
+export const INDICATOR_DEFAULT_SCORE: number = 50;
+
+interface TTL_DEFINITION {
+  target: Array<string>;
+  definition?: Record<string, number>;
+  default: number;
+}
+
+export const DEFAULT_INDICATOR_TTL = 365;
+const INDICATOR_TTL_DEFINITION: Array<TTL_DEFINITION> = [
+  {
+    target: ['IPv4-Addr', 'IPv6-Addr'],
+    definition: {
+      [MARKING_TLP_CLEAR]: 30,
+      [MARKING_TLP_GREEN]: 30,
+      [MARKING_TLP_AMBER]: 30,
+      [MARKING_TLP_AMBER_STRICT]: 60,
+      [MARKING_TLP_RED]: 60,
+    },
+    default: 60,
+  },
+  {
+    target: ['File'],
+    default: DEFAULT_INDICATOR_TTL,
+  },
+  {
+    target: ['Url'],
+    definition: {
+      [MARKING_TLP_CLEAR]: 60,
+      [MARKING_TLP_GREEN]: 60,
+      [MARKING_TLP_AMBER]: 180,
+      [MARKING_TLP_AMBER_STRICT]: 180,
+      [MARKING_TLP_RED]: 180,
+    },
+    default: 180,
+  },
+];
+
+export const isDecayEnabled = async () => {
+  return isModuleActivated('INDICATOR_DECAY_MANAGER');
+};
+
+export const computeValidTTL = async (context: AuthContext, user: AuthUser, indicator: IndicatorAddInput) => {
+  const observableType = indicator.x_opencti_main_observable_type;
+  if (observableType) {
+    const data = INDICATOR_TTL_DEFINITION.find((ttl) => ttl.target.includes(observableType));
+    if (data) {
+      if (data.definition && indicator.objectMarking && indicator.objectMarking.length > 0) {
+        // Resolve the markings and get the higher rank for TLP
+        const markingsMap = await getEntitiesMapFromCache<BasicStoreEntity>(context, user, ENTITY_TYPE_MARKING_DEFINITION);
+        const topTlpMarking = indicator.objectMarking
+          .map((id) => markingsMap.get(id))
+          .filter((marking): marking is BasicStoreEntity => marking !== null && marking !== undefined)
+          .filter((marking) => STATIC_MARKING_IDS.includes(marking.standard_id))
+          .sort((a, b) => b.x_opencti_order - a.x_opencti_order)
+          .at(0);
+        if (topTlpMarking) {
+          return data.definition[topTlpMarking.standard_id];
+        }
+      }
+      return data.default;
+    }
+  }
+  return DEFAULT_INDICATOR_TTL;
+};
+
+export const computeValidFrom = (indicator: IndicatorAddInput): Moment => {
+  if (isNotEmptyField(indicator.valid_from)) {
+    return utcDate(indicator.valid_from);
+  }
+  if (isNotEmptyField(indicator.created)) {
+    return utcDate(indicator.created);
+  }
+  return utcDate();
+};
+
+export const computeValidUntil = (indicator: IndicatorAddInput, validFrom: Moment, lifetimeInDays: number): Moment => {
+  let validUntil: Moment;
+  if (indicator.revoked && isEmptyField(indicator.valid_until)) {
+    // If indicator is explicitly revoked and not valid_until is specified
+    // Ensure the valid_until will be revoked by the time computation.
+    // Adding one second to the validFrom if valid_until is empty,
+    // because according to STIX 2.1 specification the valid_until must be greater than the valid_from.
+    validUntil = validFrom.clone().add(1, 'seconds');
+  } else if (isNotEmptyField(indicator.valid_until)) {
+    const validUntilDate = utcDate(indicator.valid_until as string);
+    // Ensure valid_until is strictly greater than valid_from
+    if (validUntilDate.isBefore(validFrom)) {
+      throw ValidationError('The valid until date must be greater than the valid from date', 'valid_until');
+    } else if (validUntilDate.isSame(validFrom)) {
+      // When creating directly through API, we accept the same date and add an extra second to valid_until
+      validUntil = utcDate(indicator.valid_until).add(1, 'seconds');
+    } else {
+      validUntil = utcDate(indicator.valid_until);
+    }
+  } else {
+    validUntil = validFrom.clone().add(lifetimeInDays, 'days');
+  }
+  return validUntil;
+};
+
+export const computeValidPeriod = async (indicator: IndicatorAddInput, lifetimeInDays: number) => {
+  const validFrom = computeValidFrom(indicator);
+  const validUntil = computeValidUntil(indicator, validFrom, lifetimeInDays);
+  return {
+    validFrom,
+    validUntil,
+    revoked: validUntil.isSameOrBefore(utcDate()),
+    validPeriod: validFrom.isBefore(validUntil),
+  };
+};
+
+export const hasSameSourceAlreadyUpdateThisScore = (sourceId: string, score: number, decay_history: DecayHistory[]) => {
+  if (score && decay_history && sourceId) {
+    // Note: the score coming from the frontend may be a string (HTML inputs always return strings via event.target.value)
+    // while the score stored in the decay history is a number. We convert both to Number before comparing
+    // to avoid a type mismatch causing this guard to always return false.
+    return decay_history.find((decayPoint) => {
+      const isSameSource = decayPoint.updated_by === sourceId;
+      const isSameScore = Number(decayPoint.score) === Number(score);
+      return isSameSource && isSameScore;
+    }) !== undefined;
+  }
+  return false;
+};

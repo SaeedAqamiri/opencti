@@ -1,0 +1,215 @@
+import moment, { type Moment } from 'moment';
+import * as R from 'ramda';
+import { listRules as findRetentionRulesToExecute } from '../modules/retentionRules/retentionRules-domain';
+import conf, { booleanConf, logApp } from '../config/conf';
+import { deleteElementById, patchAttribute } from '../database/middleware';
+import { executionContext, RETENTION_MANAGER_USER } from '../utils/access';
+import { ENTITY_TYPE_RETENTION_RULE } from '../modules/retentionRules/retentionRules-types';
+import { now, utcDate } from '../utils/format';
+import { READ_INDEX_HISTORY, READ_STIX_INDICES } from '../database/utils';
+import { elPaginate } from '../database/engine';
+import { convertFiltersToQueryOptions } from '../utils/filtering/filtering-resolution';
+import type { ManagerDefinition } from './managerModule';
+import { registerManager } from './managerModule';
+import type { AuthContext } from '../types/user';
+import type { FileEdge, RetentionRule } from '../generated/graphql';
+import { RetentionRuleScope, RetentionUnit } from '../generated/graphql';
+import { canDeleteElement } from '../database/data-consistency';
+import { deleteFile } from '../database/file-storage';
+import { DELETABLE_FILE_STATUSES, paginatedForPathWithEnrichment } from '../modules/internal/document/document-domain';
+import type { BasicNodeEdge, StoreObject } from '../types/store';
+import { ALREADY_DELETED_ERROR } from '../config/errors';
+import { ENTITY_TYPE_ACTIVITY, ENTITY_TYPE_HISTORY } from '../schema/internalObject';
+import { publishUserAction } from '../listener/UserActionListener';
+
+const RETENTION_MANAGER_ENABLED = booleanConf('retention_manager:enabled', false);
+const RETENTION_MANAGER_START_ENABLED = booleanConf('retention_manager:enabled', true);
+// Retention manager responsible to cleanup old data
+// Each API will start is retention manager.
+// If the lock is free, every API as the right to take it.
+const SCHEDULE_TIME = conf.get('retention_manager:interval') || 30000;
+const RETENTION_MANAGER_KEY = conf.get('retention_manager:lock_key') || 'retention_manager_lock';
+const RETENTION_BATCH_SIZE = conf.get('retention_manager:batch_size') || 1500;
+const RETENTION_MAX_CONCURRENCY = conf.get('retention_manager:max_deletion_concurrency') || 2;
+export const RETENTION_SCOPE_VALUES = Object.values(RetentionRuleScope);
+export const RETENTION_UNIT_VALUES = Object.values(RetentionUnit);
+
+let shutdown = false;
+
+interface DeleteOpts {
+  knowledgeType?: string;
+  forceRefresh?: boolean;
+}
+
+export const deleteElement = async (context: AuthContext, scope: string, nodeId: string, opts: DeleteOpts = {}) => {
+  const deleteOpts = { forceDelete: true, forceRefresh: opts.forceRefresh ?? false };
+  if (scope === 'knowledge') {
+    const { knowledgeType } = opts;
+    await deleteElementById(context, RETENTION_MANAGER_USER, nodeId, knowledgeType, deleteOpts);
+  } else if (scope === 'file' || scope === 'workbench') {
+    // forceDelete: true to clean up orphan ES entries even if S3 file doesn't exist
+    await deleteFile(context, RETENTION_MANAGER_USER, nodeId, { forceDelete: true });
+  } else if (scope === 'history') {
+    await deleteElementById(context, RETENTION_MANAGER_USER, nodeId, ENTITY_TYPE_HISTORY, deleteOpts);
+  } else if (scope === 'activity') {
+    await deleteElementById(context, RETENTION_MANAGER_USER, nodeId, ENTITY_TYPE_ACTIVITY, deleteOpts);
+  } else {
+    throw Error(`[Retention manager] Scope ${scope} not existing for Retention Rule.`);
+  }
+};
+
+export const getElementsToDelete = async (context: AuthContext, scope: string, before: Moment, filters?: string) => {
+  let result;
+  if (scope === 'knowledge') {
+    const jsonFilters = filters ? JSON.parse(filters) : null;
+    const queryOptions = await convertFiltersToQueryOptions(jsonFilters, { before });
+    result = await elPaginate(context, RETENTION_MANAGER_USER, READ_STIX_INDICES, { ...queryOptions, first: RETENTION_BATCH_SIZE }) as any;
+  } else if (scope === 'file') {
+    result = await paginatedForPathWithEnrichment(context, RETENTION_MANAGER_USER, 'import/global', undefined, { first: RETENTION_BATCH_SIZE, notModifiedSince: before.toISOString() });
+  } else if (scope === 'workbench') {
+    // exact_path: false to get ALL workbenches (both global and entity-attached)
+    result = await paginatedForPathWithEnrichment(context, RETENTION_MANAGER_USER, 'import/pending', undefined, { first: RETENTION_BATCH_SIZE, notModifiedSince: before.toISOString(), exact_path: false });
+  } else if (scope === 'history') {
+    const jsonFilters = filters ? JSON.parse(filters) : null;
+    const queryOptions = await convertFiltersToQueryOptions(jsonFilters, { before, field: 'timestamp' });
+    result = await elPaginate(context, RETENTION_MANAGER_USER, READ_INDEX_HISTORY, { ...queryOptions, types: [ENTITY_TYPE_HISTORY], first: RETENTION_BATCH_SIZE }) as any;
+  } else if (scope === 'activity') {
+    const jsonFilters = filters ? JSON.parse(filters) : null;
+    const queryOptions = await convertFiltersToQueryOptions(jsonFilters, { before, field: 'timestamp' });
+    result = await elPaginate(context, RETENTION_MANAGER_USER, READ_INDEX_HISTORY, { ...queryOptions, types: [ENTITY_TYPE_ACTIVITY], first: RETENTION_BATCH_SIZE }) as any;
+  } else {
+    throw Error(`[Retention manager] Scope ${scope} not existing for Retention Rule.`);
+  }
+  if (scope === 'file' || scope === 'workbench') { // don't delete progress files or files with works in progress
+    result.edges = result.edges.filter((e: FileEdge) => DELETABLE_FILE_STATUSES.includes(e.node.uploadStatus)
+      && (e.node.works ?? []).every((work) => !work || DELETABLE_FILE_STATUSES.includes(work?.status)));
+  }
+  return result;
+};
+
+export const executeProcessing = async (context: AuthContext, retentionRule: RetentionRule) => {
+  const { id, name, max_retention: maxNumber, retention_unit: unit, filters, scope, active } = retentionRule;
+  if (active === false) {
+    logApp.info(`[OPENCTI] Retention manager skipping inactive rule "${name}"`);
+    return;
+  }
+  logApp.debug(`[OPENCTI] Executing retention manager rule ${name}`);
+  const before = utcDate().subtract(maxNumber, unit ?? 'days');
+  const result = await getElementsToDelete(context, scope, before, filters);
+  let remainingDeletions = result.pageInfo.globalCount;
+  const elements = result.edges;
+  let deletedCount = elements.length;
+  // Collect deleted history entries details for audit log
+  const deletedHistoryEntries: Array<{ id: string; timestamp: string }> = [];
+  if (elements.length > 0) {
+    logApp.debug(`[OPENCTI] Retention manager clearing ${elements.length} elements`);
+    const start = new Date().getTime();
+    const deleteFn = async (element: BasicNodeEdge<StoreObject>) => {
+      const { node } = element;
+      const { updated_at: up } = node;
+      try {
+        const canElementBeDeleted = await canDeleteElement(context, RETENTION_MANAGER_USER, node);
+        if (canElementBeDeleted) { // filter elements that can't be deleted (ex: user individuals)
+          const humanDuration = moment.duration(utcDate(up).diff(utcDate())).humanize();
+          await deleteElement(context, scope, scope === 'knowledge' ? node.internal_id : node.id, { knowledgeType: node.entity_type });
+          logApp.debug(`[OPENCTI] Retention manager deleting ${node.id} after ${humanDuration}`);
+
+          if (scope === 'history' || scope === 'activity') {
+            deletedHistoryEntries.push({
+              id: node.id,
+              timestamp: (node as any).timestamp ?? up,
+            });
+          }
+        } else {
+          // remove element from counters, since we can't delete it
+          remainingDeletions -= 1;
+          deletedCount -= 1;
+          logApp.debug(`[OPENCTI] Retention manager cannot delete ${node.id}.`);
+        }
+      } catch (err: any) {
+        // Only log the error if not an already deleted message (that can happen though concurrency deletion)
+        if (err?.extensions?.code !== ALREADY_DELETED_ERROR) {
+          logApp.error('[OPENCTI-MODULE] Retention manager error', { cause: err, id: node.id, manager: 'RETENTION_MANAGER' });
+        }
+      }
+    };
+    const concurrentElements = R.splitEvery<BasicNodeEdge<StoreObject>>(RETENTION_MAX_CONCURRENCY, elements);
+    for (let i = 0; i < concurrentElements.length; i += 1) {
+      if (shutdown) {
+        break;
+      }
+      const parallelElements = concurrentElements[i];
+      const promises: Promise<void>[] = [];
+      parallelElements.forEach((elem) => {
+        promises.push(deleteFn(elem));
+      });
+      await Promise.all(promises);
+    }
+    logApp.debug(`[OPENCTI] Retention manager deleted ${elements.length} in ${new Date().getTime() - start} ms`);
+  }
+  // Patch the last execution of the rule
+  const patch = {
+    last_execution_date: now(),
+    remaining_count: remainingDeletions,
+    last_deleted_count: deletedCount,
+  };
+  await patchAttribute(context, RETENTION_MANAGER_USER, id, ENTITY_TYPE_RETENTION_RULE, patch);
+  // Publish audit log for history/activity scope deletions (these are internal objects and do not
+  // generate stream events automatically via storeDeleteEvent, so we log explicitly here)
+  if ((scope === 'history' || scope === 'activity') && deletedCount > 0) {
+    await publishUserAction({
+      user: RETENTION_MANAGER_USER,
+      event_type: 'mutation',
+      event_scope: 'delete',
+      event_access: 'administration',
+      message: `Retention rule \`${name}\` deleted \`${deletedCount}\` \`${scope}\` entries`,
+      context_data: {
+        id,
+        entity_type: ENTITY_TYPE_RETENTION_RULE,
+        input: {
+          deleted_count: deletedCount,
+          deleted_entries: deletedHistoryEntries,
+        },
+      },
+    });
+  }
+};
+
+const retentionHandler = async (lock: { signal: AbortSignal; extend: () => Promise<void>; unlock: () => Promise<void> }) => {
+  const context = executionContext('retention_manager');
+  const retentionRules = await findRetentionRulesToExecute(context, RETENTION_MANAGER_USER);
+  logApp.debug(`[OPENCTI] Retention manager execution for ${retentionRules.length} rules`);
+  // Execution of retention rules
+  if (retentionRules.length > 0) {
+    for (let index = 0; index < retentionRules.length; index += 1) {
+      lock.signal.throwIfAborted();
+      const retentionRule = retentionRules[index];
+      await executeProcessing(context, retentionRule as unknown as RetentionRule);
+    }
+  }
+};
+
+const RETENTION_MANAGER_DEFINITION: ManagerDefinition = {
+  id: 'RETENTION_MANAGER',
+  label: 'Retention manager',
+  executionContext: 'retention_manager',
+  cronSchedulerHandler: {
+    handler: retentionHandler,
+    shutdown: () => {
+      shutdown = true;
+    },
+    interval: SCHEDULE_TIME,
+    lockKey: RETENTION_MANAGER_KEY,
+    lockInHandlerParams: true,
+    dynamicSchedule: true,
+  },
+  enabledByConfig: RETENTION_MANAGER_ENABLED,
+  enabledToStart(): boolean {
+    return RETENTION_MANAGER_START_ENABLED;
+  },
+  enabled(): boolean {
+    return this.enabledByConfig;
+  },
+};
+
+registerManager(RETENTION_MANAGER_DEFINITION);

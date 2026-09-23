@@ -1,0 +1,125 @@
+import { graphql, PreloadedQuery, usePreloadedQuery } from 'react-relay';
+import React from 'react';
+import WidgetNoData from '../../../../components/dashboard/WidgetNoData';
+import type { PublicWidgetContainerProps } from '../PublicWidgetContainerProps';
+import { useFormatter } from '../../../../components/i18n';
+import usePublicDashboardViz from '../usePublicDashboardViz';
+import WidgetContainer from '../../../../components/dashboard/WidgetContainer';
+import { PublicStixCoreObjectsTreeMapQuery } from './__generated__/PublicStixCoreObjectsTreeMapQuery.graphql';
+import WidgetTree from '../../../../components/dashboard/WidgetTree';
+import type { Widget } from '../../../../utils/widget/widget';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+
+const publicStixCoreObjectsTreeMapQuery = graphql`
+  query PublicStixCoreObjectsTreeMapQuery(
+    $startDate: DateTime
+    $endDate: DateTime
+    $uriKey: String!
+    $widgetId : String!
+  ) {
+    publicStixCoreObjectsDistribution(
+      startDate: $startDate
+      endDate: $endDate
+      uriKey: $uriKey
+      widgetId : $widgetId
+    ) {
+      label
+      value
+      entity {
+        ... on BasicObject {
+          id
+          entity_type
+        }
+        ... on BasicRelationship {
+          id
+          entity_type
+        }
+        ... on StixObject {
+          representative {
+            main
+          }
+        }
+        # objects without representative
+        ... on Creator {
+          name
+        }
+        ... on Status {
+          template {
+            name
+          }
+        }
+      }
+    }
+  }
+`;
+
+interface PublicStixCoreObjectsTreeMapComponentProps {
+  parameters: Widget['parameters'];
+  dataSelection: Widget['dataSelection'];
+  queryRef: PreloadedQuery<PublicStixCoreObjectsTreeMapQuery>;
+}
+
+const PublicStixCoreObjectsTreeMapComponent = ({
+  parameters,
+  dataSelection,
+  queryRef,
+}: PublicStixCoreObjectsTreeMapComponentProps) => {
+  const { publicStixCoreObjectsDistribution } = usePreloadedQuery(
+    publicStixCoreObjectsTreeMapQuery,
+    queryRef,
+  );
+
+  if (
+    publicStixCoreObjectsDistribution
+    && publicStixCoreObjectsDistribution.length > 0
+  ) {
+    return (
+      <WidgetTree
+        data={[...publicStixCoreObjectsDistribution]}
+        groupBy={dataSelection[0].attribute ?? 'entity_type'}
+        isDistributed={!!parameters?.distributed}
+      />
+    );
+  }
+  return <WidgetNoData />;
+};
+
+const PublicStixCoreObjectsTreeMap = ({
+  uriKey,
+  widget,
+  startDate,
+  endDate,
+  title,
+}: PublicWidgetContainerProps) => {
+  const { t_i18n } = useFormatter();
+  const { id, parameters, dataSelection } = widget;
+  const queryRef = usePublicDashboardViz<PublicStixCoreObjectsTreeMapQuery>(
+    publicStixCoreObjectsTreeMapQuery,
+    {
+      uriKey,
+      widgetId: id,
+      startDate,
+      endDate,
+    },
+  );
+
+  return (
+    <WidgetContainer
+      title={parameters?.title ?? title ?? t_i18n('Entities number')}
+    >
+      {queryRef ? (
+        <React.Suspense fallback={<Loader variant={LoaderVariant.inElement} />}>
+          <PublicStixCoreObjectsTreeMapComponent
+            queryRef={queryRef}
+            parameters={parameters}
+            dataSelection={dataSelection}
+          />
+        </React.Suspense>
+      ) : (
+        <Loader variant={LoaderVariant.inElement} />
+      )}
+    </WidgetContainer>
+  );
+};
+
+export default PublicStixCoreObjectsTreeMap;

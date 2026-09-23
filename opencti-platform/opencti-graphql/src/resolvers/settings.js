@@ -1,0 +1,131 @@
+import nconf from 'nconf';
+import { BUS_TOPICS } from '../config/conf';
+import {
+  setupEnterpriseLicense,
+  getApplicationDependencies,
+  getApplicationInfo,
+  getCriticalAlerts,
+  getMemoryStatistics,
+  getMessagesFilteredByRecipients,
+  getProtectedSensitiveConfig,
+  getPublicSettings,
+  getSettings,
+  settingDeleteMessage,
+  settingEditMessage,
+  settingsCleanContext,
+  settingsEditContext,
+  settingsEditField,
+  uploadMapCustomFile,
+  deleteMapCustomFile,
+  getMapCustomFileInfo,
+} from '../domain/settings';
+import { fetchEditContext } from '../database/redis';
+import { subscribeToInstanceEvents, subscribeToPlatformSettingsEvents } from '../graphql/subscriptionWrapper';
+import { ENTITY_TYPE_SETTINGS } from '../schema/internalObject';
+import { elAggregationCount } from '../database/engine';
+import { findById } from '../modules/organization/organization-domain';
+import { READ_DATA_INDICES } from '../database/utils';
+import { internalFindByIds } from '../database/middleware-loader';
+import { getEnterpriseEditionInfo, IS_LTS_PLATFORM } from '../modules/settings/licensing';
+import { isRequestAccessEnabled } from '../modules/requestAccess/requestAccess-domain';
+import { CguStatus, PlatformType } from '../generated/graphql';
+import { getEntityMetricsConfiguration } from '../modules/metrics/metrics-utils';
+import { isEmailRewriteAllowed, smtpConfiguredEmail } from '../database/smtp';
+import { isAuthenticationForcedFromEnv } from '../modules/authenticationProvider/providers-configuration';
+import { updateCertAuth, updateHeaderAuth, updateLocalAuth } from '../domain/setting-auth';
+
+const settingsResolvers = {
+  Query: {
+    about: () => getApplicationInfo(),
+    settings: (_, __, context) => getSettings(context),
+    publicSettings: (_, __, context) => getPublicSettings(context),
+  },
+  AppDebugStatistics: {
+    objects: (_, __, context) => elAggregationCount(context, context.user, READ_DATA_INDICES, { types: ['Stix-Object'], field: 'entity_type' }),
+    relationships: (_, __, context) => elAggregationCount(context, context.user, READ_DATA_INDICES, { types: ['stix-relationship'], field: 'entity_type' }),
+  },
+  Settings: {
+    platform_type: () => (IS_LTS_PLATFORM ? PlatformType.Lts : PlatformType.Standard),
+    platform_session_idle_timeout: () => Number(nconf.get('app:session_idle_timeout')),
+    platform_session_timeout: () => Number(nconf.get('app:session_timeout')),
+    platform_organization: (settings, __, context) => findById(context, context.user, settings.platform_organization),
+    platform_critical_alerts: (_, __, context) => getCriticalAlerts(context, context.user),
+    platform_protected_sensitive_config: (_, __, context) => getProtectedSensitiveConfig(context, context.user),
+    activity_listeners: (settings, __, context) => internalFindByIds(context, context.user, settings.activity_listeners_ids),
+    platform_ip_whitelist_enabled: (settings) => settings.platform_ip_whitelist_enabled ?? false,
+    platform_ip_whitelist_exclusions: (settings, __, context) => internalFindByIds(context, context.user, settings.platform_ip_whitelist_exclusion_ids),
+    otp_mandatory: (settings) => settings.otp_mandatory ?? false,
+    platform_email: (settings) => smtpConfiguredEmail(settings),
+    platform_email_configurable: () => isEmailRewriteAllowed(),
+    password_policy_min_length: (settings) => settings.password_policy_min_length ?? 0,
+    password_policy_max_length: (settings) => settings.password_policy_max_length ?? 0,
+    password_policy_min_symbols: (settings) => settings.password_policy_min_symbols ?? 0,
+    password_policy_min_numbers: (settings) => settings.password_policy_min_numbers ?? 0,
+    password_policy_min_words: (settings) => settings.password_policy_min_words ?? 0,
+    password_policy_min_lowercase: (settings) => settings.password_policy_min_lowercase ?? 0,
+    password_policy_min_uppercase: (settings) => settings.password_policy_min_uppercase ?? 0,
+    password_policy_validity_days: (settings) => settings.password_policy_validity_days ?? 0,
+    editContext: (settings) => fetchEditContext(settings.id),
+    platform_messages: (settings, _, context) => getMessagesFilteredByRecipients(context.user, settings),
+    messages_administration: (settings) => JSON.parse(settings.platform_messages ?? '[]'),
+    platform_enterprise_edition: (settings) => getEnterpriseEditionInfo(settings),
+    request_access_enabled: (_, __, context) => isRequestAccessEnabled(context, context.user),
+    platform_ai_enabled: (settings) => settings.platform_ai_enabled ?? true,
+    platform_notifier_auto_trigger_assignee: (settings) => settings.platform_notifier_auto_trigger_assignee ?? true,
+    filigran_chatbot_ai_cgu_status: (settings) => settings.filigran_chatbot_ai_cgu_status ?? CguStatus.Pending,
+    platform_https_enabled: () => !!(nconf.get('app:https_cert:key') && nconf.get('app:https_cert:crt')),
+    caller_ip: (_, __, context) => context.req?.ip ?? null,
+    metrics_definition: () => getEntityMetricsConfiguration(),
+    is_authentication_by_env: () => isAuthenticationForcedFromEnv(),
+    platform_map_custom_file: async () => {
+      const meta = await getMapCustomFileInfo();
+      if (!meta) return null;
+      const nameMatch = meta.contentDisposition?.match(/filename="([^"]+)"/);
+      return {
+        name: nameMatch ? nameMatch[1] : 'world.pmtiles',
+        size: meta.contentLength ?? 0,
+      };
+    },
+  },
+  AppInfo: {
+    memory: getMemoryStatistics(),
+    dependencies: (_, __, context) => getApplicationDependencies(context),
+  },
+  SettingsMessage: {
+    recipients: (message, _, context) => internalFindByIds(context, context.user, message.recipients),
+  },
+  Mutation: {
+    setupEnterpriseLicense: (_, { input }, context) => setupEnterpriseLicense(context, context.user, input),
+    settingsEdit: (_, { id }, context) => ({
+      fieldPatch: ({ input }) => settingsEditField(context, context.user, id, input),
+      contextPatch: ({ input }) => settingsEditContext(context, context.user, id, input),
+      contextClean: () => settingsCleanContext(context, context.user, id),
+      editMessage: ({ input }) => settingEditMessage(context, context.user, id, input),
+      deleteMessage: ({ input }) => settingDeleteMessage(context, context.user, id, input),
+      updateLocalAuth: ({ input }) => updateLocalAuth(context, context.user, id, input),
+      updateCertAuth: ({ input }) => updateCertAuth(context, context.user, id, input),
+      updateHeaderAuth: ({ input }) => updateHeaderAuth(context, context.user, id, input),
+      uploadMapCustomFile: ({ file }) => uploadMapCustomFile(context, context.user, file),
+      deleteMapCustomFile: () => deleteMapCustomFile(context, context.user),
+    }),
+  },
+  Subscription: {
+    settings: {
+      resolve: /* v8 ignore next */ (payload) => payload.instance,
+      subscribe: /* v8 ignore next */ (_, { id }, context) => {
+        const preFn = () => settingsEditContext(context, context.user, id);
+        const cleanFn = () => settingsCleanContext(context, context.user, id);
+        const bus = BUS_TOPICS[ENTITY_TYPE_SETTINGS];
+        return subscribeToInstanceEvents(_, context, id, [bus.EDIT_TOPIC], { type: ENTITY_TYPE_SETTINGS, preFn, cleanFn });
+      },
+    },
+    settingsMessages: {
+      resolve: /* v8 ignore next */ (payload) => payload.instance,
+      subscribe: /* v8 ignore next */ async (_, __, context) => {
+        return subscribeToPlatformSettingsEvents(context);
+      },
+    },
+  },
+};
+
+export default settingsResolvers;

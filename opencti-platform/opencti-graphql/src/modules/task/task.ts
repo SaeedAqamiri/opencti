@@ -1,0 +1,53 @@
+import { ENTITY_TYPE_CONTAINER } from '../../schema/general';
+import { NAME_FIELD, normalizeName } from '../../schema/identifier';
+import { type ModuleDefinition, registerDefinition } from '../../schema/module';
+import { createdBy, objectAssignee, objectOrganization, objectParticipant } from '../../schema/stixRefRelationship';
+import { convertCaseTaskToStix_2_1, convertTaskToStix_2_0 } from './task-converter';
+import type { Stix2Task, StixTask, StoreEntityTask } from './task-types';
+import { ENTITY_TYPE_CONTAINER_TASK } from './task-types';
+import { workflowId } from '../attributes/stixDomainObject-registrationAttributes';
+
+const CASE_TASK_DEFINITION: ModuleDefinition<StoreEntityTask, StixTask, Stix2Task> = {
+  type: {
+    id: 'task',
+    name: ENTITY_TYPE_CONTAINER_TASK,
+    category: ENTITY_TYPE_CONTAINER,
+  },
+  identifier: {
+    definition: {
+      [ENTITY_TYPE_CONTAINER_TASK]: [{ src: NAME_FIELD }, { src: 'created' }],
+    },
+    resolvers: {
+      name(data: object) {
+        return normalizeName(data);
+      },
+    },
+  },
+  overviewLayoutCustomization: [
+    { key: 'details', width: 6, label: 'Entity details' },
+    { key: 'basicInformation', width: 6, label: 'Basic information' },
+    { key: 'relatedEntities', width: 6, label: 'Related entities' },
+    { key: 'mostRecentHistory', width: 6, label: 'Most recent history' },
+    { key: 'notes', width: 12, label: 'Notes about this entity' },
+  ],
+  attributes: [
+    { name: 'name', label: 'Name', type: 'string', format: 'short', mandatoryType: 'external', editDefault: true, multiple: false, upsert: true, isFilterable: true },
+    { name: 'description', label: 'Description', type: 'string', format: 'text', mandatoryType: 'no', editDefault: false, multiple: false, upsert: true, isFilterable: true },
+    { name: 'due_date', label: 'Due date', type: 'date', mandatoryType: 'no', editDefault: false, multiple: false, upsert: true, isFilterable: true },
+    { name: 'content_mapping', label: 'Content mapping', type: 'string', format: 'text', mandatoryType: 'no', editDefault: false, multiple: false, upsert: true, isFilterable: false },
+    workflowId,
+  ],
+  relations: [],
+  relationsRefs: [
+    { ...createdBy, mandatoryType: 'no' },
+    objectOrganization,
+    { ...objectAssignee, mandatoryType: 'no' },
+    objectParticipant,
+  ],
+  representative: (stix: StixTask) => {
+    return stix.name;
+  },
+  converter_2_1: convertCaseTaskToStix_2_1,
+  converter_2_0: convertTaskToStix_2_0,
+};
+registerDefinition(CASE_TASK_DEFINITION);

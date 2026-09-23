@@ -1,0 +1,129 @@
+import Grid from '@mui/material/Grid';
+import React, { FunctionComponent } from 'react';
+import { graphql, useFragment } from 'react-relay';
+import RelatedContainers from '@components/common/containers/related_containers/RelatedContainers';
+import Divider from '@mui/material/Divider';
+import ExpandableMarkdown from '../../../../components/ExpandableMarkdown';
+import { useFormatter } from '../../../../components/i18n';
+import ItemOpenVocab from '../../../../components/ItemOpenVocab';
+import { CaseIncidentDetails_case$key } from './__generated__/CaseIncidentDetails_case.graphql';
+import Card from '../../../../components/common/card/Card';
+import Label from '../../../../components/common/label/Label';
+import FieldOrEmpty from '../../../../components/FieldOrEmpty';
+import Tag from '../../../../components/common/tag/Tag';
+import { Stack } from '@mui/material';
+
+const CaseIncidentDetailsFragment = graphql`
+  fragment CaseIncidentDetails_case on CaseIncident {
+    id
+    name
+    entity_type
+    description
+    priority
+    severity
+    created
+    modified
+    created_at
+    response_types
+    objectLabel {
+      id
+      value
+      color
+    }
+    name
+    x_opencti_stix_ids
+    status {
+      id
+      order
+      template {
+        name
+        color
+      }
+    }
+    workflowEnabled
+    relatedContainers(
+      first: 10
+      orderBy: modified
+      orderMode: desc
+      types: ["Case", "Report", "Grouping"]
+      viaTypes: ["Indicator", "Stix-Cyber-Observable"]
+    ) {
+      ...RelatedContainersFragment_container_connection
+    }
+  }
+`;
+
+interface CaseIncidentDetailsProps {
+  caseIncidentData: CaseIncidentDetails_case$key;
+}
+
+const CaseIncidentDetails: FunctionComponent<CaseIncidentDetailsProps> = ({
+  caseIncidentData,
+}) => {
+  const { t_i18n } = useFormatter();
+  const data = useFragment(CaseIncidentDetailsFragment, caseIncidentData);
+  const responseTypes = data.response_types ?? [];
+
+  return (
+    <div style={{ height: '100%' }}>
+      <Card title={t_i18n('Details')}>
+        <Grid container={true} spacing={2} sx={{ marginBottom: 2 }}>
+          <Grid item xs={12}>
+            <Label>
+              {t_i18n('Description')}
+            </Label>
+            <FieldOrEmpty source={data.description}>
+              <ExpandableMarkdown source={data.description} limit={300} />
+            </FieldOrEmpty>
+          </Grid>
+          <Grid item xs={6}>
+            <Label>
+              {t_i18n('Priority')}
+            </Label>
+            <ItemOpenVocab
+              key="type"
+              small={true}
+              type="case_priority_ov"
+              value={data.priority}
+              displayMode="chip"
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <Label>
+              {t_i18n('Severity')}
+            </Label>
+            <ItemOpenVocab
+              key="type"
+              small={true}
+              type="case_severity_ov"
+              value={data.severity}
+              displayMode="chip"
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <Label>
+              {t_i18n('Incident response type')}
+            </Label>
+            <FieldOrEmpty source={responseTypes}>
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {responseTypes.map((responseType) => (
+                  <Tag
+                    key={responseType}
+                    label={responseType}
+                  />
+                ))}
+              </Stack>
+            </FieldOrEmpty>
+          </Grid>
+        </Grid>
+        <Divider />
+        <RelatedContainers
+          relatedContainers={data.relatedContainers}
+          containerId={data.id}
+          entityType={data.entity_type}
+        />
+      </Card>
+    </div>
+  );
+};
+export default CaseIncidentDetails;

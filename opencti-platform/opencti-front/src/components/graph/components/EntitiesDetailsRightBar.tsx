@@ -1,0 +1,200 @@
+import React, { useEffect, useMemo } from 'react';
+import makeStyles from '@mui/styles/makeStyles';
+import Drawer from '@mui/material/Drawer';
+import { Theme } from '@mui/material/styles/createTheme';
+import { Select, SelectContent, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@filigran/design-system';
+import { useTheme } from '@mui/styles';
+import IconButton from '@common/button/IconButton';
+import { Link } from 'react-router';
+import { OpenInNewOutlined } from '@mui/icons-material';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import EntityDetails from './EntityDetails';
+import RelationshipDetails from './RelationshipDetails';
+import { useFormatter } from '../../i18n';
+import { isStixNestedRefRelationship } from '../../../utils/Relation';
+import StixMetaObjectDetails from './StixMetaObjectDetails';
+import BasicRelationshipDetails from './BasicRelationshipDetails';
+import { GraphLink, GraphNode, isGraphLink, isGraphNode } from '../graph.types';
+import { useGraphContext } from '../GraphContext';
+import useGraphInteractions from '../utils/useGraphInteractions';
+import { SURFACE_LAYER, fdsLayerClass, layerInputVars } from '../../../utils/fdsLayer';
+
+// Deprecated - https://mui.com/system/styles/basics/
+// Do not use it for new code.
+const useStyles = makeStyles<Theme>((theme) => ({
+  drawerPaper: {
+    position: 'fixed',
+    top: '50%',
+    right: 'calc(20px + var(--chatbot-sidebar-width, 0px))',
+    transition: 'right 225ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transform: 'translateY(-50%)',
+    width: 400,
+    maxWidth: 400,
+    height: '60%',
+    maxHeight: '60%',
+    padding: '20px 0 20px 20px',
+    zIndex: 900,
+    borderRadius: 4,
+    border: 'none',
+    backgroundColor: 'var(--bg-elevation-default)',
+    boxShadow: theme.palette.mode === 'light' ? '0 0px 8px 0px rgba(7, 13, 25, .2)' : `0 0px 8px 0px ${theme.palette.background.default}`,
+    gap: '8px',
+  },
+  external: {
+    display: 'flex',
+    flexShrink: 0,
+  },
+}));
+
+const EntitiesDetailsRightsBar = () => {
+  const theme = useTheme<Theme>();
+  const classes = useStyles(theme);
+  const { t_i18n } = useFormatter();
+  const { selectDetailsPreviewObject } = useGraphInteractions();
+
+  const {
+    graphState: {
+      selectedNodes,
+      selectedLinks,
+      detailsPreviewSelected,
+    },
+  } = useGraphContext();
+
+  const selectedEntities = useMemo(() => {
+    return [...selectedLinks, ...selectedNodes];
+  }, [selectedLinks, selectedNodes]);
+
+  const uniqSelectedEntities = selectedEntities
+    .map((n) => {
+      if (
+        isGraphLink(n)
+        && n.source && typeof n.source !== 'string'
+        && n.target && typeof n.target !== 'string'
+      ) {
+        const source = n.source.label;
+        const target = n.target.label;
+        return { ...n, label: `${source} ➡️ ${target}` };
+      }
+      if (isGraphNode(n) && n.fromType && n.toType) {
+        const source = n.fromType;
+        const target = n.toType;
+        return { ...n, label: `${source} ➡️ ${target}` };
+      }
+      return n;
+    });
+
+  useEffect(() => {
+    if (uniqSelectedEntities[0].id !== detailsPreviewSelected?.id) {
+      selectDetailsPreviewObject(uniqSelectedEntities[0]);
+    }
+  }, [selectedEntities]);
+
+  const handleSelectEntity = (value: string) => {
+    const entity = selectedEntities.find((el) => el.id === value);
+    if (!entity) {
+      selectDetailsPreviewObject(uniqSelectedEntities[0]);
+    } else {
+      selectDetailsPreviewObject(entity);
+    }
+  };
+
+  if (!detailsPreviewSelected) {
+    return null;
+  }
+
+  const hasOverviewPage = !detailsPreviewSelected.parent_types.some((el) => isStixNestedRefRelationship(el))
+    && (!detailsPreviewSelected.parent_types.includes('Stix-Meta-Object')
+      || detailsPreviewSelected.entity_type === 'External-Reference')
+    && detailsPreviewSelected.entity_type !== 'basic-relationship';
+
+  const entityUrl = detailsPreviewSelected.entity_type === 'External-Reference'
+    ? `/dashboard/analyses/external_references/${detailsPreviewSelected.id}`
+    : `/dashboard/id/${detailsPreviewSelected.id}`;
+
+  return (
+    <Drawer
+      open={true}
+      variant="permanent"
+      anchor="right"
+      slotProps={{ paper: { className: fdsLayerClass(SURFACE_LAYER), sx: { ...layerInputVars } } }}
+      classes={{ paper: classes.drawerPaper }}
+      transitionDuration={theme.transitions.duration.enteringScreen}
+    >
+      <Typography
+        variant="body1"
+        sx={{ textAlign: 'right', paddingRight: '20px' }}
+      >
+        {t_i18n('', {
+          id: 'objects selected',
+          values: {
+            count: uniqSelectedEntities.length,
+          },
+        })}
+      </Typography>
+      {/* The paper declares no right padding, so the row carries that gutter itself. */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, paddingRight: 20 }}>
+        {/* Without `minWidth: 0` the selected value widens the field and pushes the button around. */}
+        <div style={{ flex: '1 1 auto', minWidth: 0 }} className={fdsLayerClass(3)}>
+          <Select
+            value={detailsPreviewSelected.id}
+            onValueChange={handleSelectEntity}
+          >
+            <SelectLabel>{t_i18n('Object')}</SelectLabel>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent aria-label={t_i18n('Object')}>
+              {uniqSelectedEntities.map((entity) => (
+                <SelectItem key={entity.id} value={entity.id}>
+                  {/* `label` is cut to 20 characters for the canvas; `name` trails the tooltip's date on a second line. */}
+                  {entity.name.split('\n')[0]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Need to be handled */}
+        {hasOverviewPage && (
+          <Tooltip title={t_i18n('Open the entity overview in a separated tab')}>
+            <div className={classes.external}>
+              <IconButton
+                aria-label={t_i18n('Open the entity overview in a separated tab')}
+                id="open-entity-in-tab-icon-button"
+                size="default"
+                component={Link}
+                target="_blank"
+                to={entityUrl}
+              >
+                <OpenInNewOutlined fontSize="medium" />
+              </IconButton>
+            </div>
+          </Tooltip>
+        )}
+      </div>
+      <div
+        style={{
+          height: '100%',
+          maxHeight: '100%',
+          overflowY: 'auto',
+          paddingRight: 20,
+        }}
+      >
+        {detailsPreviewSelected.entity_type === 'basic-relationship' && (
+          <BasicRelationshipDetails relation={detailsPreviewSelected as GraphLink} />
+        )}
+        {detailsPreviewSelected.parent_types.includes('stix-relationship')
+          && detailsPreviewSelected.entity_type !== 'basic-relationship' && (
+          <RelationshipDetails relation={detailsPreviewSelected as GraphLink} />
+        )}
+        {detailsPreviewSelected.parent_types.includes('Stix-Core-Object') && (
+          <EntityDetails entity={detailsPreviewSelected as GraphNode} />
+        )}
+        {detailsPreviewSelected.parent_types.includes('Stix-Meta-Object') && (
+          <StixMetaObjectDetails entity={detailsPreviewSelected as GraphNode} />
+        )}
+      </div>
+    </Drawer>
+  );
+};
+export default EntitiesDetailsRightsBar;

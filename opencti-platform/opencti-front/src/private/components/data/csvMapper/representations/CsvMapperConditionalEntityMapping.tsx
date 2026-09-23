@@ -1,0 +1,142 @@
+import React, { FunctionComponent } from 'react';
+import { Combobox, ComboboxContent, ComboboxControls, ComboboxField, ComboboxInput, ComboboxLabel, ComboboxTrigger } from '@filigran/design-system';
+import { Field, FieldProps } from 'formik';
+import { CsvMapperColumnBasedFormData, CsvMapperRepresentationFormData } from '@components/data/csvMapper/representations/Representation';
+import { alphabet } from '@components/data/csvMapper/representations/attributes/AttributeUtils';
+import { useCsvMapperContext } from '@components/data/csvMapper/CsvMapperContext';
+import { useTheme } from '@mui/styles';
+import { useFormatter } from '../../../../../components/i18n';
+import TextField from '../../../../../components/TextField';
+import SwitchField from '../../../../../components/fields/SwitchField';
+import type { Theme } from '../../../../../components/Theme';
+import { FieldOption } from '../../../../../utils/field';
+
+interface CsvMapperConditionalEntityMappingProps
+  extends FieldProps<CsvMapperColumnBasedFormData> {
+  representation: CsvMapperRepresentationFormData;
+  representationName: string;
+}
+
+const CsvMapperConditionalEntityMapping: FunctionComponent<
+  CsvMapperConditionalEntityMappingProps
+> = ({ form, representationName, representation }) => {
+  const theme = useTheme<Theme>();
+  const { t_i18n } = useFormatter();
+  const { dynamicMappingColumn, setDynamicMappingColumn } = useCsvMapperContext();
+
+  const columnOptions = alphabet(26);
+  const operatorOptions: FieldOption[] = [
+    { label: t_i18n('Equal'), value: 'eq' },
+    { label: t_i18n('Not equal'), value: 'not_eq' }];
+  const { setFieldValue } = form;
+
+  const columnBased = representation.column_based;
+
+  const handleColumnSelect = async (column: string | null) => {
+    await setFieldValue(`${representationName}.column_based.column_reference`, column);
+    if (column) {
+      setDynamicMappingColumn(column);
+    }
+  };
+
+  const handleOperatorSelect = async (operator: FieldOption | null) => {
+    await setFieldValue(`${representationName}.column_based.operator`, operator?.value);
+  };
+
+  const onToggleDynamicMapping = async (val: string) => {
+    if (val === 'false') {
+      await setFieldValue(`${representationName}.column_based.column_reference`, null);
+      await setFieldValue(`${representationName}.column_based.operator`, null);
+    } else {
+      await setFieldValue(`${representationName}.column_based.column_reference`, dynamicMappingColumn ?? null);
+      await setFieldValue(`${representationName}.column_based.operator`, 'eq');
+    }
+  };
+
+  return (
+    <div style={{
+      width: '100%',
+      display: 'grid',
+      gridTemplateColumns: '2fr 3fr 50px',
+      alignItems: 'end',
+      marginTop: `${theme.spacing(3)} 0 `,
+      gap: '10px',
+    }}
+    >
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+      }}
+      >
+        <Field
+          component={SwitchField}
+          type="checkbox"
+          name={`${representationName}.column_based.enabled`}
+          onChange={(_: string, val: string) => onToggleDynamicMapping(val)}
+          label={t_i18n('Entity dynamic mapping')}
+          tooltip="If this option is selected, we will dynamically map the column value that you provide to the entity."
+        />
+      </div>
+      <div style={{
+        gridColumn: '2 / span 2',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        alignItems: 'end',
+        gap: '10px',
+      }}
+      >
+        <Combobox
+          selectOnFocus
+          openOnFocus
+          options={columnOptions}
+          disabled={!columnBased?.enabled}
+          value={columnBased?.column_reference ?? null}
+          onValueChange={(val) => handleColumnSelect(val as string | null)}
+          error={!columnBased?.column_reference}
+        >
+          <ComboboxLabel>{t_i18n('Column index')}</ComboboxLabel>
+          <ComboboxField>
+            <ComboboxInput />
+            <ComboboxControls>
+              <ComboboxTrigger />
+            </ComboboxControls>
+          </ComboboxField>
+          <ComboboxContent listAriaLabel={t_i18n('Column index')} />
+        </Combobox>
+        <Combobox<FieldOption>
+          selectOnFocus
+          openOnFocus
+          options={operatorOptions}
+          disabled={!columnBased?.enabled}
+          value={operatorOptions.find((opt) => opt.value === columnBased?.operator) ?? null}
+          onValueChange={(val) => handleOperatorSelect(val as FieldOption | null)}
+          error={!columnBased?.operator}
+          getOptionLabel={(option) => option?.label ?? ''}
+        >
+          <ComboboxLabel>{t_i18n('Operator')}</ComboboxLabel>
+          <ComboboxField>
+            <ComboboxInput />
+            <ComboboxControls>
+              <ComboboxTrigger />
+            </ComboboxControls>
+          </ComboboxField>
+          <ComboboxContent listAriaLabel={t_i18n('Operator')} />
+        </Combobox>
+        <div>
+          <Field
+            component={TextField}
+            label={t_i18n('Value')}
+            name={`${representationName}.column_based.value`}
+            value={columnBased?.enabled ? columnBased.value : ''}
+            variant="outlined"
+            style={{ width: '100%' }}
+            disabled={!representation.column_based?.enabled}
+            error={!columnBased?.value && columnBased?.enabled}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CsvMapperConditionalEntityMapping;

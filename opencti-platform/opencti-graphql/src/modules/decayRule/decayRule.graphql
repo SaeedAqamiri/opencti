@@ -1,0 +1,78 @@
+type DecayRule implements InternalObject & BasicObject {
+  id: ID!
+  standard_id: String!
+  entity_type: String!
+  representative: Representative!
+  parent_types: [String!]!
+  metrics:[Metric]
+  created_at: DateTime!
+  updated_at: DateTime!
+  refreshed_at: DateTime
+  # DecayRule
+  name: String!
+  description: String
+  order: Int!
+  active: Boolean!
+  built_in: Boolean
+  appliedIndicatorsCount: Int!
+  # Decay rule settings
+  decay_lifetime: Int!
+  decay_pound: Float!
+  decay_points: [Int!]
+  decay_revoke_score: Int!
+  decaySettingsChartData: DecayData
+  decay_filters: String
+}
+
+type DecayData {
+  live_score_serie: [DecayHistory!]
+}
+
+# Ordering
+enum DecayRuleOrdering {
+  name
+  order
+  _score
+}
+
+# Relay connections
+type DecayRuleConnection {
+  pageInfo: PageInfo!
+  edges: [DecayRuleEdge!]!
+}
+type DecayRuleEdge {
+  cursor: String!
+  node: DecayRule!
+}
+
+# Queries
+type Query {
+  decayRule(id: String!): DecayRule @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  decayRules(
+    first: Int
+    after: ID
+    orderBy: DecayRuleOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+  ): DecayRuleConnection @auth(for: [SETTINGS_SETCUSTOMIZATION])
+}
+
+input DecayRuleAddInput {
+  name: String! @constraint(minLength: 2, format: "not-blank")
+  description: String
+  order: Int!
+  active: Boolean!
+  # Decay rule settings
+  decay_lifetime: Int!
+  decay_pound: Float!
+  decay_points: [Int!]
+  decay_revoke_score: Int!
+  decay_filters: String
+}
+
+type Mutation {
+  decayRuleAdd(input: DecayRuleAddInput!): DecayRule @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  decayRuleDelete(id: ID!): ID @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  decayRuleFieldPatch(id: ID!, input: [EditInput!]!): DecayRule @auth(for: [SETTINGS_SETCUSTOMIZATION])
+}

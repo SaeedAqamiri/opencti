@@ -1,0 +1,188 @@
+import React from 'react';
+import makeStyles from '@mui/styles/makeStyles';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import type { Theme } from '../../../components/Theme';
+import ListLines from '../../../components/list_lines/ListLines';
+import { usePaginationLocalStorage } from '../../../utils/hooks/useLocalStorage';
+import useEntityToggle from '../../../utils/hooks/useEntityToggle';
+import { NotifiersLinesPaginationQuery, NotifiersLinesPaginationQuery$variables } from './notifiers/__generated__/NotifiersLinesPaginationQuery.graphql';
+import useQueryLoading from '../../../utils/hooks/useQueryLoading';
+import NotifiersLines, { NotifiersLinesQuery } from './notifiers/NotifiersLines';
+import { NotifierLine_node$data } from './notifiers/__generated__/NotifierLine_node.graphql';
+import { NotifierLineDummy } from './notifiers/NotifierLine';
+import NotifierCreation from './notifiers/NotifierCreation';
+import { useFormatter } from '../../../components/i18n';
+import { emptyFilterGroup } from '../../../utils/filters/filtersUtils';
+import Breadcrumbs from '../../../components/Breadcrumbs';
+import Card from '../../../components/common/card/Card';
+import useConnectedDocumentModifier from '../../../utils/hooks/useConnectedDocumentModifier';
+import { graphql, useFragment, useLazyLoadQuery } from 'react-relay';
+import useApiMutation from '../../../utils/hooks/useApiMutation';
+import { NotifiersSettingsQuery } from './__generated__/NotifiersSettingsQuery.graphql';
+import { NotifiersSettings$key } from './__generated__/NotifiersSettings.graphql';
+import useGranted, { SETTINGS_SETCUSTOMIZATION } from '../../../utils/hooks/useGranted';
+
+const LOCAL_STORAGE_KEY = 'notifiers';
+
+// Deprecated - https://mui.com/system/styles/basics/
+// Do not use it for new code.
+const useStyles = makeStyles<Theme>(() => ({
+  container: {
+    margin: 0,
+    padding: '0 200px 0 0',
+  },
+}));
+
+const notifiersSettingsQuery = graphql`
+  query NotifiersSettingsQuery {
+    settings {
+      ...NotifiersSettings
+    }
+  }
+`;
+
+const notifiersSettingsFragment = graphql`
+  fragment NotifiersSettings on Settings {
+    id
+    platform_notifier_auto_trigger_assignee
+  }
+`;
+
+const notifiersSettingsFieldPatchMutation = graphql`
+  mutation NotifiersSettingsFieldPatchMutation($id: ID!, $input: [EditInput]!) {
+    settingsEdit(id: $id) {
+      fieldPatch(input: $input) {
+        ...NotifiersSettings
+      }
+    }
+  }
+`;
+
+const Notifiers = () => {
+  const classes = useStyles();
+  const { t_i18n } = useFormatter();
+  const { setTitle } = useConnectedDocumentModifier();
+  setTitle(t_i18n('Notifiers | Customization | Settings'));
+
+  const isGrantedToCustomization = useGranted([SETTINGS_SETCUSTOMIZATION]);
+  const settingsData = useLazyLoadQuery<NotifiersSettingsQuery>(notifiersSettingsQuery, {});
+  const settings = useFragment<NotifiersSettings$key>(notifiersSettingsFragment, settingsData.settings);
+  const [commitFieldPatch] = useApiMutation(notifiersSettingsFieldPatchMutation);
+
+  const handleToggleAutoTrigger = (_: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    commitFieldPatch({
+      variables: {
+        id: settings.id,
+        input: [{ key: 'platform_notifier_auto_trigger_assignee', value: [String(checked)] }],
+      },
+    });
+  };
+
+  const {
+    viewStorage,
+    paginationOptions,
+    helpers: storageHelpers,
+  } = usePaginationLocalStorage<NotifiersLinesPaginationQuery$variables>(
+    LOCAL_STORAGE_KEY,
+    {
+      numberOfElements: { number: 0, symbol: '', original: 0 },
+      filters: emptyFilterGroup,
+      searchTerm: '',
+      sortBy: 'created',
+      orderAsc: false,
+      openExports: false,
+      count: 25,
+    },
+  );
+  const { numberOfElements, filters, searchTerm, sortBy, orderAsc } = viewStorage;
+  const { selectedElements, deSelectedElements, selectAll, onToggleEntity } = useEntityToggle<NotifierLine_node$data>(LOCAL_STORAGE_KEY);
+  const dataColumns = {
+    connector: {
+      label: 'Connector',
+      width: '20%',
+      isSortable: true,
+    },
+    name: {
+      label: 'Name',
+      width: '20%',
+      isSortable: true,
+    },
+    description: {
+      label: 'Description',
+      width: '60%',
+      isSortable: false,
+    },
+  };
+  const queryRef = useQueryLoading<NotifiersLinesPaginationQuery>(
+    NotifiersLinesQuery,
+    paginationOptions,
+  );
+  return (
+    <div className={classes.container} data-testid="notifiers-page">
+      <Breadcrumbs elements={[{ label: t_i18n('Settings') }, { label: t_i18n('Customization') }, { label: t_i18n('Notifiers'), current: true }]} />
+      <Card title={t_i18n('Configuration')} sx={{ marginBottom: '20px' }}>
+        <FormControlLabel
+          control={(
+            <Switch
+              checked={settings.platform_notifier_auto_trigger_assignee}
+              onChange={handleToggleAutoTrigger}
+              disabled={!isGrantedToCustomization}
+            />
+          )}
+          label={t_i18n('Automatically notify users when they are assigned as participant or assignee')}
+        />
+      </Card>
+      <ListLines
+        helpers={storageHelpers}
+        sortBy={sortBy}
+        orderAsc={orderAsc}
+        dataColumns={dataColumns}
+        handleSort={storageHelpers.handleSort}
+        handleSearch={storageHelpers.handleSearch}
+        handleAddFilter={storageHelpers.handleAddFilter}
+        handleRemoveFilter={storageHelpers.handleRemoveFilter}
+        handleSwitchGlobalMode={storageHelpers.handleSwitchGlobalMode}
+        handleSwitchLocalMode={storageHelpers.handleSwitchLocalMode}
+        selectAll={selectAll}
+        keyword={searchTerm}
+        filters={filters}
+        paginationOptions={paginationOptions}
+        numberOfElements={numberOfElements}
+        message={t_i18n(
+          'There are two built-in notifiers in the platform: User Interface and Default Mailer. They are not configurable and you can create your custom ones here.',
+        )}
+        createButton={<NotifierCreation paginationOptions={paginationOptions} />}
+        iconExtension
+      >
+        {queryRef && (
+          <React.Suspense
+            fallback={(
+              <>
+                {Array(20)
+                  .fill(0)
+                  .map((_, idx) => (
+                    <NotifierLineDummy key={idx} dataColumns={dataColumns} />
+                  ))}
+              </>
+            )}
+          >
+            <NotifiersLines
+              queryRef={queryRef}
+              paginationOptions={paginationOptions}
+              dataColumns={dataColumns}
+              onLabelClick={storageHelpers.handleAddFilter}
+              selectedElements={selectedElements}
+              deSelectedElements={deSelectedElements}
+              onToggleEntity={onToggleEntity}
+              selectAll={selectAll}
+              setNumberOfElements={storageHelpers.handleSetNumberOfElements}
+            />
+          </React.Suspense>
+        )}
+      </ListLines>
+    </div>
+  );
+};
+
+export default Notifiers;

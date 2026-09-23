@@ -1,0 +1,117 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { graphql, parse } from 'graphql';
+import { makeExecutableSchema } from '@graphql-tools/schema';
+
+const loadTransformerWithFeatureFlagMock = async (impl: (flag: string) => boolean) => {
+  vi.resetModules();
+  vi.doMock('../../../src/config/conf', () => ({
+    isFeatureEnabled: vi.fn(impl),
+  }));
+  const { makeFeatureFlagDirectiveTransformer } = await import('../../../src/graphql/featureFlagDirective');
+  return makeFeatureFlagDirectiveTransformer;
+};
+
+describe('featureFlagDirective', () => {
+  afterEach(() => {
+    vi.resetAllMocks();
+    vi.doUnmock('../../../src/config/conf');
+  });
+
+  it('returns a Forbidden error when none of the flags are enabled', async () => {
+    const typeDefs = parse(`
+      directive @ff(flags: [String!]!, softFail: Boolean = false) on FIELD_DEFINITION
+      type Query {
+        flaggedFeature: String @ff(flags: ["SOME_FLAG", "SOME_OTHER_FLAG"])
+      }
+    `);
+    const resolvers = {
+      Query: {
+        flaggedFeature: () => 'experimental content',
+      },
+    };
+    const makeFeatureFlagDirectiveTransformer = await loadTransformerWithFeatureFlagMock(() => false);
+
+    let schema = makeExecutableSchema({ typeDefs, resolvers });
+    schema = makeFeatureFlagDirectiveTransformer()(schema);
+
+    const result = await graphql({ schema, source: '{ flaggedFeature }' });
+
+    expect(result.errors).not.toBeUndefined();
+    expect(result.errors?.[0].message).toMatch(/Feature is disabled/i);
+    expect(result.errors?.[0].extensions?.code).toMatch(/FORBIDDEN_ACCESS/i);
+    expect(result.errors?.[0].extensions?.data).toMatchObject({
+      flags: ['SOME_FLAG', 'SOME_OTHER_FLAG'],
+      http_status: 403,
+    });
+  });
+
+  it('calls the resolver when one of the flags is enabled', async () => {
+    const typeDefs = parse(`
+      directive @ff(flags: [String!]!, softFail: Boolean = false) on FIELD_DEFINITION
+      type Query {
+        flaggedFeature: String @ff(flags: ["SOME_FLAG", "SOME_OTHER_FLAG"])
+      }
+    `);
+    const resolvers = {
+      Query: {
+        flaggedFeature: () => 'experimental content',
+      },
+    };
+    const makeFeatureFlagDirectiveTransformer = await loadTransformerWithFeatureFlagMock((flag: string) => {
+      return flag === 'SOME_FLAG';
+    });
+
+    let schema = makeExecutableSchema({ typeDefs, resolvers });
+    schema = makeFeatureFlagDirectiveTransformer()(schema);
+
+    const result = await graphql({ schema, source: '{ flaggedFeature }' });
+
+    expect(result.data?.flaggedFeature).toBe('experimental content');
+  });
+
+  it('returns null when none of the flags are enabled and softFail is set', async () => {
+    const typeDefs = parse(`
+      directive @ff(flags: [String!]!, softFail: Boolean = false) on FIELD_DEFINITION
+      type Query {
+        flaggedFeature: String @ff(flags: ["SOME_FLAG"], softFail: true)
+      }
+    `);
+    const resolvers = {
+      Query: {
+        flaggedFeature: () => 'experimental content',
+      },
+    };
+    const makeFeatureFlagDirectiveTransformer = await loadTransformerWithFeatureFlagMock(() => false);
+
+    let schema = makeExecutableSchema({ typeDefs, resolvers });
+    schema = makeFeatureFlagDirectiveTransformer()(schema);
+
+    const result = await graphql({ schema, source: '{ flaggedFeature }' });
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.flaggedFeature).toBeNull();
+  });
+
+  it('returns defaultValue when none of the flags are enabled and softFail and defaultValue are set', async () => {
+    const typeDefs = parse(`
+      directive @ff(flags: [String!]!, softFail: Boolean = false, defaultValue: String = null) on FIELD_DEFINITION
+      type Query {
+        flaggedFeature: String @ff(flags: ["SOME_FLAG"], softFail: true, defaultValue: "\\"test\\"")
+      }
+    `);
+    const resolvers = {
+      Query: {
+        flaggedFeature: () => 'experimental content',
+      },
+    };
+    const makeFeatureFlagDirectiveTransformer = await loadTransformerWithFeatureFlagMock(() => false);
+
+    let schema = makeExecutableSchema({ typeDefs, resolvers });
+    schema = makeFeatureFlagDirectiveTransformer()(schema);
+
+    const result = await graphql({ schema, source: '{ flaggedFeature }' });
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.flaggedFeature).toEqual('test');
+  });
+});

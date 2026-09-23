@@ -1,0 +1,117 @@
+import ToggleButton from '@mui/material/ToggleButton';
+import { LockPersonOutlined } from '@mui/icons-material';
+import React, { useState } from 'react';
+import FormAuthorizedMembers, { FormAuthorizedMembersInputs } from '@components/common/form/FormAuthorizedMembers';
+import { FormikHelpers } from 'formik/dist/types';
+import type { GraphQLTaggedNode } from 'relay-runtime';
+import EETooltip from '@components/common/entreprise_edition/EETooltip';
+import { useFormatter } from '../../../../components/i18n';
+import { AccessRight, AuthorizedMemberOption, Creator } from '../../../../utils/authorizedMembers';
+import { handleErrorInForm, MESSAGING$ } from '../../../../relay/environment';
+import useDraftContext from '../../../../utils/hooks/useDraftContext';
+import useEnterpriseEdition from '../../../../utils/hooks/useEnterpriseEdition';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import useAuth from '../../../../utils/hooks/useAuth';
+
+interface FormAuthorizedMembersDialogProps {
+  id: string;
+  mutation: GraphQLTaggedNode;
+  authorizedMembers?: AuthorizedMemberOption[] | null;
+  owner?: Creator;
+  open?: boolean;
+  handleClose?: () => void;
+  customAccessRights?: AccessRight[];
+  canDeactivate: boolean;
+  customInfoMessage?: string;
+}
+
+const FormAuthorizedMembersDialog = ({
+  id,
+  mutation,
+  authorizedMembers,
+  owner,
+  open,
+  handleClose,
+  customAccessRights,
+  canDeactivate,
+  customInfoMessage,
+}: FormAuthorizedMembersDialogProps) => {
+  const draftContext = useDraftContext();
+  const isDraftEntity = !!draftContext && id === draftContext.id;
+  const disabledInDraft = !!draftContext || !!isDraftEntity;
+  const { t_i18n } = useFormatter();
+  const [openDrawer, setOpenDrawer] = useState(false);
+  const isEnterpriseEdition = useEnterpriseEdition();
+  const { settings } = useAuth();
+  const showAllMembersLine = !settings.platform_organization?.id;
+  const [commit] = useApiMutation(mutation);
+  const onSubmit = (
+    values: FormAuthorizedMembersInputs,
+    {
+      setSubmitting,
+      resetForm,
+      setErrors,
+    }: FormikHelpers<FormAuthorizedMembersInputs>,
+  ) => {
+    commit({
+      variables: {
+        id,
+        input: !values.authorizedMembers
+          ? null
+          : values.authorizedMembers
+              .filter((v) => v.accessRight !== 'none')
+              .map((member) => ({
+                id: member.value,
+                access_right: member.accessRight,
+                groups_restriction_ids: member.groupsRestriction?.length > 0
+                  ? member.groupsRestriction.map((group) => group.value)
+                  : undefined,
+              })),
+      },
+      onCompleted: () => {
+        setSubmitting(false);
+        resetForm();
+        handleClose?.();
+        setOpenDrawer(false);
+        MESSAGING$.notifySuccess(t_i18n('Authorized members successfully updated'));
+      },
+      onError: (error) => {
+        handleErrorInForm(error, setErrors);
+        setSubmitting(false);
+      },
+    });
+  };
+  const lockColor = (authorizedMembers && authorizedMembers.length > 0) ? 'warning' : 'primary';
+  return (
+    <>
+      {!handleClose && (
+        <EETooltip title={disabledInDraft ? t_i18n('Not available in draft') : t_i18n('Manage access restriction')}>
+          <ToggleButton
+            onClick={() => !disabledInDraft && isEnterpriseEdition && setOpenDrawer(true)}
+            value="manage-access"
+            size="small"
+          >
+            <LockPersonOutlined
+              fontSize="small"
+              color={!disabledInDraft && isEnterpriseEdition ? lockColor : 'disabled'}
+            />
+          </ToggleButton>
+        </EETooltip>
+      )}
+      <FormAuthorizedMembers
+        existingAccessRules={authorizedMembers ?? null}
+        open={open || openDrawer}
+        handleClose={handleClose || (() => setOpenDrawer(false))}
+        onSubmit={onSubmit}
+        owner={owner}
+        canDeactivate={canDeactivate}
+        showAllMembersLine={showAllMembersLine}
+        customAccessRights={customAccessRights}
+        customInfoMessage={customInfoMessage}
+        isDraftEntity={isDraftEntity}
+      />
+    </>
+  );
+};
+
+export default FormAuthorizedMembersDialog;

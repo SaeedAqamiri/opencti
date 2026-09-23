@@ -1,0 +1,42 @@
+# MacOS Finder files
+.DS_Store
+
+# IntelliJ Platform) | JetBrains
+.idea/
+*.iml
+
+# VSCode
+.vscode/
+.history/
+*.code-workspace
+
+# NodeJS
+node_modules/
+
+# Yarn
+.yarn/
+opencti-platform/opencti-front/.yarnrc.yml
+opencti-platform/opencti-graphql/.yarnrc.yml
+
+.mypy_cache
+.venv
+venv
+/licenses/
+
+.nx/cache
+.nx/workspace-data
+
+# Copilot
+thoughts/
+# FDS migration: local-only validation artifacts (screenshots, raw DB dumps).
+.fds-validation-artifacts/
+
+# FDS migration: ephemeral reports/captures regenerated on demand by tooling
+# (conformity checks, visual-validation notes, screenshots) — not versioned.
+# Root-level fds-migration/*.md docs and migration-state.json stay tracked.
+fds-migration/reports/
+
+
+# Env local files
+.env.local
+.env.development.local

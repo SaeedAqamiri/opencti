@@ -1,0 +1,233 @@
+import React, { FunctionComponent, useState } from 'react';
+import { Paper, Tabs, TabsContent, TabsList, TabsTrigger } from '@filigran/design-system';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import Tooltip from '@mui/material/Tooltip';
+import LinearProgress from '@mui/material/LinearProgress';
+import Button from '@common/button/Button';
+import { Delete } from 'mdi-material-ui';
+import Alert from '@mui/material/Alert';
+import TableContainer from '@mui/material/TableContainer';
+import Table from '@mui/material/Table';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import TableBody from '@mui/material/TableBody';
+import ConnectorWorksErrorLine from '@components/data/connectors/ConnectorWorksErrorLine';
+import Drawer from '@components/common/drawer/Drawer';
+import { ConnectorWorks_data$data, State } from '@components/data/connectors/__generated__/ConnectorWorks_data.graphql';
+import parseWorkErrors, { ParsedWorkMessage } from '@components/data/connectors/parseWorkErrors';
+import { connectorWorksWorkDeletionMutation } from '@components/data/connectors/ConnectorWorks';
+import { MODULES_MODMANAGE } from '../../../../utils/hooks/useGranted';
+import Security from '../../../../utils/Security';
+import TaskStatus from '../../../../components/TaskStatus';
+import { useFormatter } from '../../../../components/i18n';
+import useApiMutation from '../../../../utils/hooks/useApiMutation';
+import { MESSAGING$ } from '../../../../relay/environment';
+import Label from '../../../../components/common/label/Label';
+import { EMPTY_VALUE } from '../../../../utils/String';
+
+type WorkMessages = NonNullable<NonNullable<NonNullable<ConnectorWorks_data$data['works']>['edges']>[0]>['node']['errors'];
+interface ConnectorWorkLineProps {
+  workId: string;
+  workName: string | null | undefined;
+  workStatus: State;
+  workReceivedTime: string;
+  workEndTime: string;
+  workExpectedNumber: number | null | undefined;
+  workProcessedNumber: number | null | undefined;
+  workErrors: WorkMessages | null | undefined;
+  readOnly?: boolean | undefined;
+  statusLabel?: string;
+}
+const ConnectorWorkLine: FunctionComponent<
+  ConnectorWorkLineProps
+> = ({ workId, workName, workStatus, workReceivedTime, workEndTime, workExpectedNumber, workProcessedNumber, workErrors, readOnly, statusLabel }) => {
+  const { t_i18n, nsdt } = useFormatter();
+
+  const [commit] = useApiMutation(connectorWorksWorkDeletionMutation);
+  const [openDrawerErrors, setOpenDrawerErrors] = useState<boolean>(false);
+  const [errors, setErrors] = useState<ParsedWorkMessage[]>([]);
+  const [criticals, setCriticals] = useState<ParsedWorkMessage[]>([]);
+  const [warnings, setWarnings] = useState<ParsedWorkMessage[]>([]);
+  const [tabValue, setTabValue] = useState<string>('Critical');
+
+  const handleCloseDrawerErrors = () => {
+    setOpenDrawerErrors(false);
+    setErrors([]);
+  };
+
+  const handleDeleteWork = () => {
+    commit({
+      variables: {
+        id: workId,
+      },
+      onCompleted: () => {
+        MESSAGING$.notifySuccess('The work has been deleted');
+      },
+    });
+  };
+
+  const handleOpenDrawerErrors = async (errorsList: WorkMessages) => {
+    setOpenDrawerErrors(true);
+    const parsedList = await parseWorkErrors(errorsList);
+    setErrors(parsedList);
+    const criticalErrors = parsedList.filter((error) => error.level === 'Critical');
+    setCriticals(criticalErrors);
+    const warningErrors = parsedList.filter((error) => error.level === 'Warning');
+    setWarnings(warningErrors);
+  };
+
+  return (
+    <>
+      <Grid container={true} spacing={2}>
+        <Grid item xs={7}>
+          <Grid container={true} spacing={1}>
+            <Grid item xs={8}>
+              <Label>
+                {t_i18n('Name')}
+              </Label>
+              <Tooltip title={workName}>
+                <Typography sx={{ overflowX: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'noWrap' }}>
+                  {workName}
+                </Typography>
+              </Tooltip>
+            </Grid>
+            <Grid item xs={4}>
+              <Label>
+                {statusLabel ?? t_i18n('Status')}
+              </Label>
+              <TaskStatus status={workStatus} label={t_i18n(workStatus)} />
+            </Grid>
+            <Grid item xs={8}>
+              <Label>
+                {t_i18n('Work start time')}
+              </Label>
+              {nsdt(workReceivedTime)}
+            </Grid>
+            <Grid item xs={4}>
+              <Label>
+                {t_i18n('Work end time')}
+              </Label>
+              {workEndTime ? nsdt(workEndTime) : EMPTY_VALUE}
+            </Grid>
+          </Grid>
+        </Grid>
+        <Grid item xs={4}>
+          <Grid container={true} spacing={2}>
+            <Grid item xs={6}>
+              <Label>
+                {t_i18n('Operations completed')}
+              </Label>
+              <span style={{ fontWeight: 600, fontSize: 18 }}>
+                {workStatus === 'wait'
+                  ? EMPTY_VALUE
+                  : workProcessedNumber ?? EMPTY_VALUE}
+              </span>
+            </Grid>
+            <Grid item xs={6}>
+              <Label>
+                {t_i18n('Total number of operations')}
+              </Label>
+              <span style={{ fontWeight: 600, fontSize: 18 }}>
+                {workExpectedNumber ?? EMPTY_VALUE}
+              </span>
+            </Grid>
+            <Grid item xs={11}>
+              <Label>
+                {t_i18n('Progress')}
+              </Label>
+              <LinearProgress
+                style={{ borderRadius: 4, height: 10 }}
+                variant="determinate"
+                value={
+                  !!workExpectedNumber && !!workProcessedNumber
+                    ? Math.round((workProcessedNumber / workExpectedNumber) * 100)
+                    : 0
+                }
+              />
+            </Grid>
+          </Grid>
+        </Grid>
+        <Button
+          sx={{ position: 'absolute', right: 16, top: 16 }}
+          variant="secondary"
+          color={(workErrors ?? []).length === 0 ? 'success' : undefined}
+          intent={(workErrors ?? []).length >= 0 ? 'destructive' : undefined}
+          onClick={() => handleOpenDrawerErrors(workErrors ?? [])}
+          size="small"
+          keepMui
+        >
+          {workErrors?.length} {t_i18n('errors')}
+        </Button>
+        {!readOnly && (
+          <Security needs={[MODULES_MODMANAGE]}>
+            <Button
+              variant="secondary"
+              style={{ position: 'absolute', right: 10, bottom: 10 }}
+              onClick={() => handleDeleteWork()}
+              size="small"
+              startIcon={<Delete />}
+            >
+              {t_i18n('Delete')}
+            </Button>
+          </Security>
+        )}
+      </Grid>
+      <Drawer
+        title={t_i18n('Errors')}
+        open={openDrawerErrors}
+        onClose={handleCloseDrawerErrors}
+      >
+        <>
+          <Alert severity="info">{t_i18n('This page lists only the first 100 errors returned by the connector')}</Alert>
+          <Tabs value={tabValue} onValueChange={setTabValue}>
+            <TabsList>
+              <TabsTrigger value="Critical" badge={criticals.length} badgeLabel={`${criticals.length} ${t_i18n('errors')}`}>{t_i18n('Critical')}</TabsTrigger>
+              <TabsTrigger value="Warning" badge={warnings.length} badgeLabel={`${warnings.length} ${t_i18n('errors')}`}>{t_i18n('Warning')}</TabsTrigger>
+              <TabsTrigger value="All" badge={errors.length} badgeLabel={`${errors.length} ${t_i18n('errors')}`}>{t_i18n('All')}</TabsTrigger>
+            </TabsList>
+            <Paper padding={0}>
+              <TableContainer>
+                <Table aria-label="errors table">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t_i18n('Timestamp')}</TableCell>
+                      <TableCell>{t_i18n('Code')}</TableCell>
+                      <TableCell>{t_i18n('Message')}</TableCell>
+                      <TableCell>{t_i18n('Source')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  {/* asChild: the panel IS the <tbody> — a TabsContent <div> is invalid inside <table> */}
+                  <TabsContent value="Critical" asChild>
+                    <TableBody>
+                      {criticals.map((error, i) => (
+                        <ConnectorWorksErrorLine key={error.rawError?.timestamp ?? i} error={error} />
+                      ))}
+                    </TableBody>
+                  </TabsContent>
+                  <TabsContent value="Warning" asChild>
+                    <TableBody>
+                      {warnings.map((error, i) => (
+                        <ConnectorWorksErrorLine key={error.rawError?.timestamp ?? i} error={error} />
+                      ))}
+                    </TableBody>
+                  </TabsContent>
+                  <TabsContent value="All" asChild>
+                    <TableBody>
+                      {errors.map((error, i) => (
+                        <ConnectorWorksErrorLine key={error.rawError?.timestamp ?? i} error={error} />
+                      ))}
+                    </TableBody>
+                  </TabsContent>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Tabs>
+        </>
+      </Drawer>
+    </>
+  );
+};
+
+export default ConnectorWorkLine;

@@ -1,0 +1,114 @@
+type DefaultValue {
+  id: String!
+  name: String!
+}
+
+type TypeAttribute {
+  name: String!
+  type: String!
+  mandatory: Boolean!
+  mandatoryType: String!
+  editDefault: Boolean!
+  multiple: Boolean
+  upsert: Boolean!
+  label: String
+  defaultValues: [DefaultValue!]
+  scale: String
+}
+
+
+type ScaleAttribute {
+  name: String!
+  scale: String!
+}
+
+type DefaultValueAttribute {
+  name: String!
+  type: String!
+  defaultValues: [DefaultValue!]!
+}
+
+# OverviewLayoutCustomization
+type OverviewWidgetCustomization {
+  key: String!
+  width: Int!
+  label: String!
+}
+
+type EntitySetting implements InternalObject & BasicObject {
+  id: ID!
+  entity_type: String! @auth
+  representative: Representative!
+  standard_id: String! @auth
+  parent_types: [String!]!
+  metrics:[Metric] @auth
+  # EntitySetting
+  target_type: String! @auth
+  platform_entity_files_ref: Boolean @auth
+  platform_hidden_type: Boolean @auth
+  enforce_reference: Boolean @auth
+  sync_workflow_status_by_name: Boolean @auth
+  attributes_configuration: String @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  # Attribute definitions (name/label/mandatory/...) are schema metadata also needed by
+  # knowledge-level read views (e.g. the draft Review diff panel) to display field labels.
+  # The underlying data is already exposed through mandatoryAttributes / scaleAttributes /
+  # defaultValuesAttributes (all plain @auth), so this only requires authentication.
+  attributesDefinitions: [TypeAttribute!]! @auth
+  mandatoryAttributes: [String!]! @auth
+  scaleAttributes: [ScaleAttribute!]! @auth
+  defaultValuesAttributes: [DefaultValueAttribute!]! @auth
+  availableSettings: [String!]! @auth
+  created_at: DateTime! @auth
+  updated_at: DateTime! @auth
+  refreshed_at: DateTime @auth
+  overview_layout_customization: [OverviewWidgetCustomization!] @auth
+  fintelTemplates(
+    first: Int
+    after: ID
+    orderBy: FintelTemplateOrdering
+    orderMode: OrderingMode
+    search: String
+  ): FintelTemplateConnection @auth(for: [SETTINGS_SETCUSTOMIZATION])
+  requestAccessConfiguration: RequestAccessConfiguration @auth
+}
+
+# Ordering
+enum EntitySettingsOrdering {
+  target_type
+  _score
+}
+
+# Relay connections
+type EntitySettingConnection {
+  pageInfo: PageInfo!
+  edges: [EntitySettingEdge!]!
+}
+type EntitySettingEdge {
+  cursor: String!
+  node: EntitySetting!
+}
+
+# Queries
+type Query {
+  entitySetting(id: String!): EntitySetting @auth
+  entitySettingByType(targetType: String!): EntitySetting @auth
+  entitySettings(
+    first: Int
+    after: ID
+    orderBy: EntitySettingsOrdering
+    orderMode: OrderingMode
+    filters: FilterGroup
+    search: String
+    includeObservables: Boolean
+  ): EntitySettingConnection @auth
+}
+
+# Mutations
+type Mutation {
+  entitySettingsFieldPatch(ids: [ID!]!, input: [EditInput!]!, commitMessage: String, references: [String]): [EntitySetting] @auth(for: [SETTINGS_SETCUSTOMIZATION, SETTINGS_SETPARAMETERS])
+}
+
+# Subscriptions
+type Subscription {
+  entitySetting(id: ID!): EntitySetting @auth
+}

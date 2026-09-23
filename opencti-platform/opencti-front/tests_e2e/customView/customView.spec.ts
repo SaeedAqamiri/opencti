@@ -1,0 +1,151 @@
+import { v4 as uuid } from 'uuid';
+import { expect, test } from '../fixtures/baseFixtures';
+import CustomViewsSettingsPage from '../model/customViewsSettings.pageModel';
+import CustomViewDetailsPage from '../model/customViewDetails.pageModel';
+import LeftBarPage from '../model/menu/leftBar.pageModel';
+import CampaignPage from '../model/campaign.pageModel';
+import SettingsCustomizationPage from 'tests_e2e/model/settingsCustomization.pageModel';
+
+/**
+ * Content of the test
+ * -------------------
+ * Golden path for Custom Views feature:
+ * 1. Navigate to Settings > Customization > Campaign > Custom Views.
+ * 2. Create a new Custom View targeting Campaign entities.
+ * 3. Validate form fields (required, min length).
+ * 4. Verify the view appears in the list.
+ * 5. Add a widget to the view.
+ * 6. Enable the view and verify it appears as a tab on a Campaign entity page.
+ * 7. Set the view as Default and verify it is the landing tab.
+ * 8. Duplicate the view.
+ * 9. Export then re-import the view.
+ * 10. Delete the view (and its duplicate and the imported view).
+ */
+test('Custom View CRUD - golden path', { tag: ['@ce', '@group1'] }, async ({ page }) => {
+  const leftBarPage = new LeftBarPage(page);
+  const customViewsSettingsPage = new CustomViewsSettingsPage(page);
+  const customizationPage = new SettingsCustomizationPage(page);
+  const customViewDetailsPage = new CustomViewDetailsPage(page);
+  const campaignPage = new CampaignPage(page);
+
+  const viewName = `Custom View - ${uuid()}`;
+
+  // ─── Navigate ────────────────────────────────────────────────────────────────
+  await page.goto('/');
+  await customViewsSettingsPage.navigateFromMenu(customizationPage, 'Campaign');
+  await expect(page.getByRole('heading', { name: 'Campaign' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Custom Views' })).toBeVisible();
+
+  // ─── Open create form ────────────────────────────────────────────────────────
+  await customViewsSettingsPage.getAddButton().click();
+  await expect(page.getByRole('heading', { name: 'Create custom view' })).toBeVisible();
+
+  // ─── Validate required field ─────────────────────────────────────────────────
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText('This field is required')).toBeVisible();
+
+  // ─── Validate min-length ─────────────────────────────────────────────────────
+  await page.getByRole('textbox', { name: 'Name' }).fill('a');
+  await expect(page.getByText('name must be at least 2 characters')).toBeVisible();
+
+  // ─── Fill form and create ─────────────────────────────────────────────────────
+  await page.getByRole('textbox', { name: 'Name' }).fill(viewName);
+  await page.getByTestId('text-area').fill('E2E test custom view');
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  // ─── Verify we are in view detail / edit mode ────────────────────────────────────────────
+  await expect(customViewDetailsPage.getTitle(viewName)).toBeVisible();
+
+  // ─── Add a widget ─────────────────────────────────────────────────────────────
+  await customViewDetailsPage.widgets.openWidgetModal();
+  await customViewDetailsPage.widgets.selectWidget('List');
+  await customViewDetailsPage.widgets.selectPerspective('Entities');
+  // Assert the default filter chip through its button role: when the pointer hovers the chip,
+  // a tooltip duplicates the chip text and makes page-wide getByText locators ambiguous.
+  await expect(page.getByRole('button', { name: /In regards of.*CURRENT ENTITY/ })).toBeVisible();
+  await customViewDetailsPage.widgets.fillLabel('Malwares');
+  await customViewDetailsPage.widgets.validateFilters();
+  await customViewDetailsPage.widgets.titleField.fill('Related malwares');
+  await customViewDetailsPage.widgets.createWidget();
+
+  // Widget should now be visible in the view
+  await expect(page.getByText('Related malwares')).toBeVisible();
+
+  // ─── Enable the view ─────────────────────────────────────────────────────────
+  await expect(customViewDetailsPage.getViewIsDisabledTag()).toBeVisible();
+  await customViewDetailsPage.getEnableToggle().click();
+  await expect(customViewDetailsPage.getViewIsEnabledTag()).toBeVisible();
+
+  // ─── Verify view appears in list ─────────────────────────────────────────────
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  await expect(customViewsSettingsPage.getItemFromList(viewName)).toBeVisible();
+
+  // ─── Verify tab appears on a Campaign entity page ─────────────────────────────
+  await leftBarPage.clickOnMenu('Threats', 'Campaigns');
+  await campaignPage.getNthItemFromGrid(0).click();
+  // Tab label depends on how many custom views exist:
+  // - single enabled view → tab shows the view name
+  // - multiple enabled views → tab shows generic "Custom view" dropdown
+  // Use case-insensitive regex to handle both cases.
+  await expect(page.getByRole('tab', { name: /custom view/i })).toBeVisible();
+
+  // ─── Set as Default ──────────────────────────────────────────────────────────
+  // Use the list popover "Set as default" action (the edit form hides the default
+  // field in edition mode — default is set via the dedicated popover action).
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  const viewItem = customViewsSettingsPage.getItemFromList(viewName);
+  await customViewsSettingsPage.getQuickActionsButton(viewItem).click();
+  await customViewsSettingsPage.getSetAsDefaultQuickActionButton().click();
+
+  // Verify the default tab is first on a Campaign entity page
+  await leftBarPage.clickOnMenu('Threats', 'Campaigns');
+  await campaignPage.getNthItemFromGrid(0).click();
+  const tabs = page.getByRole('tab');
+  await expect(tabs.first()).toHaveText(viewName);
+
+  // ─── Duplicate ───────────────────────────────────────────────────────────────
+  const duplicateName = `${viewName} - copy`;
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  await customViewsSettingsPage.getItemFromList(viewName).click();
+  await customViewDetailsPage.getActionsPopover().click();
+  await customViewDetailsPage.getActionButton('Duplicate').click();
+  await customViewDetailsPage.getDuplicateButton().click();
+  await expect(page.getByText(/The custom view has been duplicated/i)).toBeVisible();
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  await expect(customViewsSettingsPage.getItemFromList(duplicateName)).toBeVisible();
+
+  // ─── Export / Import ─────────────────────────────────────────────────────────
+  await customViewsSettingsPage.getItemFromList(viewName).click();
+  const downloadPromise = page.waitForEvent('download');
+  await customViewDetailsPage.getExportButton().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBeDefined();
+  await download.saveAs(`./test-results/e2e-files/${download.suggestedFilename()}`);
+
+  // Import it back
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await customViewsSettingsPage.getImportButton().click();
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(`./test-results/e2e-files/${download.suggestedFilename()}`);
+  await expect(page.getByText(/Custom view created/i)).toBeVisible();
+  // Imported view should be visible (disabled by default)
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  await expect(customViewsSettingsPage.getItemFromList(viewName)).toHaveCount(2);
+
+  // ─── Cleanup: delete all created views ───────────────────────────────────────
+  await page.goto(customViewsSettingsPage.getPageUrl('Campaign'));
+  for (const name of [viewName, duplicateName, viewName]) {
+    const items = customViewsSettingsPage.getItemFromList(name);
+    const item = items.nth(0);
+    await item.waitFor({ state: 'visible', timeout: 30000 });
+    const countBeforeDelete = await items.count();
+    await customViewsSettingsPage.getQuickActionsButton(item).click();
+    await customViewsSettingsPage.getDeleteQuickActionButton().click();
+    await customViewsSettingsPage.getConfirmButton().click();
+    // Wait for the deletion to be reflected in the list before opening the next popover,
+    // otherwise the next delete menu item anchors to a moving row and is never stable to click.
+    await expect(items).toHaveCount(countBeforeDelete - 1);
+  }
+  await expect(customViewsSettingsPage.getItemFromList(viewName)).toBeHidden();
+});

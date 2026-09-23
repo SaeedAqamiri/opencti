@@ -1,0 +1,70 @@
+import Button from '@common/button/Button';
+import Dialog from '@common/dialog/Dialog';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
+import DialogActions from '@mui/material/DialogActions';
+import React, { useState } from 'react';
+import Card from '../../../components/common/card/Card';
+import { useFormatter } from '../../../components/i18n';
+
+const ProfileLocalStorage: React.FC = () => {
+  const { t_i18n } = useFormatter();
+
+  const [displayConfirmation, setDisplayConfirmation] = useState(false);
+
+  return (
+    <>
+      <Card title={t_i18n('Local settings')} sx={{ marginBottom: 3 }}>
+        <Alert
+          severity="info"
+          variant="outlined"
+        >
+          {t_i18n('Your local storage contains the latest filters and searches used in most views of the platform. Clearing local storage might help to load a page crashing because of some filtering, searching or sorting issue.')}
+        </Alert>
+        <div style={{ display: 'flex', justifyContent: 'end', marginTop: 16 }}>
+          <Button
+            onClick={() => setDisplayConfirmation(true)}
+          >
+            {t_i18n('Clear local storage')}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Confirmation dialog */}
+      <Dialog
+        open={displayConfirmation}
+        onClose={() => setDisplayConfirmation(false)}
+        title={t_i18n('Clear local storage')}
+      >
+        <Alert
+          icon={false}
+          severity="warning"
+          variant="outlined"
+          sx={{ color: 'text.primary' }}
+        >
+          <AlertTitle style={{ marginBottom: 0, fontWeight: 400 }}>
+            {t_i18n('This will erase all the views settings you have made. All these changes will be lost. Are you sure?')}
+          </AlertTitle>
+        </Alert>
+        <DialogActions>
+          <Button
+            variant="secondary"
+            onClick={() => setDisplayConfirmation(false)}
+          >
+            {t_i18n('Cancel')}
+          </Button>
+          <Button
+            onClick={() => {
+              localStorage.clear();
+              setDisplayConfirmation(false);
+            }}
+          >
+            {t_i18n('Validate')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
+export default ProfileLocalStorage;

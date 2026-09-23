@@ -1,0 +1,203 @@
+import { Suspense, useMemo } from 'react';
+import { useLocation, useParams } from 'react-router';
+import { graphql, PreloadedQuery, usePreloadedQuery, useSubscription } from 'react-relay';
+import useQueryLoading from 'src/utils/hooks/useQueryLoading';
+import { RootStixCyberObservableQuery } from '@components/observations/stix_cyber_observables/__generated__/RootStixCyberObservableQuery.graphql';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import { RootStixCyberObservableSubscription } from '@components/observations/stix_cyber_observables/__generated__/RootStixCyberObservableSubscription.graphql';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import StixCyberObservable from './StixCyberObservable';
+import StixCyberObservableKnowledge from './StixCyberObservableKnowledge';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import StixCyberObservableHeader from './StixCyberObservableHeader';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import StixCoreObjectOrStixCoreRelationshipContainers from '../../common/containers/StixCoreObjectOrStixCoreRelationshipContainers';
+import FileManager from '../../common/files/FileManager';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import StixCyberObservableDeletion from './StixCyberObservableDeletion';
+import { PATH_OBSERVABLE, PATH_OBSERVABLES } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootStixCyberObservableSubscription($id: ID!) {
+    stixCyberObservable(id: $id) {
+      ...StixCyberObservable_stixCyberObservable
+      ...StixCyberObservableEditionContainer_stixCyberObservable
+      ...StixCyberObservableKnowledge_stixCyberObservable
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+    }
+  }
+`;
+
+const stixCyberObservableQuery = graphql`
+  query RootStixCyberObservableQuery($id: String!) {
+    stixCyberObservable(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      standard_id
+      entity_type
+      observable_value
+      ...StixCyberObservable_stixCyberObservable
+      ...StixCyberObservableHeader_stixCyberObservable
+      ...StixCyberObservableDetails_stixCyberObservable
+      ...StixCyberObservableIndicators_stixCyberObservable
+      ...StixCyberObservableKnowledge_stixCyberObservable
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+type RootStixCyberObservableProps = {
+  observableId: string;
+  queryRef: PreloadedQuery<RootStixCyberObservableQuery>;
+};
+
+const RootStixCyberObservable = ({ observableId, queryRef }: RootStixCyberObservableProps) => {
+  const subConfig = useMemo<GraphQLSubscriptionConfig<RootStixCyberObservableSubscription>>(() => ({
+    subscription,
+    variables: { id: observableId },
+  }), [observableId]);
+
+  const location = useLocation();
+  const { t_i18n } = useFormatter();
+  useSubscription<RootStixCyberObservableSubscription>(subConfig);
+
+  const {
+    stixCyberObservable,
+    connectorsForExport,
+    connectorsForImport,
+  } = usePreloadedQuery<RootStixCyberObservableQuery>(stixCyberObservableQuery, queryRef);
+
+  const { forceUpdate } = useForceUpdate();
+
+  const basePath = PATH_OBSERVABLE(observableId);
+  const paddingRight = getPaddingRight(location.pathname, basePath, false);
+  const link = `${basePath}/knowledge`;
+
+  return (
+    <>
+      {stixCyberObservable ? (
+        <div style={{ paddingRight }}>
+          <Breadcrumbs elements={[
+            { label: t_i18n('Observations') },
+            { label: t_i18n('Observables'), link: PATH_OBSERVABLES },
+            { label: stixCyberObservable.observable_value, current: true },
+          ]}
+          />
+          <StixCyberObservableHeader
+            stixCyberObservable={stixCyberObservable}
+            enableEnrollPlaybook={true}
+            DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+              <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                <StixCyberObservableDeletion id={stixCyberObservable.id} isOpen={isOpen} handleClose={onClose} />
+              </Security>
+            )}
+          />
+          <StixDomainObjectMain
+            entity={stixCyberObservable}
+            basePath={basePath}
+            pages={{
+              overview: (
+                <StixCyberObservable
+                  stixCyberObservableData={stixCyberObservable}
+                />
+              ),
+              knowledge: (
+                <div key={forceUpdate}>
+                  <StixCyberObservableKnowledge
+                    stixCyberObservable={stixCyberObservable}
+                  />
+                </div>
+              ),
+              content: (
+                <StixCoreObjectContentRoot
+                  stixCoreObject={stixCyberObservable}
+                />
+              ),
+              analyses: (
+                <StixCoreObjectOrStixCoreRelationshipContainers
+                  stixDomainObjectOrStixCoreRelationship={
+                    stixCyberObservable
+                  }
+                />
+              ),
+              sightings: (
+                <EntityStixSightingRelationships
+                  entityId={observableId}
+                  entityLink={link}
+                  noPadding={true}
+                  isTo={false}
+                  stixCoreObjectTypes={[
+                    'Region',
+                    'Country',
+                    'City',
+                    'Position',
+                    'Sector',
+                    'Organization',
+                    'Individual',
+                    'System',
+                  ]}
+                />
+              ),
+              files: (
+                <FileManager
+                  id={observableId}
+                  connectorsImport={connectorsForImport}
+                  connectorsExport={connectorsForExport}
+                  entity={stixCyberObservable}
+                />
+              ),
+              history: (
+                <StixCoreObjectHistory
+                  stixCoreObjectId={observableId}
+                />
+              ),
+            }}
+          />
+        </div>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </>
+  );
+};
+
+const Root = () => {
+  const { observableId } = useParams() as { observableId: string };
+  const queryRef = useQueryLoading<RootStixCyberObservableQuery>(stixCyberObservableQuery, { id: observableId });
+
+  return (
+    <>
+      {queryRef && (
+        <Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootStixCyberObservable queryRef={queryRef} observableId={observableId} />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+export default Root;

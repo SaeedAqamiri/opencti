@@ -1,0 +1,288 @@
+import React, { useMemo, Suspense, useState } from 'react';
+import { Route, Routes, useLocation, useParams, useNavigate } from 'react-router';
+import { graphql, useSubscription, usePreloadedQuery, PreloadedQuery } from 'react-relay';
+import { GraphQLSubscriptionConfig } from 'relay-runtime';
+import { propOr } from 'ramda';
+import { RootIndividualQuery } from '@components/entities/individuals/__generated__/RootIndividualQuery.graphql';
+import { RootIndicatorSubscription } from '@components/observations/indicators/__generated__/RootIndicatorSubscription.graphql';
+import useForceUpdate from '@components/common/bulk/useForceUpdate';
+import useQueryLoading from 'src/utils/hooks/useQueryLoading';
+import StixDomainObjectMain from '@components/common/stix_domain_objects/StixDomainObjectMain';
+import CreateRelationshipContextProvider from '@components/common/stix_core_relationships/CreateRelationshipContextProvider';
+import StixCoreRelationshipCreationFromEntityHeader from '@components/common/stix_core_relationships/StixCoreRelationshipCreationFromEntityHeader';
+import StixCoreObjectContentRoot from '../../common/stix_core_objects/StixCoreObjectContentRoot';
+import Individual from './Individual';
+import IndividualKnowledge from './IndividualKnowledge';
+import StixDomainObjectHeader from '../../common/stix_domain_objects/StixDomainObjectHeader';
+import FileManager from '../../common/files/FileManager';
+import Loader, { LoaderVariant } from '../../../../components/Loader';
+import StixCoreObjectHistory from '../../common/stix_core_objects/StixCoreObjectHistory';
+import IndividualAnalysis from './IndividualAnalysis';
+import ErrorNotFound from '../../../../components/ErrorNotFound';
+import { buildViewParamsFromUrlAndStorage, saveViewParameters } from '../../../../utils/ListParameters';
+import StixCoreObjectKnowledgeBar from '../../common/stix_core_objects/StixCoreObjectKnowledgeBar';
+import EntityStixSightingRelationships from '../../events/stix_sighting_relationships/EntityStixSightingRelationships';
+import { useFormatter } from '../../../../components/i18n';
+import Breadcrumbs from '../../../../components/Breadcrumbs';
+import { getPaddingRight } from '../../../../utils/utils';
+import IndividualEdition from './IndividualEdition';
+import Security from '../../../../utils/Security';
+import { KNOWLEDGE_KNUPDATE, KNOWLEDGE_KNUPDATE_KNDELETE } from '../../../../utils/hooks/useGranted';
+import IndividualDeletion from './IndividualDeletion';
+import { PATH_INDIVIDUAL, PATH_INDIVIDUALS } from '@components/common/routes/paths';
+
+const subscription = graphql`
+  subscription RootIndividualsSubscription($id: ID!) {
+    stixDomainObject(id: $id) {
+      ... on Individual {
+        ...Individual_individual
+        ...IndividualEditionContainer_individual
+      }
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...PictureManagementViewer_entity
+    }
+  }
+`;
+
+const individualQuery = graphql`
+  query RootIndividualQuery($id: String!) {
+    individual(id: $id) {
+      id
+      draftVersion {
+        draft_id
+        draft_operation
+      }
+      isUser
+      entity_type
+      name
+      x_opencti_aliases
+      currentUserAccessRight
+      ...StixCoreRelationshipCreationFromEntityHeader_stixCoreObject
+      ...StixCoreObjectKnowledgeBar_stixCoreObject
+      ...Individual_individual
+      ...IndividualKnowledge_individual
+      ...FileImportViewer_entity
+      ...FileExportViewer_entity
+      ...FileExternalReferencesViewer_entity
+      ...WorkbenchFileViewer_entity
+      ...PictureManagementViewer_entity
+      ...StixCoreObjectContent_stixCoreObject
+      ...StixCoreObjectSharingListFragment
+    }
+    connectorsForImport {
+      ...FileManager_connectorsImport
+    }
+    connectorsForExport {
+      ...FileManager_connectorsExport
+    }
+  }
+`;
+
+type RootIndividualProps = {
+  individualId: string;
+  queryRef: PreloadedQuery<RootIndividualQuery>;
+};
+
+const RootIndividual = ({ individualId, queryRef }: RootIndividualProps) => {
+  const subConfig = useMemo<GraphQLSubscriptionConfig<RootIndicatorSubscription>>(() => ({
+    subscription,
+    variables: { id: individualId },
+  }), [individualId]);
+  const location = useLocation();
+
+  const navigate = useNavigate();
+  const LOCAL_STORAGE_KEY = `individual-${individualId}`;
+  const params = buildViewParamsFromUrlAndStorage(
+    navigate,
+    location,
+    LOCAL_STORAGE_KEY,
+  );
+
+  const [viewAs, setViewAs] = useState<string>(propOr('knowledge', 'viewAs', params));
+
+  const saveView = () => {
+    saveViewParameters(
+      navigate,
+      location,
+      LOCAL_STORAGE_KEY,
+      viewAs,
+    );
+  };
+
+  const handleChangeViewAs = (value: string) => {
+    setViewAs(value);
+    saveView();
+  };
+
+  const { t_i18n } = useFormatter();
+  useSubscription<RootIndicatorSubscription>(subConfig);
+
+  const {
+    individual,
+    connectorsForExport,
+    connectorsForImport,
+  } = usePreloadedQuery<RootIndividualQuery>(individualQuery, queryRef);
+
+  const { forceUpdate } = useForceUpdate();
+
+  const basePath = PATH_INDIVIDUAL(individualId);
+  const link = `${basePath}/knowledge`;
+  let paddingRight = 0;
+  if (viewAs === 'knowledge') {
+    paddingRight = getPaddingRight(location.pathname, basePath);
+  }
+
+  return (
+    <CreateRelationshipContextProvider>
+      {individual ? (
+        <>
+          <Routes>
+            <Route
+              path="/knowledge/*"
+              element={viewAs === 'knowledge' && (
+                <StixCoreObjectKnowledgeBar
+                  stixCoreObjectLink={link}
+                  availableSections={[
+                    'organizations',
+                    'locations',
+                    'threats',
+                    'threat_actors',
+                    'intrusion_sets',
+                    'campaigns',
+                    'incidents',
+                    'malwares',
+                    'attack_patterns',
+                    'tools',
+                    'observables',
+                  ]}
+                  data={individual}
+                />
+              )}
+            />
+          </Routes>
+          <div style={{ paddingRight }}>
+            <Breadcrumbs elements={[
+              { label: t_i18n('Entities') },
+              { label: t_i18n('Individuals'), link: PATH_INDIVIDUALS },
+              { label: individual.name, current: true },
+            ]}
+            />
+            <StixDomainObjectHeader
+              entityType="Individual"
+              stixDomainObject={individual}
+              isOpenctiAlias={true}
+              enableQuickSubscription={true}
+              EditComponent={!individual.isUser && (
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <IndividualEdition individualId={individual.id} />
+                </Security>
+              )}
+              RelateComponent={(
+                <Security needs={[KNOWLEDGE_KNUPDATE]}>
+                  <StixCoreRelationshipCreationFromEntityHeader
+                    data={individual}
+                  />
+                </Security>
+              )}
+              DeleteComponent={({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+                <Security needs={[KNOWLEDGE_KNUPDATE_KNDELETE]}>
+                  <IndividualDeletion id={individual.id} isOpen={isOpen} handleClose={onClose} />
+                </Security>
+              )}
+              onViewAs={handleChangeViewAs}
+              viewAs={viewAs}
+              redirectToContent={true}
+              disableSharing={individual.isUser}
+              enableEnrollPlaybook={true}
+            />
+            <StixDomainObjectMain
+              entity={individual}
+              basePath={basePath}
+              pages={{
+                overview: (
+                  <Individual
+                    individualData={individual}
+                    viewAs={viewAs}
+                  />
+                ),
+                knowledge: (
+                  <div key={forceUpdate}>
+                    <IndividualKnowledge
+                      individualData={individual}
+                      viewAs={viewAs}
+                    />
+                  </div>
+                ),
+                content: (
+                  <StixCoreObjectContentRoot
+                    stixCoreObject={individual}
+                  />
+                ),
+                analyses: (
+                  <IndividualAnalysis
+                    individual={individual}
+                    viewAs={viewAs}
+                  />
+                ),
+                sightings: (
+                  <EntityStixSightingRelationships
+                    entityId={individual.id}
+                    entityLink={link}
+                    noPadding={true}
+                    isTo={true}
+                    stixCoreObjectTypes={[
+                      'Region',
+                      'Country',
+                      'City',
+                      'Position',
+                      'Sector',
+                      'Organization',
+                      'Individual',
+                      'System',
+                    ]}
+                  />
+                ),
+                files: (
+                  <FileManager
+                    id={individualId}
+                    connectorsImport={connectorsForImport}
+                    connectorsExport={connectorsForExport}
+                    entity={individual}
+                  />
+                ),
+                history: (
+                  <StixCoreObjectHistory
+                    stixCoreObjectId={individualId}
+                  />
+                ),
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <ErrorNotFound />
+      )}
+    </CreateRelationshipContextProvider>
+  );
+};
+const Root = () => {
+  const { individualId } = useParams() as { individualId: string };
+  const queryRef = useQueryLoading<RootIndividualQuery>(individualQuery, {
+    id: individualId,
+  });
+
+  return (
+    <>
+      {queryRef && (
+        <Suspense fallback={<Loader variant={LoaderVariant.container} />}>
+          <RootIndividual individualId={individualId} queryRef={queryRef} />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+export default Root;
