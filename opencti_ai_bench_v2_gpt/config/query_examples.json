@@ -1,0 +1,24 @@
+[
+  {
+    "question": "Which tools does TEST Aster directly use?",
+    "query": {
+      "op": "neighbors",
+      "key": "g_aster",
+      "predicate": "uses",
+      "direction": "out",
+      "target_type": "tool",
+      "active_only": true
+    }
+  },
+  {
+    "question": "Which malware does TEST Aster directly use?",
+    "query": {
+      "op": "neighbors",
+      "key": "g_aster",
+      "predicate": "uses",
+      "direction": "out",
+      "target_type": "malware",
+      "active_only": true
+    }
+  }
+]

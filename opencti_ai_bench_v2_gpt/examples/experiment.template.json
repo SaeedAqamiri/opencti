@@ -1,0 +1,18 @@
+{
+  "implementation": "SET_ME",
+  "implementation_commit": null,
+  "model_name": null,
+  "model_revision": null,
+  "quantization": null,
+  "model_server_version": null,
+  "temperature": 0,
+  "seed": null,
+  "hardware": null,
+  "prompt_sha256": null,
+  "tool_schema_sha256": null,
+  "opencti_version": null,
+  "opencti_schema_sha256": null,
+  "transport": "fixture-jsonl",
+  "cache_policy": "fresh run per case",
+  "note": "Null means not supplied, never treat as measured. Fill before publishing a model comparison."
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "case_id",
+    "answer_sha256",
+    "fixture_sha256",
+    "reviewer_id",
+    "rubric_version",
+    "factuality",
+    "coverage",
+    "uncertainty",
+    "citation_alignment",
+    "style",
+    "verdict"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "answer_sha256": {
+      "type": "string"
+    },
+    "fixture_sha256": {
+      "type": "string"
+    },
+    "reviewer_id": {
+      "type": "string"
+    },
+    "rubric_version": {
+      "const": "2.0"
+    },
+    "factuality": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "coverage": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "uncertainty": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "citation_alignment": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "style": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "evidence_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

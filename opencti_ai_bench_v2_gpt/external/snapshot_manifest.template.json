@@ -1,0 +1,21 @@
+{
+  "datasets": [
+    {
+      "dataset_id": "user-attack-snapshot",
+      "path": null,
+      "sha256": null,
+      "source_release": null,
+      "object_count_verified": null
+    },
+    {
+      "dataset_id": "user-otx-snapshot",
+      "path": null,
+      "sha256": null,
+      "pulse_selection": null,
+      "transform_commit": null,
+      "provenance_policy": null
+    }
+  ],
+  "status": "UNBOUND",
+  "do_not_infer_release_from_filename": true
+}

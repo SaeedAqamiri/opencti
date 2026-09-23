@@ -1,0 +1,2 @@
+# Python 3.10+; standard library only for the core and tests.
+# No installation is needed for python -m ctibench.

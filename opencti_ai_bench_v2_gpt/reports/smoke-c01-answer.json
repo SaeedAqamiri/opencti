@@ -1,0 +1,37 @@
+{
+  "case_id": "C01",
+  "answer_state": "ANSWERED",
+  "complete": true,
+  "answer": "",
+  "entity_keys": [
+    "t_echo",
+    "t_lantern"
+  ],
+  "values": {},
+  "claims": [
+    {
+      "kind": "relation",
+      "subject": "g_aster",
+      "predicate": "uses",
+      "object": "t_echo",
+      "evidence_ids": [
+        "e_g_aster_t_echo"
+      ]
+    },
+    {
+      "kind": "relation",
+      "subject": "g_aster",
+      "predicate": "uses",
+      "object": "t_lantern",
+      "evidence_ids": [
+        "e_g_aster_t_lantern"
+      ]
+    }
+  ],
+  "citations": [
+    "e_g_aster_t_echo",
+    "e_g_aster_t_lantern",
+    "t_echo",
+    "t_lantern"
+  ]
+}

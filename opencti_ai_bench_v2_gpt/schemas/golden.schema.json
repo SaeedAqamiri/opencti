@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "case_id",
+    "kind",
+    "expected_state",
+    "expected_complete",
+    "expected_keys",
+    "expected_values",
+    "requires_human_review",
+    "checks",
+    "required_claims",
+    "required_evidence",
+    "reference_query",
+    "faults",
+    "security"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "text",
+        "set",
+        "narrative",
+        "narrative_set",
+        "values",
+        "query",
+        "partial_set",
+        "safety"
+      ]
+    },
+    "expected_complete": {
+      "type": "boolean"
+    },
+    "expected_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "expected_values": {
+      "type": "object"
+    },
+    "requires_human_review": {
+      "type": "boolean"
+    },
+    "choice_fields": {
+      "type": "object"
+    },
+    "semantic_reference": {
+      "type": "object"
+    }
+  }
+}

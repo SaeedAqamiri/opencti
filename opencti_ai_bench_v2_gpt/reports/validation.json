@@ -1,0 +1,65 @@
+{
+  "scope": "Infrastructure validation only; NOT model evaluation",
+  "python_tested": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+  "unit_tests": {
+    "count": 61,
+    "passed": 61,
+    "failed": 0
+  },
+  "schemas": {
+    "public_cases_validated": 72,
+    "golden_records_validated": 72
+  },
+  "fixture": {
+    "nodes": 71,
+    "edges": 71,
+    "documents": 8,
+    "synthetic": true
+  },
+  "stix": {
+    "objects": 153,
+    "json_and_references_checked": true,
+    "full_stix_validator_run": false,
+    "opencti_import_tested": false
+  },
+  "transport_smoke": {
+    "case": "C01",
+    "candidate": "deterministic transport_smoke_agent.py",
+    "repetitions": 3,
+    "summary": {
+      "scheduled": 3,
+      "attempted": 3,
+      "status_counts": {
+        "PASS": 3
+      },
+      "coverage": 1.0,
+      "confirmed_success_over_attempted": 1.0,
+      "pending_reviews": 0,
+      "warning": "No overall weighted quality score. Pending review, missing execution and skipped capability are not passes.",
+      "suites": {
+        "A": {
+          "scheduled": 0,
+          "statuses": {}
+        },
+        "B": {
+          "scheduled": 0,
+          "statuses": {}
+        },
+        "C": {
+          "scheduled": 3,
+          "statuses": {
+            "PASS": 3
+          }
+        }
+      }
+    }
+  },
+  "model_evaluation_run": false,
+  "live_opencti_run": false,
+  "live_mcp_run": false,
+  "visual_review": {
+    "desktop": "checked",
+    "mobile": "checked",
+    "horizontal_page_overflow": false
+  }
+}

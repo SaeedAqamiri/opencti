@@ -1,0 +1,170 @@
+[
+  {
+    "legacy_id": "fix-1",
+    "suite": "A",
+    "synthetic_analogue": "A01",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "shorter-1",
+    "suite": "A",
+    "synthetic_analogue": "A04",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "longer-1",
+    "suite": "A",
+    "synthetic_analogue": "A07",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "tone-1",
+    "suite": "A",
+    "synthetic_analogue": "A10",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "summarize-1",
+    "suite": "A",
+    "synthetic_analogue": "A13",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "explain-1",
+    "suite": "A",
+    "synthetic_analogue": "A16",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "container-report",
+    "suite": "B",
+    "synthetic_analogue": "B01",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "activity",
+    "suite": "B",
+    "synthetic_analogue": "B07",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "history",
+    "suite": "B",
+    "synthetic_analogue": "B11",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "nlq-phishing-intrusion-sets",
+    "suite": "B",
+    "synthetic_analogue": "B17",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "nlq-apt28-tools",
+    "suite": "B",
+    "synthetic_analogue": "B13",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "nlq-apt28-malware",
+    "suite": "B",
+    "synthetic_analogue": "B14",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "nlq-apt29-attack-patterns",
+    "suite": "B",
+    "synthetic_analogue": "B15",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "nlq-zebrocy-mitigations",
+    "suite": "B",
+    "synthetic_analogue": "B16",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t1-apt28-tools",
+    "suite": "C",
+    "synthetic_analogue": "C01",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t2-shared-malware",
+    "suite": "C",
+    "synthetic_analogue": "C02",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t3-kimsuky-neighbors",
+    "suite": "C",
+    "synthetic_analogue": "C03",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t4-investigate-ioc",
+    "suite": "C",
+    "synthetic_analogue": "C04",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t5-actor-profile",
+    "suite": "C",
+    "synthetic_analogue": "C05",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t6-coa-two-hop",
+    "suite": "C",
+    "synthetic_analogue": "C06",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  },
+  {
+    "legacy_id": "t7-write-probe",
+    "suite": "C",
+    "synthetic_analogue": "C24",
+    "status": "WAITING_FOR_SOURCE_SNAPSHOT_AND_ADAPTER",
+    "golden": null,
+    "note": "Analogue only; real identities/counts have not been recomputed."
+  }
+]

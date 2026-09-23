@@ -76,5 +76,41 @@
       "source": "https://www.cisa.gov/news-events/aa22-320a"
     }
   },
-  "cisa_frozen_at": "2026-09-19"
+  "cisa_frozen_at": "2026-09-19",
+  "otx_connector": {
+    "frozen_at": "2026-09-22T16:10:24+00:00",
+    "mode": "live external-import connector (OpenCTI-Platform/connectors master, pycti 7.260921.0)",
+    "connector_id": "8bbae241-6289-4faf-b7d6-7503bed50bbc",
+    "connector_state": {
+      "latest_pulse_timestamp": "2026-09-22T08:08:09.348000",
+      "last_run": 1790093199
+    },
+    "poll_period": "PT30M",
+    "pulse_start_timestamp": "2026-09-20T00:00:00.000000",
+    "baseline_counts": {
+      "reports": 13,
+      "indicators": 286
+    },
+    "counts_after_first_sync": {
+      "reports": 16,
+      "indicators": 353,
+      "stixCyberObservables": 313,
+      "attackPatterns": 860,
+      "malwares": 744,
+      "intrusionSets": 189,
+      "tools": 98,
+      "vulnerabilities": 0
+    },
+    "notes": "Live stream: account subscribes ~9114 OTX pulses; connector polls every 30 min. Benchmark questions may reference connector-created reports (createdBy AlienVault)."
+  },
+  "write_fixtures": {
+    "purpose": "disposable BENCH-SCRATCH objects for WRK benchmark questions",
+    "file": "write_fixtures.json",
+    "names": [
+      "BENCH-SCRATCH Report Alpha",
+      "BENCH-SCRATCH Report Beta",
+      "bench-scratch.example.com"
+    ],
+    "label": "bench-scratch"
+  }
 }

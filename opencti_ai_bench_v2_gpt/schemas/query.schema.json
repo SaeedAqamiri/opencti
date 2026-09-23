@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fixture query AST; NOT an OpenCTI GraphQL filter",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "name"
+      ],
+      "properties": {
+        "op": {
+          "const": "search"
+        },
+        "name": {
+          "type": "string"
+        },
+        "entity_type": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "key",
+        "predicate",
+        "direction",
+        "target_type",
+        "active_only"
+      ],
+      "properties": {
+        "op": {
+          "const": "neighbors"
+        },
+        "key": {
+          "type": "string"
+        },
+        "predicate": {
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "in",
+            "out"
+          ]
+        },
+        "target_type": {
+          "type": "string"
+        },
+        "active_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "left",
+        "right",
+        "target_type"
+      ],
+      "properties": {
+        "op": {
+          "const": "intersection"
+        },
+        "left": {
+          "type": "string"
+        },
+        "right": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "key",
+        "minimum"
+      ],
+      "properties": {
+        "op": {
+          "const": "shared_threshold"
+        },
+        "key": {
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "key"
+      ],
+      "properties": {
+        "op": {
+          "const": "mitigations_for"
+        },
+        "key": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "op": {
+          "const": "campaigns_between"
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "as_of"
+      ],
+      "properties": {
+        "op": {
+          "const": "valid_indicators"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  ]
+}

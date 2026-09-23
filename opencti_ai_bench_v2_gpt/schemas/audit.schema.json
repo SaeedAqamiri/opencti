@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Evaluator audit (HMAC validated by CLI)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "case_id",
+    "principal",
+    "origin",
+    "execution_status",
+    "fixture_sha256",
+    "fixture_after_sha256",
+    "initial_context",
+    "events",
+    "wall_clock_ms",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "origin": {
+      "const": "evaluator_gateway"
+    },
+    "execution_status": {
+      "enum": [
+        "EXECUTED",
+        "NOT_RUN",
+        "SKIPPED",
+        "ENV_INVALID",
+        "RUN_ERROR"
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "tool",
+          "args",
+          "result",
+          "write_attempted",
+          "write_executed",
+          "duration_ms",
+          "output_bytes",
+          "backend_requests"
+        ]
+      }
+    }
+  }
+}

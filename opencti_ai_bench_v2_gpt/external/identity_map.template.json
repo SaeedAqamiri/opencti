@@ -1,0 +1,14 @@
+{
+  "status": "UNBOUND",
+  "schema_version": "2.0",
+  "records": [
+    {
+      "benchmark_key": "example-only",
+      "source_ids": [],
+      "entity_type": null,
+      "opencti_internal_id": null,
+      "canonical_stix_id": null,
+      "merge_policy_reviewed": false
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "tools": {
+    "search_entities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query"
+      ],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "entity_type": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      }
+    },
+    "get_entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      }
+    },
+    "get_neighbors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "predicate": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "active_only": {
+          "type": "boolean"
+        },
+        "cursor": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      }
+    },
+    "get_document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      }
+    },
+    "get_activity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      }
+    },
+    "get_history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      }
+    },
+    "query_graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query"
+      ],
+      "properties": {
+        "query": {
+          "type": "object"
+        },
+        "cursor": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
